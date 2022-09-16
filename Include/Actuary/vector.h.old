@@ -1,0 +1,125 @@
+// PVector.h    Version 3.5  October 12, 2007 - Added 'add' and 'del' methods and 'removeDuplicates' methods
+//					   3.0  March 1, 2009 - Eliminate shorts
+//					   3.1  August 21,2009 - Added == and != operators
+//					   3.2  November 1, 2014  - Fixed to run on VSE 2013
+//					   3.3  November 21, 2015 - Add friend [] operator to allow for conversions	
+//					   3.4  December 4, 2015 - Add conversion to long double for use by Table class
+//					   3.5  Definitions moved to .cpp
+
+#ifndef PVector_H
+#define PVector_H
+
+#include <cmath>
+#include <cassert>
+#include <cstdlib>
+#include <cstdio>
+#include <iomanip>
+#include <iostream>
+
+// declare class and functions that will be used as friends
+template <typename Type> class PVector;
+template <typename Type> PVector<Type> vmax(const PVector<Type> &v1, const PVector<Type> &v2);
+template <typename Type> PVector<Type> vmin(const PVector<Type> &v1, const PVector<Type> &v2);
+template <typename Type> PVector<Type> operator+(const PVector<Type> &v1, const PVector<Type> &v2);
+template <typename Type> PVector<Type> operator-(const PVector<Type> &v1, const PVector<Type> &v2);
+template <typename Type> PVector<Type> operator*(const PVector<Type> &v1, const PVector<Type> &v2);
+template <typename Type> PVector<Type> operator/(const PVector<Type> &v1, const PVector<Type> &v2);
+
+template <typename Type> PVector<Type> operator+(const long double &scalar, const PVector<Type> &v1);
+template <typename Type> PVector<Type> operator-(const long double &scalar, const PVector<Type> &v1);
+template <typename Type> PVector<Type> operator*(const long double &scalar, const PVector<Type> &v1);
+template <typename Type> PVector<Type> operator/(const long double &scalar, const PVector<Type> &v1);
+template <typename Type> PVector<Type> operator^(const long double &scalar, const PVector<Type> &v1);
+template <typename Type> PVector<Type> operator!(const PVector<Type> &v1);  //Inverse of PVector
+
+
+template <typename Type>
+class PVector {
+
+protected:
+	Type *data;
+	unsigned long int size;
+	void init(const Type *array, unsigned long int sz);
+
+public:
+	// Constructors
+    PVector();
+    PVector(PVector<Type>* origVec);
+    PVector(const PVector<Type>& origVec);
+    PVector(unsigned long int sz);
+    PVector(const Type *array, unsigned long int sz);       // Assumes size of array >= sz
+    PVector(const Type start, unsigned long int numelem, const Type r);
+
+	//Destructors
+    ~PVector();
+
+	//Methods
+	unsigned long int getSize() const;
+	unsigned int isFound(const long double target, unsigned int decimals=6) const;
+	unsigned int getPosition(long double target, unsigned int decimals=6) const;
+	unsigned int countUnique() const;
+    void append(const Type num);	// Increase PVector size by one by adding number at end
+    int add(const Type num);		// Increase PVector size by one and add number 'Type' in sorted order
+    int del(const Type num, unsigned int decimals=0);		// Delete number 'Type' in PVector and decrease size by one
+	void reSize(unsigned long int sz);
+	void display() const;
+    PVector<unsigned int> sort(int direction=1);
+	unsigned int removeDuplicates(int direction=0);
+	void write(FILE *outFile);
+	Type maxValue() const;
+	Type minValue() const;
+	Type sum() const;
+    template<typename Type> friend PVector<Type> vmax(const PVector<Type> &v1, const PVector<Type> &v2);
+    template<typename Type> friend PVector<Type> vmin(const PVector<Type> &v1, const PVector<Type> &v2);
+
+	// Conversion to long double
+    PVector<long double>& asLongDouble() const;
+
+	//Assignment Operators
+    PVector<Type>& operator=(const PVector<Type> &v1);
+    PVector<Type>& operator=(const long double &scalar);
+
+	//Subscript Operators
+	Type& operator[](unsigned long int elem);
+	const Type& operator[](unsigned long int elem)const;
+
+	//Unary Minus Operator
+    PVector<Type> operator-() const;
+
+	//Calculation Operators
+    template<typename Type> friend PVector<Type> operator+(const PVector<Type> &v1, const PVector<Type> &v2);
+    template<typename Type> friend PVector<Type> operator-(const PVector<Type> &v1, const PVector<Type> &v2);
+    template<typename Type> friend PVector<Type> operator*(const PVector<Type> &v1, const PVector<Type> &v2);
+    template<typename Type> friend PVector<Type> operator/(const PVector<Type> &v1, const PVector<Type> &v2);
+                                   PVector<Type> operator+(const long double &scalar) const;
+    template<typename Type> friend PVector<Type> operator+(const long double &scalar, const PVector<Type> &v1);
+                                   PVector<Type> operator-(const long double &scalar) const;
+    template<typename Type> friend PVector<Type> operator-(const long double &scalar, const PVector<Type> &v1);
+                                   PVector<Type> operator*(const long double &scalar) const;
+    template<typename Type> friend PVector<Type> operator*(const long double &scalar, const PVector<Type> &v1);
+                                   PVector<Type> operator/(const long double &scalar) const;
+    template<typename Type> friend PVector<Type> operator/(const long double &scalar, const PVector<Type> &v1);
+    template<typename Type> friend PVector<Type> operator^(const long double &scalar, const PVector<Type> &v1);
+
+	//Calculation and Assigment Operators
+    PVector<Type>& operator+=(const PVector<Type> &v1);
+    PVector<Type>& operator-=(const PVector<Type> &v1);
+    PVector<Type>& operator*=(const PVector<Type> &v1);
+    PVector<Type>& operator/=(const PVector<Type> &v1);
+
+    PVector<Type>& operator+=(const long double &scalar);
+    PVector<Type>& operator-=(const long double &scalar);
+    PVector<Type>& operator*=(const long double &scalar);
+    PVector<Type>& operator/=(const long double &scalar);
+
+	//Logical Operators
+    bool operator==(const PVector<Type> &v1) const;
+    bool operator!=(const PVector<Type> &v1) const;
+
+	//Other Operators
+    template<typename Type> friend PVector<Type> operator!(const PVector<Type> &v1);  //Inverse of PVector
+//	operator Type();
+};
+
+
+#endif

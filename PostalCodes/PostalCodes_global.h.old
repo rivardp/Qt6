@@ -1,0 +1,15 @@
+#ifndef POSTALCODES_GLOBAL_H
+#define POSTALCODES_GLOBAL_H
+
+#include <QtCore/qglobal.h>
+#include "../PostalCodes/postalCodeInfo.h"
+
+#if defined(POSTALCODES_LIBRARY)
+    #define POSTALCODES_EXPORT Q_DECL_EXPORT
+#else
+    #define POSTALCODES_EXPORT Q_DECL_IMPORT
+#endif
+
+extern "C" POSTALCODES_EXPORT POSTALCODE_INFO lookup(QString);
+
+#endif // POSTALCODES_GLOBAL_H
