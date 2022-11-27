@@ -2,6 +2,7 @@
 
 #include "databaseSearches.h"
 #include "../UpdateFuneralHomes/Include/dataRecord.h"
+#include "qdebug.h"
 
 int databaseSearches::surnameLookup(const QString name, GLOBALVARS *globals)
 {
@@ -13,6 +14,8 @@ int databaseSearches::surnameLookup(const QString name, GLOBALVARS *globals)
     PQString errorMessage;
 
     success = query.prepare("SELECT COUNT(*) FROM death_audits.deceased WHERE lastName = :lastName");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":lastName", QVariant(name));
     success = query.exec();
     if (!success || (query.size() > 1))
@@ -94,6 +97,8 @@ bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, 
     bool result = false;
 
     success = query.prepare("SELECT maleCount, femaleCount, malePct FROM death_audits.firstnames WHERE name = :name");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":name", QVariant(name));
     success = query.exec();
     if (!success || (query.size() > 1))
@@ -154,6 +159,8 @@ bool databaseSearches::nicknameLookup(const QString name, GLOBALVARS *gv)
     PQString errorMessage;
 
     success = query.prepare("SELECT nickname FROM death_audits.nicknames WHERE nickname = :nickname");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":nickname", QVariant(name));
     success = query.exec();
     if (!success)
@@ -183,6 +190,8 @@ bool databaseSearches::pureNickNameLookup(const QString name, GLOBALVARS *gv)
     PQString errorMessage;
 
     success = query.prepare("SELECT formalNames FROM death_audits.nicknames WHERE nickname = :nickname");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":nickname", QVariant(name));
     success = query.exec();
     if (!success || (query.size() > 1))
@@ -213,11 +222,20 @@ bool databaseSearches::nickNameInList(const OQString name, QList<QString> &listO
     bool isNickName = false;
     PQString errMsg;
 
-    for (int i = 0; i < listOfNames.size(); i++)
-        isNickName = isNickName || name.isInformalVersionOf(listOfNames.at(i), errMsg);
+    if ((name.getLength() == 2) && !name.isSuffix() && !name.isPrefix() && !name.isTitle())
+    {
+        if (!name.containsVowel())
+            isNickName = true;
+    }
 
-    if (errMsg.getLength() > 0)
-        gv->logMsg(ErrorRecord, errMsg);
+    if (!isNickName)
+    {
+        for (int i = 0; i < listOfNames.size(); i++)
+            isNickName = isNickName || name.isInformalVersionOf(listOfNames.at(i), errMsg);
+
+        if (errMsg.getLength() > 0)
+            gv->logMsg(ErrorRecord, errMsg);
+    }
 
     return isNickName;
 }
@@ -243,6 +261,8 @@ void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTA
     PQString errorMessage;
 
     success = query.prepare("SELECT maleCount, femaleCount, malePct FROM death_audits.firstnames WHERE name = :name");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":name", QVariant(name));
     success = query.exec();
 
@@ -321,11 +341,12 @@ bool databaseSearches::validRecordExists(downloadOutputs &outputs, GLOBALVARS *g
     QSqlError error;
     PQString errorMessage;
 
-    //success = query.prepare("SELECT cycle FROM death_audits.deceased WHERE providerID = :providerID AND providerKey = :providerKey AND ID = :ID");
     success = query.prepare("SELECT deceasedNumber "
                             "FROM death_audits.deceasedidinfo "
                             "WHERE providerID = :providerID AND providerKey = :providerKey AND ID = :ID "
                             "GROUP BY deceasedNumber");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":providerID", QVariant(outputs.providerID));
     query.bindValue(":providerKey", QVariant(outputs.providerKey));
     query.bindValue(":ID", QVariant(outputs.ID));
@@ -378,6 +399,8 @@ void databaseSearches::removeLowConviction(QList<QString> &nameList, GLOBALVARS 
         else
         {
             success = query.prepare("SELECT maleCount, femaleCount, malePct FROM death_audits.firstnames WHERE name = :name");
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation";
             query.bindValue(":name", QVariant(name));
             success = query.exec();
 
@@ -425,6 +448,8 @@ QString databaseSearches::IDforLastDeathPreceding(const QDate &DOD, const unsign
                             "(SELECT dts.deceasedNumber, dts.ID FROM death_audits.deceasedidinfo dts WHERE dts.providerID = :providerID AND dts.providerKey = :providerKey ORDER BY dts.deceasedNumber) "
                             "AS ft USING(deceasedNumber) "
                             "WHERE d.DOD <= :DOD");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":providerID", QVariant(providerID));
     query.bindValue(":providerKey", QVariant(providerKey));
     query.bindValue(":DOD", QVariant(DOD));
@@ -445,6 +470,8 @@ QString databaseSearches::IDforLastDeathPreceding(const QDate &DOD, const unsign
                                     "(SELECT dts.deceasedNumber, dts.ID FROM death_audits.deceasedidinfo dts WHERE dts.providerID = :providerID AND dts.providerKey = :providerKey ORDER BY dts.deceasedNumber) "
                                     "AS ft USING(deceasedNumber) "
                                     "WHERE d.DOD = :DOD");
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation";
             query.bindValue(":providerID", QVariant(providerID));
             query.bindValue(":providerKey", QVariant(providerKey));
             query.bindValue(":DOD", QVariant(targetDOD));
@@ -488,6 +515,8 @@ QDate databaseSearches::getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned
         success = query.prepare("SELECT MAX(GREATEST(d.DOD, ft.publishDate)) FROM death_audits.deceased d INNER JOIN "
                                 "(SELECT dts.deceasedNumber, dts.publishDate FROM death_audits.deceasedidinfo dts WHERE dts.providerID = :providerID ORDER BY dts.deceasedNumber) "
                                 "AS ft USING(deceasedNumber)");
+        if (!success)
+            qDebug() << "Problem with SQL statement formulation";
         query.bindValue(":providerID", QVariant(provID));
 
         success = query.exec();
@@ -506,6 +535,8 @@ QDate databaseSearches::getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned
         success = query.prepare("SELECT MAX(GREATEST(d.DOD, ft.publishDate)) FROM death_audits.deceased d INNER JOIN "
                                 "(SELECT dts.deceasedNumber, dts.publishDate FROM death_audits.deceasedidinfo dts WHERE dts.providerID = :providerID AND dts.providerKey = :providerKey ORDER BY dts.deceasedNumber) "
                                 "AS ft USING(deceasedNumber)");
+        if (!success)
+            qDebug() << "Problem with SQL statement formulation";
         query.bindValue(":providerID", QVariant(provID));
         query.bindValue(":providerKey", QVariant(provKey));
 
@@ -549,6 +580,8 @@ QString databaseSearches::lookupPostalCode(GLOBALVARS *gv, PROVIDER provID, unsi
 
     success = query.prepare("SELECT fhPostalCode FROM death_audits.funeralhomedata WHERE providerID = :providerID AND providerKey = :providerKey "
                                                                                    "AND ((fhRunStatus = 1) OR (fhRunStatus = 2))");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":providerID", QVariant(provID));
     query.bindValue(":providerKey", QVariant(provKey));
 
@@ -587,6 +620,8 @@ QString databaseSearches::pcLookup(GLOBALVARS *gv, PROVIDER provID, unsigned int
 
     success = query.prepare("SELECT postalCode FROM death_audits.funeralhomelocation WHERE providerID = :providerID AND providerKey = :providerKey "
                                                                                     "AND location = :location");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":providerID", QVariant(provID));
     query.bindValue(":providerKey", QVariant(provKey));
     query.bindValue(":location", QVariant(location));
@@ -624,8 +659,50 @@ QString databaseSearches::pcLookup(GLOBALVARS *gv, PROVIDER provID, unsigned int
     return result;
 }
 
+bool databaseSearches::fillInPostalCodeInfo(GLOBALVARS *gv, POSTALCODE_INFO &pci, QString pc)
+{
+    QSqlQuery query;
+    QSqlError error;
+    POSTALCODE_INFO pcInfoLookup;
+
+    bool success;
+
+    success = query.prepare("SELECT postalCode, location, provLong, provShort, provEnum, timeZone, latitude, longitude FROM death_audits.postalcodes WHERE postalCode = :postalCode");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
+    query.bindValue(":postalCode", QVariant(pc));
+
+    success = query.exec();
+    if (success)
+    {
+        if (query.size() > 0)
+        {
+            query.next();
+            pcInfoLookup.setData(query.value(0).toString(), query.value(1).toString(), query.value(2).toString(), query.value(3).toString(), query.value(4).toInt(), query.value(5).toInt(), query.value(6).toDouble(), query.value(7).toDouble());
+            if (pcInfoLookup.isValid())
+                pci = pcInfoLookup;
+        }
+    }
+    else
+    {
+        PQString errorMessage;
+
+        error = query.lastError();
+        errorMessage << QString("SQL problem finding postal code information based for postal code: ");
+        errorMessage << pc;
+        errorMessage << " in postalcodes database";
+        gv->logMsg(ErrorSQL, errorMessage, static_cast<int>(error.type()));
+    }
+
+    return pcInfoLookup.isValid();
+}
+
 POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString location)
 {
+    // Try to assign a postal base on the following order of priority
+    // 1. Use the funeralhomelocation database (locations entered based on funeral home website)
+    // 2. Pick the postal code that is closest to the funeral home postal code
+
     QSqlQuery queryA, queryB;
     QSqlError errorA, errorB;
 
@@ -633,78 +710,82 @@ POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID
     bool errorEncounteredA = false;
     bool errorEncounteredB = false;
 
-    QString result, tempResult;
+    QString providerPC;
     double distance, tempDistance;
-    POSTALCODE_INFO pcInfoFH, pcInfoPlace, pcResult;
-    PostalCodes *pcDatabase;
+    POSTALCODE_INFO pcInfoFH, pcResult, pcInfoLookup;
 
-    success = queryA.prepare("SELECT postalCode, location, province, prov, provinceEnum, timezone, latitude, longitude FROM death_audits.postalcodeplaces WHERE location = :location");
-    queryA.bindValue(":location", QVariant(location));
+    providerPC = pcLookup(gv, provID, provKey, location);
+    if (providerPC.length() > 0)
+    {
+        fillInPostalCodeInfo(gv, pcInfoLookup, providerPC);
+        if (pcInfoLookup.isValid())
+        {
+            pcResult = pcInfoLookup;
+            return pcResult;
+        }
+    }
+
+    // Obtain postal code of funeral home
+    success = queryA.prepare("SELECT fhPostalCode FROM death_audits.funeralhomedata WHERE providerID = :providerID and providerKey = :providerKey");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
+    queryA.bindValue(":providerID", QVariant(provID));
+    queryA.bindValue(":providerKey", QVariant(provKey));
 
     success = queryA.exec();
+    if (success && (queryA.size() == 1))
+    {
+        queryA.next();
+        providerPC = queryA.value(0).toString();
+        if (providerPC.length() > 0)
+            fillInPostalCodeInfo(gv, pcInfoFH, providerPC);
+    }
+    else
+    {
+        errorEncounteredA = true;
+    }
+
+    queryA.clear();
+
+
+    success = queryB.prepare("SELECT postalCode, location, provLong, provShort, provEnum, timeZone, latitude, longitude FROM death_audits.postalcodes WHERE location = :location");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
+    queryB.bindValue(":location", QVariant(location));
+
+    success = queryB.exec();
     if (success)
     {
-        if (queryA.size() == 1)
+        if (queryB.size() > 0)
         {
-            queryA.next();
-            POSTALCODE_INFO temp(queryA.value(0).toString(), queryA.value(1).toString(), queryA.value(2).toString(), queryA.value(3).toString(), queryA.value(4).toInt(), queryA.value(5).toInt(), queryA.value(6).toDouble(), queryA.value(7).toDouble());
-            if (temp.isValid())
-                pcResult = temp;
-        }
-        else
-        {
-            success = queryB.prepare("SELECT fhPostalCode FROM death_audits.funeralhomedata WHERE providerID = :providerID and providerKey = :providerKey");
-            queryB.bindValue(":providerID", QVariant(provID));
-            queryB.bindValue(":providerKey", QVariant(provKey));
-
-            success = queryB.exec();
-            if (success && (queryB.size() == 1))
+            distance = 9999;
+            while(queryB.next())
             {
-                queryB.next();
-                tempResult = queryB.value(0).toString();
-            }
-            else
-                errorEncounteredB = true;
-
-            if (!errorEncounteredB)
-            {
-                distance = 9999;
-                pcDatabase = new PostalCodes();
-                pcInfoFH = pcDatabase->lookup(tempResult);
-                if (pcInfoFH.isValid())
+                pcInfoLookup.setData(queryB.value(0).toString(), queryB.value(1).toString(), queryB.value(2).toString(), queryB.value(3).toString(), queryB.value(4).toInt(), queryB.value(5).toInt(), queryB.value(6).toDouble(), queryB.value(7).toDouble());
+                if (pcInfoLookup.isValid())
                 {
-                    while (queryA.next())
-                    {
-                        tempResult = queryA.value(0).toString();
-                        pcInfoPlace = pcDatabase->lookup(tempResult);
-                        if (pcInfoPlace.isValid())
-                        {
-                            tempDistance = pcInfoFH.distanceTo(pcInfoPlace);
-                            if (tempDistance < distance)
-                                pcResult = pcInfoPlace;
-                        }
-                    }
+                    tempDistance = pcInfoFH.distanceTo(pcInfoLookup);
+                    if (tempDistance < distance)
+                        pcResult = pcInfoLookup;
                 }
-                delete pcDatabase;
-                pcDatabase = nullptr;
             }
         }
     }
     else
-        errorEncounteredA = true;
+        errorEncounteredB = true;
 
-    if (errorEncounteredA)
+    if (errorEncounteredB)
     {
         PQString errorMessage;
 
         errorA = queryA.lastError();
         errorMessage << QString("SQL problem finding postal code based on place for: ");
         errorMessage << provID << "-" << provKey << "-" << location;
-        errorMessage << " in postalcodeplaces database";
+        errorMessage << " in postalcodes database";
         gv->logMsg(ErrorSQL, errorMessage, static_cast<int>(errorA.type()));
     }
 
-    if (errorEncounteredB)
+    if (errorEncounteredA)
     {
         PQString errorMessage;
 
@@ -728,7 +809,8 @@ QList<QString> databaseSearches::getURLlist(unsigned int deceasedID, GLOBALVARS 
     bool success;
 
     success = query.prepare("SELECT url FROM death_audits.deceasedidinfo WHERE deceasedNumber = :deceasedNumber");
-
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":deceasedNumber", QVariant(deceasedID));
 
     success = query.exec();
@@ -766,6 +848,8 @@ bool databaseSearches::deceasedRecordExists(const unsigned int &providerID, cons
         pubDateSQL << pubDate.toString("yyyy/MM/dd") << QString(" 0:0:0");
 
         success = query.prepare("SELECT deceasedNumber FROM death_audits.deceasedidinfo WHERE ((providerID = :providerID) AND (providerKey = :providerKey) AND (ID = :deceasedID) AND (publishDate >= :publishDate))");
+        if (!success)
+            qDebug() << "Problem with SQL statement formulation";
         query.bindValue(":providerID", QVariant(providerID));
         query.bindValue(":providerKey", QVariant(providerKey));
         query.bindValue(":deceasedID", QVariant(deceasedID));
@@ -774,6 +858,8 @@ bool databaseSearches::deceasedRecordExists(const unsigned int &providerID, cons
     else
     {
         success = query.prepare("SELECT deceasedNumber FROM death_audits.deceasedidinfo WHERE ((providerID = :providerID) AND (providerKey = :providerKey) AND (ID = :deceasedID))");
+        if (!success)
+            qDebug() << "Problem with SQL statement formulation";
         query.bindValue(":providerID", QVariant(providerID));
         query.bindValue(":providerKey", QVariant(providerKey));
         query.bindValue(":deceasedID", QVariant(deceasedID));
@@ -809,7 +895,8 @@ dataRecord databaseSearches::readRecord(unsigned int deceasedID, QString lastNam
     success = query.prepare("SELECT lastName, altLastName1, altLastName2, altLastName3, firstName, nameAKA1, nameAKA2, middlenames, "
                             "suffix, prefix, gender, DOB, DOD, YOB, YOD, ageAtDeath, minDOB, maxDOB, lastUpdated "
                             "FROM death_audits.deceased WHERE deceasedNumber = :deceasedNumber AND lastName = :lastName");
-
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":deceasedNumber", QVariant(deceasedID));
     query.bindValue(":lastName", QVariant(lastName));
 
@@ -905,7 +992,8 @@ dataRecord databaseSearches::readRecord(unsigned int deceasedID, QString lastNam
     success = query.prepare("SELECT url, providerID, providerKey, ID, publishDate "
                             "FROM death_audits.deceasedidinfo "
                             "WHERE deceasedNumber = :deceasedNumber");
-
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":deceasedNumber", QVariant(deceasedID));
 
     success = query.exec();
@@ -956,6 +1044,8 @@ dataRecord databaseSearches::readMonitoredRecord(unsigned int memberID, QString 
 
     success = query.prepare("SELECT lastName, firstName, nameAKA1, nameAKA2, middlenames, gender, DOB, minDOB, maxDOB, DOD, deceasedNumber "
                             "FROM death_audits.deceased WHERE deceasedNumber = :memberID AND lastName = :lastName");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
 
     /*// SELECT MAX(L.DOB), MIN(L.DOB), MAX(R.ID) FROM death_audits.deceased L INNER JOIN death_audits.deceasedidinfo R ON L.deceasedNumber = R.deceasedNumber WHERE R.providerID = 1038 AND R.providerKey = 5;
     success = query.prepare("SELECT L.lastName, L.firstName, L.nameAKA1, L.nameAKA2, L.middlenames, L.gender, L.DOB, L.minDOB, L.maxDOB, L.DOD, L.deceasedNumber, R.url "
@@ -1047,8 +1137,8 @@ double databaseSearches::genderLookup(QList<QString> &listOfNames, GLOBALVARS *g
     {
     case 0:
         result = 0.5;
-        probabilityWrongMale = 0.50;
-        probabilityWrongFemale = 0.50;
+        //probabilityWrongMale = 0.50;
+        //probabilityWrongFemale = 0.50;
         break;
 
     case 1:
@@ -1079,8 +1169,8 @@ double databaseSearches::genderLookup(QList<QString> &listOfNames, GLOBALVARS *g
             break;
         }
 
-        probabilityWrongMale   = 1.0 - nameStats.malePct;
-        probabilityWrongFemale = nameStats.malePct;
+        //probabilityWrongMale   = 1.0 - nameStats.malePct;
+        //probabilityWrongFemale = nameStats.malePct;
 
         break;  // case 1
 
@@ -1159,7 +1249,8 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
 
     success = query.prepare("SELECT fhFirstObit, fhLastObit FROM death_audits.funeralhomedata "
                             "WHERE providerID = :providerID AND providerKey = :providerKey AND ((fhRunStatus = 1) OR (fhRunStatus = 2))");
-
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":providerID", QVariant(dr.getProvider()));
     query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
 
@@ -1184,7 +1275,8 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
 
             success = query.prepare("UPDATE death_audits.funeralhomedata SET fhLastObit = :fhLastObit "
                                     "WHERE providerID = :providerID AND providerKey = :providerKey AND ((fhRunStatus = 1) OR (fhRunStatus = 2))");
-
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation";
             query.bindValue(":fhLastObit", QVariant(dateSQL.getString()));
             query.bindValue(":providerID", QVariant(dr.getProvider()));
             query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
@@ -1200,7 +1292,8 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
 
             success = query.prepare("UPDATE death_audits.funeralhomedata SET fhFirstObit = :fhFirstObit "
                                     "WHERE providerID = :providerID AND providerKey = :providerKey AND ((fhRunStatus = 1) OR (fhRunStatus = 2))");
-
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation";
             query.bindValue(":fhFirstObit", QVariant(dateSQL.getString()));
             query.bindValue(":providerID", QVariant(dr.getProvider()));
             query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
@@ -1223,7 +1316,8 @@ bool databaseSearches::savePostalCodeInfo(int deceasedNumber, int providerID, in
     bool updated = false;
 
     success = query.prepare("SELECT providerID, providerKey FROM death_audits.deceasedlocation WHERE deceasedNumber = :deceasedNumber");
-
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":deceasedNumber", QVariant(deceasedNumber));
 
     success = query.exec();
@@ -1235,7 +1329,8 @@ bool databaseSearches::savePostalCodeInfo(int deceasedNumber, int providerID, in
             // New Record
             success = queryAdd.prepare("INSERT INTO death_audits.deceasedlocation (deceasedNumber, postalCode, city, province, prov, latitude, longitude, providerID, providerKey) "
                                        "VALUES (:deceasedNumber, :postalCode, :city, :province, :prov, :latitude, :longitude, :providerID, :providerKey)");
-
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation";
             queryAdd.bindValue(":deceasedNumber", QVariant(deceasedNumber));
             queryAdd.bindValue(":postalCode", QVariant(pc.getPostalCode()));
             queryAdd.bindValue(":city", QVariant(pc.getCity()));
@@ -1268,7 +1363,8 @@ bool databaseSearches::savePostalCodeInfo(int deceasedNumber, int providerID, in
                                               "SET postalCode = :postalCode, city = :city, province = :province, prov = :prov, "
                                               "    latitude = :latitude, longitude = :longitude, providerID = :providerID, providerKey = :providerKey "
                                               "WHERE deceasedNumber = :deceasedNumber");
-
+                if (!success)
+                    qDebug() << "Problem with SQL statement formulation";
                 queryUpdate.bindValue(":deceasedNumber", QVariant(deceasedNumber));
                 queryUpdate.bindValue(":postalCode", QVariant(pc.getPostalCode()));
                 queryUpdate.bindValue(":city", QVariant(pc.getCity()));
@@ -1294,11 +1390,11 @@ POSTALCODE_INFO databaseSearches::getPostalCodeInfo(int deceasedNumber, GLOBALVA
     PQString errorMessage;
     bool success;
     POSTALCODE_INFO result;
-    PostalCodes pcDatabase;
-    QString pc;
+    PROVINCE provEnum;
 
-    success = query.prepare("SELECT postalCode, city, province, prov, latitude, longitude, providerID, providerKey FROM death_audits.deceasedlocation WHERE deceasedNumber = :deceasedNumber");
-
+    success = query.prepare("SELECT postalCode, city, province, prov, latitude, longitude FROM death_audits.deceasedlocation WHERE deceasedNumber = :deceasedNumber");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
     query.bindValue(":deceasedNumber", QVariant(deceasedNumber));
 
     success = query.exec();
@@ -1312,8 +1408,9 @@ POSTALCODE_INFO databaseSearches::getPostalCodeInfo(int deceasedNumber, GLOBALVA
     else
     {
         query.next();
-        pc = query.value(0).toString();
-        result = pcDatabase.lookup(pc);
+        result.convertPCtoProv(query.value(0).toString(), provEnum);
+
+        result.setData(query.value(0).toString(), query.value(1).toString(), query.value(2).toString(), query.value(3).toString(), provEnum, -1, query.value(4).toDouble(), query.value(5).toDouble());
     }
 
     return result;

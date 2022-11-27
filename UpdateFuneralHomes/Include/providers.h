@@ -7,7 +7,7 @@
 #include "tchar.h"
 
 enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, CooperativeFuneraire, Phaonix, DomainFuneraire, SalonsFuneraire,
-               AvisDeDeces, GreatWest, ObitTree, EchoVita, SaltWire, BlackPress,
+               AvisDeDeces, GreatWest, ObitTree, EchoVita, SaltWire, BlackPress, Aberdeen,
                Batesville = 1000, SIDS, BrowseAll, DignityMemorial, FosterMcGarvey, CFS, Frazer, Alternatives, FuneralTech, WordPress,
                FrontRunner, FuneralOne, WebStorm, GasLamp, ClickTributes, ConnellyMcKinley, Arbor, SiteWyze, ThinkingThru, Codesign,
                Shape5, TributeArchive, YAS, WFFH, FHW, Crew, Jelly, Nirvana, Bergetti, PacificByte,
@@ -40,7 +40,7 @@ enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, Coopera
                Montcalm, Trahan, Laurent, Eternel, Ruel, Hamel, CremAlt, London, Dryden, Forest,
                JasonSmith, Lampman, ecoPassages, Peaceful, Ranger, People, Whitcroft, TriCity, LegacyCardstrom, Wiebe,
                Arimathea, GFournier, CharleVoix2, Harmonia, Omega, HeritageWP, Ouellet, HommageNB, Drake, CityLine,
-               Komitas};
+               Komitas, Driftwood};
 
 // Search parameters
 

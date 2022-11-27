@@ -4,9 +4,9 @@
 
 QDate MAKEDATE::today = QDate();
 
-MAKEDATE::MAKEDATE() : numChar1(0), numChar2(0), numChar3(0), format(DATEORDER(doNULL)),
-potentialYMD(false), potentialMDY(false), potentialDMY(false), currentNumber(1), totalStored(0),
-isValid(false), isFinal(false), conviction(CONVICTION(0)), analyzeFurther(false)
+MAKEDATE::MAKEDATE() : isValid(false), isFinal(false), analyzeFurther(false), format(DATEORDER(doNULL)),
+    conviction(CONVICTION(0)), totalStored(0), numChar1(0), numChar2(0), numChar3(0),
+    potentialYMD(false), potentialDMY(false), potentialMDY(false), currentNumber(1)
 {
 	// num1, num2, and num3 three are intentionally left undefined to catch logic errors
 }
@@ -23,11 +23,8 @@ MAKEDATE::MAKEDATE(int num1, int num2, int num3, int num4, int num5, int num6, Q
     DATEORDER dateOrder;
     int yyyy1, yyyy2;
     int yearPosition;
-    bool yearSet, monthSet, daySet, dateOrderSet, definitive;
+    bool yearSet,definitive;
     yearSet = false;
-    monthSet = false;
-    daySet = false;
-    dateOrderSet = false;
 
     // Start with year
     if ((num3 > 1900) && (num6 > 1900) && (num3 <= today.year()) && (num6 <= today.year()))
@@ -345,8 +342,7 @@ void MAKEDATE::analyzeNumbers(DATEORDER dateOrder)
                 if (tempDate.isValid() && (tempDate < today))
                     dateMDY = tempDate;
 
-                QDate oneMonthAgo = today;
-                oneMonthAgo.addMonths(-1);
+                QDate oneMonthAgo = today.addMonths(-1);
 
                 if (dateYMD.isValid() && (dateYMD >= dateDMY) && (dateYMD >= dateMDY) && (dateYMD > oneMonthAgo))
                 {

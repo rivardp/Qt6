@@ -10,35 +10,12 @@
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QApplication app(argc, argv);
-
-    /*******************************************/
-    /*        Load the PostalCode dll          */
-    /*******************************************/
-
-    /*QLibrary library("PostalCodes.dll");
-    if (!library.load())
-        qDebug() << library.errorString();
-    if (library.load())
-    {
-        qDebug() << "Postal Codes library loaded";
-    }*/
-
-    /*******************************************/
-    /*           Set Locale to UTF-8           */
-    /*******************************************/
-
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
-
-    /*******************************************/
-    /*           Run initial setup             */
-    /*******************************************/
 
     GLOBALVARS globals;
 
     // Setup the MySQL connection with database manager 'db'
-    if (!createConnection(globals.db, "deceasedUpdater"))
+    if (!createConnection("deceasedUpdater"))
     {
         qDebug() << "Error connecting to SQL database 'death_audits'";
         globals.logMsg(ErrorConnection, QString("Error connecting to SQL database death_audits"));
@@ -78,7 +55,7 @@ int main(int argc, char *argv[])
         if(file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         {
             outputStream = new QTextStream(file);
-            *outputStream << QString("BatchProcess commenced at ") << QDateTime::currentDateTime().toString("h:mm") << endl;
+            *outputStream << QString("BatchProcess commenced at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
         }
 
         delete outputStream;

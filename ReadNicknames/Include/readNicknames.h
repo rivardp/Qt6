@@ -11,7 +11,7 @@
 #include "../Include/Penser/PQStream.h"
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 #include "../PostalCodes/postalCodeInfo.h"
-#include "../PostalCodes/postalcodes.h"
+//#include "../PostalCodes/postalcodes.h"
 
 void readLine(QFile &filename, QString &formalname, QString &nickname);
 void updateFirstNameDB(const QString &formalname, const QString &nickname, GLOBALVARS *globals);

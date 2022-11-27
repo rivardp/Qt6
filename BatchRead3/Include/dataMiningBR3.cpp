@@ -96,6 +96,7 @@ void MINER::mineReadObits()
 {
     bool followRedirects = true;    // Not necessary for this program as final HTML filenames are read in
     bool POSTrequests = false;      // Only used for exception sites;
+    globals->noMajorIssues = true;
 
     // Determine if run should download and overwrite over any existing files
     bool forceOverwrite;
@@ -201,7 +202,7 @@ void MINER::mineReadObits()
         }
         inputFile->close();
         errorMsg.clear();
-        errorMsg << "Number of records read was: " << records.size();
+        errorMsg << "Number of records read was: " << QString::number(records.size());
         globals->logMsg(AuditListing, errorMsg);
 
         QString searchSingleParam1, searchSingleParam2;
@@ -403,7 +404,7 @@ void MINER::mineReadObits()
         for (int i = 0; i < numProcessed; i++)
         {
             if (masterDownloadRequestList[i].outputs.obitListEntry.size() > 0)
-                outputStream << masterDownloadRequestList[i].outputs.obitListEntry << endl;
+                outputStream << masterDownloadRequestList[i].outputs.obitListEntry << Qt::endl;
         }
     }
     else
@@ -421,7 +422,7 @@ void MINER::mineReadObits()
         if(file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         {
             outputStream = new QTextStream(file);
-            *outputStream << QString("BatchRead completed running and exited normally at ") << QDateTime::currentDateTime().toString("h:mm") << endl;
+            *outputStream << QString("BatchRead completed running and exited normally at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
         }
 
         delete outputStream;

@@ -8,9 +8,9 @@ class POSTALCODE_INFO
 {
 public:
     POSTALCODE_INFO();
-    // Next constructor is strictly for use with hash
+    POSTALCODE_INFO(const POSTALCODE_INFO &);
     POSTALCODE_INFO(const QString postal_code, const QString city, const QString province, const QString province_abbr, const int province_enum,
-                    const int time_zone, const double latitude, const double longitude);
+                    const int time_zone, const double latitude, const double longitude);  // Constructor assumes valid data - use setData() otherwise
 
     QString getPostalCode() const;
     QString getCity() const;
@@ -22,6 +22,8 @@ public:
     double getLongitude() const;
 
     bool setPostalCode(QString pc);
+    void setData(const QString postal_code, const QString city, const QString province, const QString province_abbr, const int province_enum,
+                 const int time_zone, const double latitude, const double longitude);
     void clear();
 
     bool isValid() const;
@@ -34,8 +36,6 @@ public:
     POSTALCODE_INFO& operator= (const POSTALCODE_INFO &rhs);
     bool operator== (const POSTALCODE_INFO &rhs);
     bool operator!= (const POSTALCODE_INFO &rhs);
-
-    friend class PostalCodes;
 
 
 private:
@@ -51,6 +51,7 @@ private:
     bool valid;
 
     void setValid(bool status);
+    void validate();
 };
 
 

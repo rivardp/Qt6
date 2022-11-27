@@ -40,8 +40,8 @@ public:
 
 
 protected:
-	unsigned int position;
-	bool EOS;
+    bool EOS;
+    unsigned int position;
 };
 
 

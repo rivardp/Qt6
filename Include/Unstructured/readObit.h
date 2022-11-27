@@ -102,7 +102,9 @@ public:
     void fillInDatesEighthPass();
     void fillInDatesNinthPass();
     void fillInDatesTenthPass();
+    void fillInDatesEleventhPass();
     void assignFirstDateToDOD();
+    bool useFirstSentenceSingleDate();
 
     bool missingDateInfo() const;
     bool isLocation(OQString word);

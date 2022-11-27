@@ -1,15 +1,27 @@
 #include "postalCodeInfo.h"
 
 
-POSTALCODE_INFO::POSTALCODE_INFO()
+POSTALCODE_INFO::POSTALCODE_INFO() : valid(false)
 {
-    valid = false;
 }
 
 POSTALCODE_INFO::POSTALCODE_INFO(const QString init_postal_code, const QString init_city, const QString init_province, const QString init_province_abbr, const int init_province_enum,
                                  const int init_time_zone, const double init_latitude, const double init_longitude)
 {
+    setData(init_postal_code, init_city, init_province, init_province_abbr, init_province_enum, init_time_zone, init_latitude, init_longitude);
     valid = true;
+}
+
+POSTALCODE_INFO::POSTALCODE_INFO(const POSTALCODE_INFO &rhs)
+{
+    setData(rhs.postal_code, rhs.city, rhs.province, rhs.province_abbr, rhs.province_enum, rhs.time_zone, rhs.latitude, rhs.longitude);
+    validate();
+}
+
+void POSTALCODE_INFO::setData(const QString init_postal_code, const QString init_city, const QString init_province, const QString init_province_abbr, const int init_province_enum,
+                              const int init_time_zone, const double init_latitude, const double init_longitude)
+{
+    clear();
 
     postal_code = init_postal_code;
     city = init_city;
@@ -19,6 +31,16 @@ POSTALCODE_INFO::POSTALCODE_INFO(const QString init_postal_code, const QString i
     time_zone = init_time_zone;
     latitude = init_latitude;
     longitude = init_longitude;
+
+    validate();
+}
+
+void POSTALCODE_INFO::validate()
+{
+    if (((postal_code.length() == 7) || (postal_code.length() == 3)) && (province.length() > 0) && (province_enum != provUnknown) && (latitude != 0) && (longitude != 0))
+        valid = true;
+    else
+        valid = false;
 }
 
 void POSTALCODE_INFO::setValid(bool status)
@@ -165,65 +187,65 @@ double POSTALCODE_INFO::distanceBetween(POSTALCODE_INFO &pc1, POSTALCODE_INFO &p
 
 void POSTALCODE_INFO::convertPCtoProv(QString postalCode, PROVINCE &prov)
 {
-    QChar firstLetter = postalCode.at(1);
+    QChar firstLetter = postalCode.at(0);
     //enum PROVINCE { provUnknown = 0, BC, AB, SK, MB, ON, QC, NB, NS, PEI, NL, YT, NT, NU};
 
-    switch (firstLetter.digitValue())
+    switch (firstLetter.unicode())
     {
-    case 'A':
+    case 66:    // A
         prov = NL;
         break;
 
-    case 'B':
+    case 67:    // B
         prov = NS;
         break;
 
-    case 'C':
+    case 68:    // C
         prov = PE;
         break;
 
-    case 'E':
+    case 70:    // E:
         prov = NB;
         break;
 
-    case 'G':
-    case 'H':
-    case 'I':
-    case 'J':
+    case 72:    // G
+    case 73:    // H
+    case 74:    // I
+    case 75:    // J
         prov = QC;
         break;
 
-    case 'K':
-    case 'L':
-    case 'M':
-    case 'N':
-    case 'O':
-    case 'P':
+    case 76:    // K
+    case 77:    // L
+    case 78:    // M
+    case 79:    // N
+    case 80:    // O
+    case 81:    // P
         prov = ON;
         break;
 
-    case 'R':
+    case 82:    // R
         prov = MB;
         break;
 
-    case 'S':
+    case 83:    // S
         prov = SK;
         break;
 
-    case 'T':
+    case 84:    // T
         prov = AB;
         break;
 
-    case 'V':
+    case 86:    // V
         prov = BC;
         break;
 
-    case 'Y':
-        prov = YT;
+    case 88:    // X
+        prov = NT;
         break;
 
-    case 'Z':
-        prov = NS;
+    case 89:    // Y
+        prov = YT;
         break;
 
     default:
@@ -237,67 +259,101 @@ void POSTALCODE_INFO::convertPCtoProv(QString postalCode, QString &prov, bool ab
     PROVINCE enumProv;
     convertPCtoProv(postalCode, enumProv);
 
-    if (abbreviated)
-        prov = static_cast<QString>(enumProv);
-    else
+    switch(enumProv)
     {
-        switch(enumProv)
-        {
-        case BC:
+    case BC:
+        if (abbreviated)
+            prov = "BC";
+        else
             prov = "British Columbia";
-            break;
+        break;
 
-        case AB:
+    case AB:
+        if (abbreviated)
+            prov = "AB";
+        else
             prov = "Alberta";
-            break;
+        break;
 
-        case SK:
+    case SK:
+        if (abbreviated)
+            prov = "SK";
+        else
             prov = "Saskatchewan";
-            break;
+        break;
 
-        case MB:
+    case MB:
+        if (abbreviated)
+            prov = "MB";
+        else
             prov = "Manitoba";
-            break;
+        break;
 
-        case ON:
+    case ON:
+        if (abbreviated)
+            prov = "ON";
+        else
             prov = "Ontario";
-            break;
+        break;
 
-        case QC:
+    case QC:
+        if (abbreviated)
+            prov = "QC";
+        else
             prov = "Québec";
-            break;
+        break;
 
-        case NB:
+    case NB:
+        if (abbreviated)
+            prov = "NB";
+        else
             prov = "New Brunswick";
-            break;
+        break;
 
-        case NS:
+    case NS:
+        if (abbreviated)
+            prov = "NS";
+        else
             prov = "Nova Scotia";
-            break;
+        break;
 
-        case PE:
+    case PE:
+        if (abbreviated)
+            prov = "PE";
+        else
             prov = "Prince Edward Island";
-            break;
+        break;
 
-        case NL:
+    case NL:
+        if (abbreviated)
+            prov = "NL";
+        else
             prov = "Newfoundland";
-            break;
+        break;
 
-        case YT:
+    case YT:
+        if (abbreviated)
+            prov = "YT";
+        else
             prov = "Yukon";
-            break;
+        break;
 
-        case NT:
+    case NT:
+        if (abbreviated)
+            prov = "NT";
+        else
             prov = "NorthWest Territories";
-            break;
+        break;
 
-        case NU:
+    case NU:
+        if (abbreviated)
+            prov = "NU";
+        else
             prov = "Nunavet";
-            break;
+        break;
 
-        default:
-            prov = "";
-            break;
-        }
+    default:
+        prov = "";
+        break;
     }
 }

@@ -13,7 +13,7 @@ unstructuredContent::unstructuredContent(const OQString source) : OQStream(sourc
 {    
 }
 
-unstructuredContent::unstructuredContent(const unstructuredContent &orig)
+unstructuredContent::unstructuredContent(const unstructuredContent &orig) : OQStream()
 {
     itsString = orig.getString();
     copyKeyVariablesFrom(orig);
@@ -83,7 +83,7 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
 
 	while (!tempStream.isEOS())
 	{
-        dividerBeforeWord = dividerAfterWord = standAloneComma = standAlonePeriod = containsDOBandDOD = wordIsInitial = false;
+        dividerBeforeWord = dividerAfterWord = standAloneComma = standAlonePeriod = containsDOBandDOD = false;
 
         originalWord = tempStream.getWord(true, SLASH, false);
         totalWordCount++;
@@ -793,8 +793,8 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
     if ((lang != language_unknown) && (contentLanguage != lang))
         globals->globalDr->wi.bilingualFlag = numLanguages + 10;
 
-    if (globals->globalDr->wi.bilingualFlag >= 2)
-        globals->globalDr->setLanguage(multiple);
+    if (globals->globalDr->wi.bilingualFlag >= 2){
+        globals->globalDr->setLanguage(multiple);}
 
 	// Determine gender
 	switch (contentLanguage)
@@ -1480,9 +1480,11 @@ unsigned int unstructuredContent::pullOutFrenchDates(QList<QDate> &dateList, uns
 		else
 		{
 			if (word.isAlphaNumeric())
+            {
                 dd = static_cast<int>(word.drawOutNumber());
-			if ((dd != 0) && (dd <= 31))
-				stillOK = true;
+                if ((dd != 0) && (dd <= 31))
+                    stillOK = true;
+            }
 
             // Assume any date after "service" or "celebration" is funeral date
             tempWord = lowerWord;
@@ -1492,7 +1494,7 @@ unsigned int unstructuredContent::pullOutFrenchDates(QList<QDate> &dateList, uns
         }
 
 		// Read in next word to try to match to month
-		if (stillOK)
+        if (stillOK & !EOS)
 		{
 			word = getWord(true);		// pull next word from content
             originalWord = word;
@@ -1524,9 +1526,10 @@ unsigned int unstructuredContent::pullOutFrenchDates(QList<QDate> &dateList, uns
 			else
 			{
 				stillOK = false;
-                if (!EOS)
-                    backward(wordLength + 1);  // back up position by last word plus space
-				numWordsRead--;
+                //if (!EOS)
+                //    backward(wordLength + 1);  // back up position by last word plus space
+                backward(wordLength + 1);  // back up position by last word plus space
+                numWordsRead--;
 			}
 
 			// Attempt to read in year
@@ -1579,7 +1582,7 @@ unsigned int unstructuredContent::pullOutFrenchDates(QList<QDate> &dateList, uns
 			if (stillOK)
 			{
                 testDate = QDate(yyyy, mm, dd);
-                if (testDate.isValid())
+                if (testDate.isValid() && (testDate > QDate(1900,1,1)))
                 {
                     dateList.append(testDate);
                     numValidDates++;
@@ -2261,19 +2264,34 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                         exclude = true;
                 }
 
+                if (!exclude && (numWords == 1) && word.isHyphenated())
+                {
+                    // Look for "Ti-xxx" french nicknames
+                    int index = word.findPosition("-");
+                    OQString OQtempWord = word.left(index);
+                    if (OQtempWord == "Ti")
+                    {
+                        nameInfo.name = word.getString();
+                        nameInfo.type = ntFirst;
+                        nameInfo.numWords = 1;
+                        globals->globalDr->setAlternates(nameInfo);
+                    }
+                    exclude = true;
+                }
+
                 if (!exclude)
                 {
                     // Create a list of words within the parentheses or quotes
                     QString tempQString;
                     OQString OQtempWord;
                     QStringList sList1, sList2, sList3, sList4, sList5;
-                    sList1 = tempContent.getString().split(" ", QString::SkipEmptyParts);
+                    sList1 = tempContent.getString().split(" ", Qt::SkipEmptyParts);
                     for (int i = 0; i <= sList1.count() - 1; i++) {
-                        sList2.append(sList1.at(i).split("-", QString::SkipEmptyParts));}
+                        sList2.append(sList1.at(i).split("-", Qt::SkipEmptyParts));}
                     for (int i = 0; i <= sList2.count() - 1; i++) {
-                        sList3.append(sList2.at(i).split("/", QString::SkipEmptyParts));}
+                        sList3.append(sList2.at(i).split("/", Qt::SkipEmptyParts));}
                     for (int i = 0; i <= sList3.count() - 1; i++) {
-                        sList4.append(sList3.at(i).split("\\", QString::SkipEmptyParts));}
+                        sList4.append(sList3.at(i).split("\\", Qt::SkipEmptyParts));}
 
                     while (sList4.count() > 0)
                     {
@@ -2922,7 +2940,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                                                                     nameInfo.type = ntLast;
                                                                 else
                                                                 {
-                                                                    globals->globalDr->wi.checkExclName = 2;
+                                                                    globals->globalDr->wi.checkExclName = QChar('2');
                                                                     exclude = true;
                                                                 }
                                                             }
@@ -2934,7 +2952,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                                                             nameInfo.type = ntLast;
                                                         else
                                                         {
-                                                            globals->globalDr->wi.checkExclName = 2;
+                                                            globals->globalDr->wi.checkExclName = QChar('2');
                                                             exclude = true;
                                                         }
                                                     }
@@ -3011,11 +3029,34 @@ DATES unstructuredContent::readDOBandDOD(bool reliable)
         }
         else
         {
-            resultDates.potentialDOB = dateList[1];
-            resultDates.potentialDOD = dateList[0];
-            resultDates.fullyCredible = false;
-            errMsg << "Investigate reversed dates for: " << globals->globalDr->getURL();
-            globals->globalDr->wi.dateFlag = 1;
+            if (dateList[0].year() == dateList[1].year())
+            {
+                if (dateList[0].year() >= 2012)
+                {
+                    // Assume entered YOD instead of YOB in date
+                    globals->globalDr->setTypoDOB(dateList[0]);
+                    if (globals->globalDr->getYOB() == static_cast<unsigned int>(dateList[0].year()))
+                    {
+                        globals->globalDr->setYOB(0, true);
+                        globals->globalDr->setMinDOB(QDate(1875,1,1));
+                    }
+                    dateList.removeFirst();
+                }
+                else
+                {
+                    // Assume entered YOB instead of YOD in date
+                    globals->globalDr->setTypoDOD(dateList[1]);
+                    dateList.removeLast();
+                }
+            }
+            else
+            {
+                resultDates.potentialDOB = dateList[1];
+                resultDates.potentialDOD = dateList[0];
+                resultDates.fullyCredible = false;
+                errMsg << "Investigate reversed dates for: " << globals->globalDr->getURL();
+                globals->globalDr->wi.dateFlag = 1;
+            }
         }
     }
     else
@@ -3179,7 +3220,7 @@ bool unstructuredContent::isJustNames(bool justSavedNames)
                 break;
 
             case french:
-                stillOK = ((word == OQString(QLatin1String("nécrologie"))) || (word == OQString("de")) || (word == OQString("pour")));
+                stillOK = ((word == OQString(QString("nécrologie"))) || (word == OQString("de")) || (word == OQString("pour")));
                 break;
 
             case english:
@@ -3187,7 +3228,7 @@ bool unstructuredContent::isJustNames(bool justSavedNames)
                 break;
 
             default:
-                stillOK = ((word == OQString("obituary")) || (word == OQString("for")) || (word == OQString("of")) || (word == OQString(QLatin1String("nécrologie"))) || (word == OQString("de")) || (word == OQString("pour")));
+                stillOK = ((word == OQString("obituary")) || (word == OQString("for")) || (word == OQString("of")) || (word == OQString(QString("nécrologie"))) || (word == OQString("de")) || (word == OQString("pour")));
                 break;
             }
         }
@@ -3219,7 +3260,8 @@ void unstructuredContent::processStructuredNames(QList<NAMESTATS> &nameStatsList
     removeAllSuffixPrefix();
     removeIntroductions();
     globals->globalObit->saveStructuredNamesProcessed(itsString);
-    if (contains(","))
+    bool ignoreBookendedLetters = true;
+    if (contains(",", ignoreBookendedLetters))
         readLastNameFirst(nameStatsList);
     else
         readFirstNameFirst(nameStatsList);
@@ -3472,7 +3514,7 @@ PQString unstructuredContent::processAllNames()
 
             // Issue warning if they could potentially be multiple former last names
             bool allMatched = true;
-            QStringList list = word.getString().split(" ", QString::SkipEmptyParts);
+            QStringList list = word.getString().split(" ", Qt::SkipEmptyParts);
             int i = 0;
 
             while (allMatched && (i < list.size()))
@@ -3486,6 +3528,7 @@ PQString unstructuredContent::processAllNames()
                 PQString warningMessage;
                 warningMessage << "Verify if: (" << word << ") should be included as last names for: " << globals->globalDr->getURL();
                 //globals->logMsg(ErrorRecord, warningMessage);
+                word.replace(",", "COMMA");     // Needed to avoid extraneous comman in CSV file
                 globals->globalDr->wi.confirmTreatmentName = word.getString();
             }
         }
@@ -3968,7 +4011,6 @@ PQString unstructuredContent::processAllNames()
         nameInfoList[0].type = ntLast;
         commaPositionAfter = 1;
         lastNameFirst = true;
-        lastNameAttained = true;
     }
 
 	// Re-order the names (rotate left) if a last name appeared first
@@ -4076,6 +4118,7 @@ PQString unstructuredContent::processAllNames()
                                 //PQString warningMessage;
                                 //warningMessage << "Check middle name: " << nameInfo.name << " as it may be a last name for: \"" << globals->globalDr->getFullName() << "\"  source: "<< globals->globalDr->getURL();
                                 //globals->logMsg(ErrorRecord, warningMessage);
+                                nameInfo.name.replace(",", "COMMA");     // Needed to avoid extraneous comman in CSV file
                                 globals->globalDr->wi.confirmMiddleName = nameInfo.name.getString();
                             }
                         }
@@ -4582,15 +4625,16 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     // The  logic is aligned with justInitialNames contained in determineLanguageAndGender
     // It is assumed that the first words are names
 
-    QRegExp re;
-    re.setCaseSensitivity(Qt::CaseInsensitive);
-    re.setPattern("-? ?celebration of life ?(-|for)?");
+    QRegularExpression re;
+    re.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+    re.setPattern("-? ?celebration of life ?(-|for|of)?");
     itsString.replace(re, "");
     re.setPattern(" ?achat columbarium ?");
     itsString.replace(re, "");
     re.setPattern("\\bP\\.?\\s?ENG\\b");
     itsString.replace(re, "");
-
+    re.setPattern("a\\.k\\.a\\.");
+    itsString.replace(re,"aka");
 
     this->removeHTMLtags();
     this->unQuoteHTML();
@@ -4603,6 +4647,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     bool hadComma, hadPeriod, wordAssessed, breakExemption, inQuotes, isForeign, standAloneComma;
     unsigned int wordLength;
     int indexA, indexB, indexC;
+    int numWords;
 
     QString comma(",");
     QString period(".");
@@ -4612,6 +4657,25 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     bool dividerAfterWord = false;
     bool namesFinished = false;
     bool keepWord, isSurname, hyphenatedName, noCommas;
+    bool removed = false;
+
+    // Remove trailing aka
+    indexA = itsString.indexOf(" aka ", Qt::CaseInsensitive);
+    if (indexA > 0)
+    {
+        originalWord = itsString.right(itsString.length() - indexA);  // for use later if necessary
+        nextWord = itsString.right(itsString.length() - (indexA + 5));
+        nextWord.removeBookEnds(QUOTES);
+        numWords = nextWord.countWords();
+        if (numWords == 1)
+        {
+            globals->globalDr->setFirstName(nextWord);
+            word = itsString.left(indexA);
+            word.removeEnding(" ");
+            word.removeEnding(",");
+            setItsString(word);
+        }
+    }
 
     // Deal with problematic colons
     indexA = itsString.indexOf(":");
@@ -4635,7 +4699,34 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     itsString.replace(";", ", ");
     itsString.replace("  ", " ");
 
-    // Deal with multiple commas
+    // Deal with multiple commas (ignoring commas within parentheses or quotes)
+    QString placeHolder("§");
+    QString removedString;
+    QRegularExpression target;
+    QRegularExpressionMatch match;
+
+    target.setPattern("(\\(.+?\\))");
+    match = target.match(itsString);
+    if (match.hasMatch())
+    {
+        removedString = match.captured();
+        if (removedString.contains(","))
+        {
+            itsString.replace(target, placeHolder);
+            removed = true;
+        }
+    }
+    else
+    {
+        target.setPattern("(\".+\")");
+        match = target.match(itsString);
+        if (match.hasMatch())
+        {
+            removedString = match.captured();
+            itsString.replace(target, placeHolder);
+        }
+    }
+
     indexA = itsString.indexOf(",");
     indexB = itsString.lastIndexOf(",");
     if ((indexA >= 0) && (indexB >= 0) && (indexA != indexB))
@@ -5053,8 +5144,16 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
             }
             else
             {
-                // Since the word is not "alpha", it can't be a name and names must be finished
-                namesFinished = true;
+                if (word.getString() == placeHolder)
+                {
+                    newString += word;
+                    newString += space;
+                }
+                else
+                {
+                    // Since the word is not "alpha", it can't be a name and names must be finished
+                    namesFinished = true;
+                }
             }
         }
     }  // end while
@@ -5102,6 +5201,14 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
                 }
             }
         }
+    }
+
+    // Replace removedString
+    if (removed)
+    {
+        removedString = " " + removedString + " ";
+        itsString.replace(placeHolder, removedString);
+        itsString.replace("  ", " ");
     }
 }
 
@@ -5300,9 +5407,9 @@ void unstructuredContent::pickOffNames()
                         }
                         else
                         {
-                            if ((nameType == ntPrefix) || (nameType == ntSuffix))
+                            if ((nameType == ntPrefix) || (nameType == ntSuffix)){
                             // Don't save word but keep going
-                            ;
+                            ;}
                         }
                     }
                     else
@@ -5693,7 +5800,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
     bool firstNameLoaded, skipWord, isMaidenName, priorWordJeanne;
     double unisex = 0.5;
 
-    QList<OQString> names;
+    QList<QString> names;
     QList<QString> firstNames, workingFirstNameList;
     QList<QString> suffixExemptions;
     NAMESTATS nameStats;
@@ -6071,7 +6178,6 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
         handled = false;
         notFinished = false;
         insertInstead = false;
-        //potentialCompoundName = false;
         potentialPrefix = false;
         skipWord = false;
         isMaidenName = false;
@@ -6131,7 +6237,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                             bool allMiddleNames = true;
                             bool allLastNames = true;
                             QString singleWord;
-                            QList<QString> nameList = word.getString().split(" ", QString::SkipEmptyParts);
+                            QList<QString> nameList = word.getString().split(" ", Qt::SkipEmptyParts);
                             while ((j < nameList.size()) && (allMiddleNames || allLastNames))
                             {
                                 singleWord = nameList.at(j).toLower();
@@ -6184,6 +6290,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                             PQString errMsg;
                             errMsg << "Couldn't determine how to handle (" << word << ") for: " << globals->globalDr->getURL();
                             //globals->logMsg(ErrorRecord, errMsg);
+                            word.replace(",", "COMMA");     // Needed to avoid extraneous comman in CSV file
                             globals->globalDr->wi.confirmTreatmentName = word.getString();
 
                             skipWord = true;
@@ -6223,7 +6330,8 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                 wordIsInitial = word.isInitial();
 
                 // Remove potential duplicates
-                if (names.contains(word.proper()))
+                tempWord = word.proper();
+                if (names.contains(word.proper().getString()))
                 {
                     skipWord = true;
                     handled = true;
@@ -6316,7 +6424,9 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                         suffix += word;     // Retain original capitalization
                     }
                     word.clear();
-                    if (!EOS && (totalWordsRemaining > 0))
+                    notFinished = false;
+                    handled = true;
+                    /*if (!EOS && (totalWordsRemaining > 0))
                     {
                         word = getWord(true);
                         totalWordsRemaining--;
@@ -6330,7 +6440,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                     {
                         notFinished = false;
                         handled = true;
-                    }
+                    }*/
                 }
             }
 
@@ -6661,12 +6771,12 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                     word.cleanUpEnds();
                     if (!insertInstead)
                     {
-                        names.append(word.proper());
+                        names.append(word.proper().getString());
                         nameStatsList.append(nameStats);
                     }
                     else
                     {
-                        names.insert(1, word.proper());
+                        names.insert(1, word.proper().getString());
                         nameStatsList.insert(1, nameStats);
                     }
                 }
@@ -6679,7 +6789,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
 
     }  // end initial processing
 
-    QListIterator<OQString> iter(names);
+    QListIterator<QString> iter(names);
     unsigned int totalNumNames = static_cast<unsigned int>(names.size());
     // Assume something is wrong if too many words
     if (totalNumNames > 7)
@@ -7404,8 +7514,8 @@ QDate unstructuredContent::readDateField(DATEORDER dateOrder)
     // Returns the first found date
 
     QDate result;
-    if (itsString.size() == 0)
-        return result;
+    if (itsString.size() == 0){
+        return result;}
 
 	MAKEDATE potentialDate;
 	bool stillOK;
@@ -7417,8 +7527,8 @@ QDate unstructuredContent::readDateField(DATEORDER dateOrder)
     fixBasicErrors();
     beg();
     OQString word = getWord(false, SPACE);
-    if (word.getLength() == 0)
-        return result;
+    if (word.getLength() == 0){
+        return result;}
 
 	/***************************************/
 	/*      Try numeric first              */
@@ -7645,7 +7755,7 @@ bool unstructuredContent::sentenceKeyWordsAndDates(const LANGUAGE lang, DATES &r
     bool skipDeath, skipBirth, skipStillBorn;
     QList<QDate> dateList;
     QDate minDate, maxDate;
-    OQString word, cleanString;
+    OQString word, nextWord, cleanString;
 
     matched = false;
     birthMatch = false;
@@ -7707,6 +7817,13 @@ bool unstructuredContent::sentenceKeyWordsAndDates(const LANGUAGE lang, DATES &r
             if (!birthMatch)
             {
                 birthMatch = word.isBirthWord(lang);
+                if (birthMatch)
+                {
+                    nextWord = peekAtWord();
+                    nextWord.removeEnding(PUNCTUATION);
+                    if (globals->globalDr->isALastName(nextWord))
+                        birthMatch = false;
+                }
                 if ((birthMatch) && (numDates == 1))
                     ambiguouslyEntered = (word.lower() == OQString("entered"));
             }
@@ -7723,7 +7840,7 @@ bool unstructuredContent::sentenceKeyWordsAndDates(const LANGUAGE lang, DATES &r
                 GENDER gender = globals->globalDr->getGender();
                 if (deathMatch && (lang == french) && (gender == genderUnknown))
                 {
-                    if (word.lower() == OQString(QString(QLatin1String("décédé"))))
+                    if (word.lower() == OQString(QString(QString("décédé"))))
                     {
                         if (globals->globalDr->getWorkingGender() == Male)
                             globals->globalDr->setGender(Male);
@@ -7732,7 +7849,7 @@ bool unstructuredContent::sentenceKeyWordsAndDates(const LANGUAGE lang, DATES &r
                     }
                     else
                     {
-                        if (word.lower() == OQString(QString(QLatin1String("décédée"))))
+                        if (word.lower() == OQString(QString(QString("décédée"))))
                         {
                             if (globals->globalDr->getWorkingGender() == Female)
                                 globals->globalDr->setGender(Female);
@@ -7743,10 +7860,10 @@ bool unstructuredContent::sentenceKeyWordsAndDates(const LANGUAGE lang, DATES &r
                 }
             }
             if (!stillbornMatch)
-                stillbornMatch = (word.lower() == OQString("stillborn")) || (word.lower() == OQString(QString(QLatin1String("mort-né")))) || (word.lower() == OQString("mortinato"));
+                stillbornMatch = (word.lower() == OQString("stillborn")) || (word.lower() == OQString(QString(QString("mort-né")))) || (word.lower() == OQString("mortinato"));
             if (!marriedFlag)
             {
-                marriedFlag = (word.lower() == OQString("married")) || (word.lower() == OQString(QString(QLatin1String("marié")))) || (word.lower() == OQString("casado"));
+                marriedFlag = (word.lower() == OQString("married")) || (word.lower() == OQString(QString(QString("marié")))) || (word.lower() == OQString("casado"));
                 if (marriedFlag && birthMatch && (numDates == 1))
                 {
                     if (cumPosition < firstDateLocation)
@@ -8362,7 +8479,7 @@ unsigned int unstructuredContent::contentReadAgeAtDeath(unsigned int maxSentence
     unsigned int i = 1;
     unsigned int result = 0;
 
-    while ((globals->globalDr->missingDOB() || globals->globalDr->missingDOD()) && !isEOS() && (globals->globalDr->getAgeAtDeath() == 0) && (i <= maxSentences))
+    while ((globals->globalDr->missingDOB() || globals->globalDr->missingDOD() || (globals->globalDr->getDOB() == globals->globalDr->getDOD())) && !isEOS() && (globals->globalDr->getAgeAtDeath() == 0) && (i <= maxSentences))
     {
         sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, globals->globalDr->getLanguage());
         if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true)))
@@ -8415,7 +8532,6 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
     QDate DOD, DOB;
     OQString word, nextWord, doubleWord, cleanString;
     OQString peekTwoAhead, peekThreeAhead;
-    QString target;
     bool noDates, justDOD, DODerror, partialDate;
     qint64 daysDifference;
     bool contextError = false;
@@ -8605,7 +8721,7 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                     if ((word.isAGivenName(errMsg) || word.isPronoun()))
                     {
                         nextWord = cleanContent.peekAtWord(false, 1);
-                        if ((nextWord == OQString("was")) || (nextWord == OQString(QLatin1String("était"))))
+                        if ((nextWord == OQString("was")) || (nextWord == OQString(QString("était"))))
                         {
                             nextWord = cleanContent.peekAtWord(false, 2);
                             if (nextWord.isNumeric())
@@ -8630,7 +8746,7 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                         }
                         else
                         {
-                            if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QLatin1String("après"))))
+                            if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))))
                                 eventCheck = true;
                         }
                     }
@@ -8641,7 +8757,7 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
 
                 if (hadOrdinal)
                 {
-                    if ((nextWord.lower() == PQString("year")) || (nextWord.lower() == PQString("annee")) || (nextWord.lower() == PQString(QLatin1String("année"))))
+                    if ((nextWord.lower() == PQString("year")) || (nextWord.lower() == PQString("annee")) || (nextWord.lower() == PQString(QString("année"))))
                         reduceByOne = true;
 
                     if ((nextWord.lower() == PQString("birthday")) || (nextWord.lower() == PQString("anniversaire")))
@@ -8889,7 +9005,7 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
                     contextChanged = true;
                 else
                 {
-                    if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QLatin1String("après"))))
+                    if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))))
                         eventCheck = true;
                 }
             }
@@ -8898,7 +9014,7 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
         {
             if (hadOrdinal)
             {
-                if ((nextWord.lower() == PQString("year")) || (nextWord.lower() == PQString("annee")) || (nextWord.lower() == PQString(QLatin1String("année"))))
+                if ((nextWord.lower() == PQString("year")) || (nextWord.lower() == PQString("annee")) || (nextWord.lower() == PQString(QString("année"))))
                     reduceByOne = true;
 
                 if ((nextWord.lower() == PQString("birthday")) || (nextWord.lower() == PQString("anniversaire")))
@@ -9040,7 +9156,7 @@ bool unstructuredContent::sentenceReadSpouseName(LANGUAGE lang)
     bool found = false;
     QStringList targetWords, targetWordsEnglish, targetWordsFrench, targetWordsSpanish;
     targetWordsEnglish = QString("his wife|her husband|his spouse|her spouse|husband of|wife of|spouse of").split("|");
-    targetWordsFrench = QString(QLatin1String("son mari|sa femme|son époux|mari de|femme de|époux de|épouse de|conjoint de|conjointe de|son conjoint")).split("|");
+    targetWordsFrench = QString(QString("son mari|sa femme|son époux|mari de|femme de|époux de|épouse de|conjoint de|conjointe de|son conjoint")).split("|");
     targetWordsSpanish = QString("su esposa|su marido").split("|");
 
     QString target, sentence;
@@ -9107,6 +9223,125 @@ bool unstructuredContent::sentenceReadSpouseName(LANGUAGE lang)
     return found;
 }
 
+bool unstructuredContent::sentenceReadYearsMarried(LANGUAGE lang)
+{
+    bool found = false;
+    bool updated = false;
+
+    QStringList targetWords, targetWordsEnglish, targetWordsFrench, targetWordsSpanish;
+    targetWordsEnglish = QString("husband of|wife of|spouse of|were married on|got married on").split("|");
+    QString target;
+    OQString nextWord;
+    int index, yearsMarried;
+
+    if ((lang == language_unknown) || (lang = english) || (lang == multiple_unknown) || (lang == multiple))
+    {
+        targetWords = targetWordsEnglish;
+
+        while (!found && (targetWords.size() > 0))
+        {
+            target = targetWords.takeFirst();
+            index = this->findPosition(target);
+            if (index > 0)
+            {
+                forward(index + target.length());
+                nextWord = getWord();
+                if (nextWord.isNumeric())
+                {
+                    yearsMarried = nextWord.asNumber();
+                    nextWord = getWord();
+                    nextWord.removeEnding(PUNCTUATION);
+                    if (nextWord == "years")
+                        found = true;
+                    else
+                        yearsMarried = 0;
+                }
+                else
+                {
+                    if (nextWord.isWrittenMonth(english))
+                    {
+                        nextWord = getWord();
+                        nextWord = getWord();
+                        if (nextWord.isNumeric())
+                        {
+                            yearsMarried = globals->today.year() - nextWord.asNumber();
+                            if ((yearsMarried > 0) && (yearsMarried < 100))
+                                found = true;
+                            else
+                                yearsMarried = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if ((lang == language_unknown) || (lang = french) || (lang == multiple_unknown) || (lang == multiple))
+    {
+        targetWords = targetWordsFrench;
+
+        while (!found && (targetWords.size() > 0))
+        {
+            target = targetWords.takeFirst();
+            index = this->findPosition(target);
+            if (index > 0)
+            {
+                forward(index + target.length());
+                nextWord = getWord();
+                if (nextWord.isNumeric())
+                {
+                    yearsMarried = nextWord.asNumber();
+                    nextWord = getWord();
+                    nextWord.removeEnding(PUNCTUATION);
+                    if (nextWord == "years")
+                        found = true;
+                    else
+                        yearsMarried = 0;
+                }
+            }
+        }
+    }
+
+    if ((lang == language_unknown) || (lang = spanish) || (lang == multiple_unknown) || (lang == multiple))
+    {
+        targetWords = targetWordsSpanish;
+
+        while (!found && (targetWords.size() > 0))
+        {
+            target = targetWords.takeFirst();
+            index = this->findPosition(target);
+            if (index > 0)
+            {
+                forward(index + target.length());
+                nextWord = getWord();
+                if (nextWord.isNumeric())
+                {
+                    yearsMarried = nextWord.asNumber();
+                    nextWord = getWord();
+                    nextWord.removeEnding(PUNCTUATION);
+                    if (nextWord == "years")
+                        found = true;
+                    else
+                        yearsMarried = 0;
+                }
+            }
+        }
+    }
+
+    if (found)
+    {
+        QDate maxDOB = QDate(globals->globalDr->getYOD() - yearsMarried - 14, 1, 1);
+        if (maxDOB.isValid() && (maxDOB >= globals->globalDr->getMinDOB()) && (maxDOB < globals->globalDr->getMaxDOB()))
+        {
+            globals->globalDr->setMaxDOB(maxDOB);
+            updated = true;
+        }
+    }
+
+    return !updated;
+}
+
+
 void unstructuredContent::readDateOfService(QDate &DOSD, LANGUAGE lang)
 {
     beg();
@@ -9133,7 +9368,7 @@ void unstructuredContent::sentenceReadDateOfService(QDate &DOSD, LANGUAGE lang)
     if (itsString.contains(QString("funeral"), Qt::CaseInsensitive) || itsString.contains(QString("service"), Qt::CaseInsensitive) || itsString.contains(QString("celebration"), Qt::CaseInsensitive))
         validSentenceFound = true;
 
-    if (!validSentenceFound && (lang == french) && (itsString.contains(QString(QLatin1String("funéraille")), Qt::CaseInsensitive) || itsString.contains(QString(QLatin1String("célébration")), Qt::CaseInsensitive)
+    if (!validSentenceFound && (lang == french) && (itsString.contains(QString(QString("funéraille")), Qt::CaseInsensitive) || itsString.contains(QString(QString("célébration")), Qt::CaseInsensitive)
                                                     || itsString.contains(QString("service"), Qt::CaseInsensitive)))
         validSentenceFound = true;
 
@@ -9191,8 +9426,10 @@ void unstructuredContent::parseDateFromAndTo(const OQString &word, MAKEDATE &mak
                     makeDate.nextNum();
                     numStarted = false;
                 }
-                else;
-                    // assume extra dividers between numbers and do nothing
+                else
+                {
+                    // assume extra dividers between numbers and do nothing;
+                }
             }
 		}
 	}
@@ -9885,7 +10122,9 @@ bool unstructuredContent::clean(LANGUAGE lang)
     QRegularExpression targetS, targetI;
     targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
 
+    // TODO
     //targetS.setPattern("");
+    Q_UNUSED(lang);
 
     return true;
 }
@@ -10293,6 +10532,8 @@ bool unstructuredContent::stripOutAndProcessDates()
         globals->globalDr->setDOB(dateList[0]);
         globals->globalDr->setDOD(dateList[1]);
     }
+    cleanString.replace("DATEofBIRTH", "");
+    cleanString.replace("DATEofDEATH", "");
     setItsString(cleanString);
 
     itsString.replace("  ", " ");

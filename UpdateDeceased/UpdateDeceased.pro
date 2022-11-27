@@ -33,7 +33,6 @@ HEADERS += \
     ../Include/Penser/QtUtilities.h \
     ../Include/Unstructured/readObit.h \
     ../PostalCodes/postalCodeInfo.h \
-    ../PostalCodes/postalcodes.h \
     ../UpdateFuneralHomes/Include/dataRecord.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
     ../UpdateFuneralHomes/Include/mostCommonName.h \
@@ -60,7 +59,6 @@ SOURCES += main.cpp \
     ../Include/Penser/QtUtilities.cpp \
     ../Include/Unstructured/readObit.cpp \
     ../PostalCodes/postalCodeInfo.cpp \
-    ../PostalCodes/postalcodes.cpp \
     ../UpdateFuneralHomes/Include/dataRecord.cpp \
     ../UpdateFuneralHomes/Include/mostCommonName.cpp \
     Include/globalVarsUD.cpp \

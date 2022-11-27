@@ -84,7 +84,7 @@ void updateFirstNameDB(const QString &formalname, const QString &nickname, GLOBA
 
             // Pull current nicknames
             QString currentNames = query.value(0).toString();
-            QList<QString> listOfNames = currentNames.split(QString(" "), QString::SkipEmptyParts, Qt::CaseInsensitive);
+            QList<QString> listOfNames = currentNames.split(QString(" "), Qt::SkipEmptyParts, Qt::CaseInsensitive);
             if ((listOfNames.size() == 1) && (listOfNames.at(0).length() == 0))
                 listOfNames.clear();
             int numNames = listOfNames.size();
@@ -209,7 +209,7 @@ void updateNickNameDB(const QString &formalname, const QString &nickname, GLOBAL
 
             // Pull current formalnames
             QString currentNames = query.value(0).toString();
-            QList<QString> listOfNames = currentNames.split(QString(" "), QString::SkipEmptyParts, Qt::CaseInsensitive);
+            QList<QString> listOfNames = currentNames.split(QString(" "), Qt::SkipEmptyParts, Qt::CaseInsensitive);
             if ((listOfNames.size() == 1) && (listOfNames.at(0).length() == 0))
                 listOfNames.clear();
             int numNames = listOfNames.size();

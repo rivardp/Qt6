@@ -8,12 +8,12 @@
 #include <QSqlError>
 #include <QDebug>
 
+#include "../Include//Penser/OQStream.h"
 #include "../UpdateFuneralHomes/Include/dataStructure.h"
 #include "../UpdateFuneralHomes/Include/dataRecord.h"
 #include "../Include/PMySQL/databaseSearches.h"
-#include "../Include/Penser/QtUtilities.h"
+//#include "../Include/Penser/QtUtilities.h"
 #include "../PostalCodes/postalCodeInfo.h"
-#include "../PostalCodes/postalcodes.h"
 
 #define mPREFIX         1
 #define mSUFFIX         2
@@ -102,6 +102,7 @@ public:
     bool closeDOBrange;
     int potentialNumDataMatches;
     int numNameMatches;
+    double pcDistance;
     enum MATCHKEY matchKey;
 
     bool matchedLNAME;
@@ -141,6 +142,7 @@ public:
     void setSufficientlyMatched(bool sufficient);
     MATCHKEY getMatchKey() const;
     bool isNewRecord() const;
+    bool hasNoMajorInconsistencies() const;
     void addToScore(int points);
     void addToInconsistencyScore(int points);
     unsigned int countItems(int score);

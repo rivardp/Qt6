@@ -77,16 +77,6 @@ QString PQString::operator[](unsigned int offset) const
     }
 }
 
-QCharRef PQString::operator[](unsigned int offset)
-{
-    int offSet = static_cast<int>(offset);
-    if (offSet >= itsString.length())
-        offSet = itsString.length() - 1;
-
-    return itsString[offSet];
-}
-
-
 PQString PQString::operator+(const PQString& rhs)
 {
     QString temp(itsString);
@@ -231,6 +221,9 @@ QString PQString::getUnaccentedString() const
 
 QString PQString::replaceLigatures() const
 {
+    if (itsString.length() == 0)
+        return itsString;
+
     QVector<uint> intVector = itsString.toUcs4();
     uint maxInt = *std::max_element(intVector.begin(), intVector.end());
     if (maxInt < 64256)
@@ -295,7 +288,16 @@ QString PQString::replaceLigatures() const
         }
     }
 
-    return QString::fromUcs4(intVector.data(), intVector.size());
+    QString newString;
+    for (int i = 0; i < intVector.size(); i++)
+    {
+        int cappedI = intVector.at(i);
+        if (cappedI > 65535)
+            cappedI = 65533;
+        newString += QString(QChar(cappedI));
+    }
+
+    return newString;
 }
 
 std::string PQString::getStdString() const
@@ -667,9 +669,9 @@ void PQString::convertToQStringList(QStringList &nameList)
     else
     {
         if (itsString.contains(QChar(45), Qt::CaseSensitive))
-            nameList = itsString.split(QChar(45), QString::SkipEmptyParts, Qt::CaseSensitive);
+            nameList = itsString.split(QChar(45), Qt::SkipEmptyParts, Qt::CaseSensitive);
         else
-            nameList = itsString.split(QChar(8211), QString::SkipEmptyParts, Qt::CaseSensitive);
+            nameList = itsString.split(QChar(8211), Qt::SkipEmptyParts, Qt::CaseSensitive);
     }
 
     PQString name;
@@ -818,10 +820,10 @@ PQString PQString::proper() const
 			result += singleChar.lower();
 	}
 
-    if (inParentheses)
-        result = PQString("(") + result + PQString(")");
-    if (inQuotes)
-        result = PQString("\"") + result + PQString("\"");
+    if (inParentheses){
+        result = PQString("(") + result + PQString(")");}
+    if (inQuotes){
+        result = PQString("\"") + result + PQString("\"");}
 
 	return result;
 }
@@ -902,6 +904,7 @@ PQString& PQString::simplify(bool insertPeriods)
     itsString.replace(QString(">¤"), QString(">"));
     itsString.replace(QString(".¤"), QString("."));
     itsString.replace(QString("¤."), QString("."));
+    itsString.replace(QString("¤ "), QString(" "));
 
     return *this;
 }
@@ -1067,14 +1070,19 @@ void PQString::removeBlankSentences()
 
 void PQString::decodeHTMLchars()
 {
-    QRegExp re("&#([0-9]+);");
-    re.setMinimal(true);
+    static QRegularExpression re("&#([0-9]+);");
+    static QRegularExpressionMatch match;
+    int number;
 
-    int pos = 0;
-    while( (pos = re.indexIn(itsString, pos)) != -1 )
+    match = re.match(itsString);
+    while (match.hasMatch())
     {
-        itsString = itsString.replace(re.cap(0), QChar(re.cap(1).toInt(0,10)));
-        pos++;
+        number = match.captured(1).toInt(0,10);
+        if (number <= 65535)
+            itsString.replace(match.captured(0), QChar(number));
+        else
+            itsString.replace(match.captured(0), "");
+        match = re.match(itsString);
     }
 }
 
@@ -1091,127 +1099,127 @@ void PQString::replaceHTMLentities()
     itsString.replace(QString("&amp;"), QString("&"), Qt::CaseInsensitive);
     itsString.replace(QString("&quot;"), QString("\""), Qt::CaseInsensitive);
     itsString.replace(QString("&apos;"), QString("'"), Qt::CaseInsensitive);
-    itsString.replace(QString("&quot;"), QLatin1String(""""), Qt::CaseSensitive);
-    itsString.replace(QString("&euro;"), QLatin1String("€"), Qt::CaseSensitive);
-    itsString.replace(QString("&sbquo;"), QLatin1String("‚"), Qt::CaseSensitive);
-    itsString.replace(QString("&fnof;"), QLatin1String("ƒ"), Qt::CaseSensitive);
-    itsString.replace(QString("&bdquo;"), QLatin1String("„"), Qt::CaseSensitive);
-    itsString.replace(QString("&hellip;"), QLatin1String("…"), Qt::CaseSensitive);
-    itsString.replace(QString("&dagger;"), QLatin1String("†"), Qt::CaseSensitive);
-    itsString.replace(QString("&Dagger;"), QLatin1String("‡"), Qt::CaseSensitive);
-    itsString.replace(QString("&circ;"), QLatin1String("ˆ"), Qt::CaseSensitive);
-    itsString.replace(QString("&permil;"), QLatin1String("‰"), Qt::CaseSensitive);
-    itsString.replace(QString("&Scaron;"), QLatin1String("Š"), Qt::CaseSensitive);
-    itsString.replace(QString("&lsaquo;"), QLatin1String("‹"), Qt::CaseSensitive);
-    itsString.replace(QString("&OElig;"), QLatin1String("Œ"), Qt::CaseSensitive);
-    itsString.replace(QString("&lsquo;"), QLatin1String("'"), Qt::CaseSensitive);
-    itsString.replace(QString("&rsquo;"), QLatin1String("'"), Qt::CaseSensitive);
-    itsString.replace(QString("&ldquo;"), QLatin1String("'"), Qt::CaseSensitive);
-    itsString.replace(QString("&rdquo;"), QLatin1String("'"), Qt::CaseSensitive);
-    itsString.replace(QString("&bull;"), QLatin1String("•"), Qt::CaseSensitive);
-    itsString.replace(QString("&ndash;"), QLatin1String("–"), Qt::CaseSensitive);
-    itsString.replace(QString("&mdash;"), QLatin1String("—"), Qt::CaseSensitive);
-    itsString.replace(QString("&tilde;"), QLatin1String("˜"), Qt::CaseSensitive);
-    itsString.replace(QString("&trade;"), QLatin1String("™"), Qt::CaseSensitive);
-    itsString.replace(QString("&scaron;"), QLatin1String("š"), Qt::CaseSensitive);
-    itsString.replace(QString("&rsaquo;"), QLatin1String("›"), Qt::CaseSensitive);
-    itsString.replace(QString("&oelig;"), QLatin1String("œ"), Qt::CaseSensitive);
-    itsString.replace(QString("&Yuml;"), QLatin1String("Ÿ"), Qt::CaseSensitive);
-    itsString.replace(QString("&iexcl;"), QLatin1String("¡"), Qt::CaseSensitive);
-    itsString.replace(QString("&cent;"), QLatin1String("¢"), Qt::CaseSensitive);
-    itsString.replace(QString("&pound;"), QLatin1String("£"), Qt::CaseSensitive);
-    itsString.replace(QString("&curren;"), QLatin1String("¤"), Qt::CaseSensitive);
-    itsString.replace(QString("&yen;"), QLatin1String("¥"), Qt::CaseSensitive);
-    itsString.replace(QString("&brvbar;"), QLatin1String("¦"), Qt::CaseSensitive);
-    itsString.replace(QString("&sect;"), QLatin1String("§"), Qt::CaseSensitive);
-    itsString.replace(QString("&uml;"), QLatin1String("¨"), Qt::CaseSensitive);
-    itsString.replace(QString("&copy;"), QLatin1String("©"), Qt::CaseSensitive);
-    itsString.replace(QString("&ordf;"), QLatin1String("ª"), Qt::CaseSensitive);
-    itsString.replace(QString("&laquo;"), QLatin1String("«"), Qt::CaseSensitive);
-    itsString.replace(QString("&not;"), QLatin1String("¬"), Qt::CaseSensitive);
-    itsString.replace(QString("&shy;"), QLatin1String("­"), Qt::CaseSensitive);
-    itsString.replace(QString("&reg;"), QLatin1String("®"), Qt::CaseSensitive);
-    itsString.replace(QString("&macr;"), QLatin1String("¯"), Qt::CaseSensitive);
-    itsString.replace(QString("&deg;"), QLatin1String("°"), Qt::CaseSensitive);
-    itsString.replace(QString("&plusmn;"), QLatin1String("±"), Qt::CaseSensitive);
-    itsString.replace(QString("&sup2;"), QLatin1String("²"), Qt::CaseSensitive);
-    itsString.replace(QString("&sup3;"), QLatin1String("³"), Qt::CaseSensitive);
-    itsString.replace(QString("&acute;"), QLatin1String("´"), Qt::CaseSensitive);
-    itsString.replace(QString("&micro;"), QLatin1String("µ"), Qt::CaseSensitive);
-    itsString.replace(QString("&para;"), QLatin1String("¶"), Qt::CaseSensitive);
-    itsString.replace(QString("&middot;"), QLatin1String("·"), Qt::CaseSensitive);
-    itsString.replace(QString("&cedil;"), QLatin1String("¸"), Qt::CaseSensitive);
-    itsString.replace(QString("&sup1;"), QLatin1String("¹"), Qt::CaseSensitive);
-    itsString.replace(QString("&ordm;"), QLatin1String("º"), Qt::CaseSensitive);
-    itsString.replace(QString("&raquo;"), QLatin1String("»"), Qt::CaseSensitive);
-    itsString.replace(QString("&frac14;"), QLatin1String("¼"), Qt::CaseSensitive);
-    itsString.replace(QString("&frac12;"), QLatin1String("½"), Qt::CaseSensitive);
-    itsString.replace(QString("&frac34;"), QLatin1String("¾"), Qt::CaseSensitive);
-    itsString.replace(QString("&iquest;"), QLatin1String("¿"), Qt::CaseSensitive);
-    itsString.replace(QString("&Agrave;"), QLatin1String("À"), Qt::CaseSensitive);
-    itsString.replace(QString("&Aacute;"), QLatin1String("Á"), Qt::CaseSensitive);
-    itsString.replace(QString("&Acirc;"), QLatin1String("Â"), Qt::CaseSensitive);
-    itsString.replace(QString("&Atilde;"), QLatin1String("Ã"), Qt::CaseSensitive);
-    itsString.replace(QString("&Auml;"), QLatin1String("Ä"), Qt::CaseSensitive);
-    itsString.replace(QString("&Aring;"), QLatin1String("Å"), Qt::CaseSensitive);
-    itsString.replace(QString("&AElig;"), QLatin1String("Æ"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ccedil;"), QLatin1String("Ç"), Qt::CaseSensitive);
-    itsString.replace(QString("&Egrave;"), QLatin1String("È"), Qt::CaseSensitive);
-    itsString.replace(QString("&Eacute;"), QLatin1String("É"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ecirc;"), QLatin1String("Ê"), Qt::CaseSensitive);
-    itsString.replace(QString("&Euml;"), QLatin1String("Ë"), Qt::CaseSensitive);
-    itsString.replace(QString("&Igrave;"), QLatin1String("Ì"), Qt::CaseSensitive);
-    itsString.replace(QString("&Iacute;"), QLatin1String("Í"), Qt::CaseSensitive);
-    itsString.replace(QString("&Icirc;"), QLatin1String("Î"), Qt::CaseSensitive);
-    itsString.replace(QString("&Iuml;"), QLatin1String("Ï"), Qt::CaseSensitive);
-    itsString.replace(QString("&ETH;"), QLatin1String("Ð"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ntilde;"), QLatin1String("Ñ"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ograve;"), QLatin1String("Ò"), Qt::CaseSensitive);
-    itsString.replace(QString("&Oacute;"), QLatin1String("Ó"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ocirc;"), QLatin1String("Ô"), Qt::CaseSensitive);
-    itsString.replace(QString("&Otilde;"), QLatin1String("Õ"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ouml;"), QLatin1String("Ö"), Qt::CaseSensitive);
-    itsString.replace(QString("&times;"), QLatin1String("×"), Qt::CaseSensitive);
-    itsString.replace(QString("&Oslash;"), QLatin1String("Ø"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ugrave;"), QLatin1String("Ù"), Qt::CaseSensitive);
-    itsString.replace(QString("&Uacute;"), QLatin1String("Ú"), Qt::CaseSensitive);
-    itsString.replace(QString("&Ucirc;"), QLatin1String("Û"), Qt::CaseSensitive);
-    itsString.replace(QString("&Uuml;"), QLatin1String("Ü"), Qt::CaseSensitive);
-    itsString.replace(QString("&Yacute;"), QLatin1String("Ý"), Qt::CaseSensitive);
-    itsString.replace(QString("&THORN;"), QLatin1String("Þ"), Qt::CaseSensitive);
-    itsString.replace(QString("&szlig;"), QLatin1String("ß"), Qt::CaseSensitive);
-    itsString.replace(QString("&agrave;"), QLatin1String("à"), Qt::CaseSensitive);
-    itsString.replace(QString("&aacute;"), QLatin1String("á"), Qt::CaseSensitive);
-    itsString.replace(QString("&acirc;"), QLatin1String("â"), Qt::CaseSensitive);
-    itsString.replace(QString("&atilde;"), QLatin1String("ã"), Qt::CaseSensitive);
-    itsString.replace(QString("&auml;"), QLatin1String("ä"), Qt::CaseSensitive);
-    itsString.replace(QString("&aring;"), QLatin1String("å"), Qt::CaseSensitive);
-    itsString.replace(QString("&aelig;"), QLatin1String("æ"), Qt::CaseSensitive);
-    itsString.replace(QString("&ccedil;"), QLatin1String("ç"), Qt::CaseSensitive);
-    itsString.replace(QString("&egrave;"), QLatin1String("è"), Qt::CaseSensitive);
-    itsString.replace(QString("&eacute;"), QLatin1String("é"), Qt::CaseSensitive);
-    itsString.replace(QString("&ecirc;"), QLatin1String("ê"), Qt::CaseSensitive);
-    itsString.replace(QString("&euml;"), QLatin1String("ë"), Qt::CaseSensitive);
-    itsString.replace(QString("&igrave;"), QLatin1String("ì"), Qt::CaseSensitive);
-    itsString.replace(QString("&iacute;"), QLatin1String("í"), Qt::CaseSensitive);
-    itsString.replace(QString("&icirc;"), QLatin1String("î"), Qt::CaseSensitive);
-    itsString.replace(QString("&iuml;"), QLatin1String("ï"), Qt::CaseSensitive);
-    itsString.replace(QString("&eth;"), QLatin1String("ð"), Qt::CaseSensitive);
-    itsString.replace(QString("&ntilde;"), QLatin1String("ñ"), Qt::CaseSensitive);
-    itsString.replace(QString("&ograve;"), QLatin1String("ò"), Qt::CaseSensitive);
-    itsString.replace(QString("&oacute;"), QLatin1String("ó"), Qt::CaseSensitive);
-    itsString.replace(QString("&ocirc;"), QLatin1String("ô"), Qt::CaseSensitive);
-    itsString.replace(QString("&otilde;"), QLatin1String("õ"), Qt::CaseSensitive);
-    itsString.replace(QString("&ouml;"), QLatin1String("ö"), Qt::CaseSensitive);
-    itsString.replace(QString("&divide;"), QLatin1String("÷"), Qt::CaseSensitive);
-    itsString.replace(QString("&oslash;"), QLatin1String("ø"), Qt::CaseSensitive);
-    itsString.replace(QString("&ugrave;"), QLatin1String("ù"), Qt::CaseSensitive);
-    itsString.replace(QString("&uacute;"), QLatin1String("ú"), Qt::CaseSensitive);
-    itsString.replace(QString("&ucirc;"), QLatin1String("û"), Qt::CaseSensitive);
-    itsString.replace(QString("&uuml;"), QLatin1String("ü"), Qt::CaseSensitive);
-    itsString.replace(QString("&yacute;"), QLatin1String("ý"), Qt::CaseSensitive);
-    itsString.replace(QString("&thorn;"), QLatin1String("þ"), Qt::CaseSensitive);
-    itsString.replace(QString("&yuml;"), QLatin1String("ÿ"), Qt::CaseSensitive);
+    itsString.replace(QString("&quot;"), QString(""""), Qt::CaseSensitive);
+    itsString.replace(QString("&euro;"), QString("€"), Qt::CaseSensitive);
+    itsString.replace(QString("&sbquo;"), QString("‚"), Qt::CaseSensitive);
+    itsString.replace(QString("&fnof;"), QString("ƒ"), Qt::CaseSensitive);
+    itsString.replace(QString("&bdquo;"), QString("„"), Qt::CaseSensitive);
+    itsString.replace(QString("&hellip;"), QString("…"), Qt::CaseSensitive);
+    itsString.replace(QString("&dagger;"), QString("†"), Qt::CaseSensitive);
+    itsString.replace(QString("&Dagger;"), QString("‡"), Qt::CaseSensitive);
+    itsString.replace(QString("&circ;"), QString("ˆ"), Qt::CaseSensitive);
+    itsString.replace(QString("&permil;"), QString("‰"), Qt::CaseSensitive);
+    itsString.replace(QString("&Scaron;"), QString("Š"), Qt::CaseSensitive);
+    itsString.replace(QString("&lsaquo;"), QString("‹"), Qt::CaseSensitive);
+    itsString.replace(QString("&OElig;"), QString("Œ"), Qt::CaseSensitive);
+    itsString.replace(QString("&lsquo;"), QString("'"), Qt::CaseSensitive);
+    itsString.replace(QString("&rsquo;"), QString("'"), Qt::CaseSensitive);
+    itsString.replace(QString("&ldquo;"), QString("'"), Qt::CaseSensitive);
+    itsString.replace(QString("&rdquo;"), QString("'"), Qt::CaseSensitive);
+    itsString.replace(QString("&bull;"), QString("•"), Qt::CaseSensitive);
+    itsString.replace(QString("&ndash;"), QString("–"), Qt::CaseSensitive);
+    itsString.replace(QString("&mdash;"), QString("—"), Qt::CaseSensitive);
+    itsString.replace(QString("&tilde;"), QString("˜"), Qt::CaseSensitive);
+    itsString.replace(QString("&trade;"), QString("™"), Qt::CaseSensitive);
+    itsString.replace(QString("&scaron;"), QString("š"), Qt::CaseSensitive);
+    itsString.replace(QString("&rsaquo;"), QString("›"), Qt::CaseSensitive);
+    itsString.replace(QString("&oelig;"), QString("œ"), Qt::CaseSensitive);
+    itsString.replace(QString("&Yuml;"), QString("Ÿ"), Qt::CaseSensitive);
+    itsString.replace(QString("&iexcl;"), QString("¡"), Qt::CaseSensitive);
+    itsString.replace(QString("&cent;"), QString("¢"), Qt::CaseSensitive);
+    itsString.replace(QString("&pound;"), QString("£"), Qt::CaseSensitive);
+    itsString.replace(QString("&curren;"), QString("¤"), Qt::CaseSensitive);
+    itsString.replace(QString("&yen;"), QString("¥"), Qt::CaseSensitive);
+    itsString.replace(QString("&brvbar;"), QString("¦"), Qt::CaseSensitive);
+    itsString.replace(QString("&sect;"), QString("§"), Qt::CaseSensitive);
+    itsString.replace(QString("&uml;"), QString("¨"), Qt::CaseSensitive);
+    itsString.replace(QString("&copy;"), QString("©"), Qt::CaseSensitive);
+    itsString.replace(QString("&ordf;"), QString("ª"), Qt::CaseSensitive);
+    itsString.replace(QString("&laquo;"), QString("«"), Qt::CaseSensitive);
+    itsString.replace(QString("&not;"), QString("¬"), Qt::CaseSensitive);
+    itsString.replace(QString("&shy;"), QString("­"), Qt::CaseSensitive);
+    itsString.replace(QString("&reg;"), QString("®"), Qt::CaseSensitive);
+    itsString.replace(QString("&macr;"), QString("¯"), Qt::CaseSensitive);
+    itsString.replace(QString("&deg;"), QString("°"), Qt::CaseSensitive);
+    itsString.replace(QString("&plusmn;"), QString("±"), Qt::CaseSensitive);
+    itsString.replace(QString("&sup2;"), QString("²"), Qt::CaseSensitive);
+    itsString.replace(QString("&sup3;"), QString("³"), Qt::CaseSensitive);
+    itsString.replace(QString("&acute;"), QString("´"), Qt::CaseSensitive);
+    itsString.replace(QString("&micro;"), QString("µ"), Qt::CaseSensitive);
+    itsString.replace(QString("&para;"), QString("¶"), Qt::CaseSensitive);
+    itsString.replace(QString("&middot;"), QString("·"), Qt::CaseSensitive);
+    itsString.replace(QString("&cedil;"), QString("¸"), Qt::CaseSensitive);
+    itsString.replace(QString("&sup1;"), QString("¹"), Qt::CaseSensitive);
+    itsString.replace(QString("&ordm;"), QString("º"), Qt::CaseSensitive);
+    itsString.replace(QString("&raquo;"), QString("»"), Qt::CaseSensitive);
+    itsString.replace(QString("&frac14;"), QString("¼"), Qt::CaseSensitive);
+    itsString.replace(QString("&frac12;"), QString("½"), Qt::CaseSensitive);
+    itsString.replace(QString("&frac34;"), QString("¾"), Qt::CaseSensitive);
+    itsString.replace(QString("&iquest;"), QString("¿"), Qt::CaseSensitive);
+    itsString.replace(QString("&Agrave;"), QString("À"), Qt::CaseSensitive);
+    itsString.replace(QString("&Aacute;"), QString("Á"), Qt::CaseSensitive);
+    itsString.replace(QString("&Acirc;"), QString("Â"), Qt::CaseSensitive);
+    itsString.replace(QString("&Atilde;"), QString("Ã"), Qt::CaseSensitive);
+    itsString.replace(QString("&Auml;"), QString("Ä"), Qt::CaseSensitive);
+    itsString.replace(QString("&Aring;"), QString("Å"), Qt::CaseSensitive);
+    itsString.replace(QString("&AElig;"), QString("Æ"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ccedil;"), QString("Ç"), Qt::CaseSensitive);
+    itsString.replace(QString("&Egrave;"), QString("È"), Qt::CaseSensitive);
+    itsString.replace(QString("&Eacute;"), QString("É"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ecirc;"), QString("Ê"), Qt::CaseSensitive);
+    itsString.replace(QString("&Euml;"), QString("Ë"), Qt::CaseSensitive);
+    itsString.replace(QString("&Igrave;"), QString("Ì"), Qt::CaseSensitive);
+    itsString.replace(QString("&Iacute;"), QString("Í"), Qt::CaseSensitive);
+    itsString.replace(QString("&Icirc;"), QString("Î"), Qt::CaseSensitive);
+    itsString.replace(QString("&Iuml;"), QString("Ï"), Qt::CaseSensitive);
+    itsString.replace(QString("&ETH;"), QString("Ð"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ntilde;"), QString("Ñ"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ograve;"), QString("Ò"), Qt::CaseSensitive);
+    itsString.replace(QString("&Oacute;"), QString("Ó"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ocirc;"), QString("Ô"), Qt::CaseSensitive);
+    itsString.replace(QString("&Otilde;"), QString("Õ"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ouml;"), QString("Ö"), Qt::CaseSensitive);
+    itsString.replace(QString("&times;"), QString("×"), Qt::CaseSensitive);
+    itsString.replace(QString("&Oslash;"), QString("Ø"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ugrave;"), QString("Ù"), Qt::CaseSensitive);
+    itsString.replace(QString("&Uacute;"), QString("Ú"), Qt::CaseSensitive);
+    itsString.replace(QString("&Ucirc;"), QString("Û"), Qt::CaseSensitive);
+    itsString.replace(QString("&Uuml;"), QString("Ü"), Qt::CaseSensitive);
+    itsString.replace(QString("&Yacute;"), QString("Ý"), Qt::CaseSensitive);
+    itsString.replace(QString("&THORN;"), QString("Þ"), Qt::CaseSensitive);
+    itsString.replace(QString("&szlig;"), QString("ß"), Qt::CaseSensitive);
+    itsString.replace(QString("&agrave;"), QString("à"), Qt::CaseSensitive);
+    itsString.replace(QString("&aacute;"), QString("á"), Qt::CaseSensitive);
+    itsString.replace(QString("&acirc;"), QString("â"), Qt::CaseSensitive);
+    itsString.replace(QString("&atilde;"), QString("ã"), Qt::CaseSensitive);
+    itsString.replace(QString("&auml;"), QString("ä"), Qt::CaseSensitive);
+    itsString.replace(QString("&aring;"), QString("å"), Qt::CaseSensitive);
+    itsString.replace(QString("&aelig;"), QString("æ"), Qt::CaseSensitive);
+    itsString.replace(QString("&ccedil;"), QString("ç"), Qt::CaseSensitive);
+    itsString.replace(QString("&egrave;"), QString("è"), Qt::CaseSensitive);
+    itsString.replace(QString("&eacute;"), QString("é"), Qt::CaseSensitive);
+    itsString.replace(QString("&ecirc;"), QString("ê"), Qt::CaseSensitive);
+    itsString.replace(QString("&euml;"), QString("ë"), Qt::CaseSensitive);
+    itsString.replace(QString("&igrave;"), QString("ì"), Qt::CaseSensitive);
+    itsString.replace(QString("&iacute;"), QString("í"), Qt::CaseSensitive);
+    itsString.replace(QString("&icirc;"), QString("î"), Qt::CaseSensitive);
+    itsString.replace(QString("&iuml;"), QString("ï"), Qt::CaseSensitive);
+    itsString.replace(QString("&eth;"), QString("ð"), Qt::CaseSensitive);
+    itsString.replace(QString("&ntilde;"), QString("ñ"), Qt::CaseSensitive);
+    itsString.replace(QString("&ograve;"), QString("ò"), Qt::CaseSensitive);
+    itsString.replace(QString("&oacute;"), QString("ó"), Qt::CaseSensitive);
+    itsString.replace(QString("&ocirc;"), QString("ô"), Qt::CaseSensitive);
+    itsString.replace(QString("&otilde;"), QString("õ"), Qt::CaseSensitive);
+    itsString.replace(QString("&ouml;"), QString("ö"), Qt::CaseSensitive);
+    itsString.replace(QString("&divide;"), QString("÷"), Qt::CaseSensitive);
+    itsString.replace(QString("&oslash;"), QString("ø"), Qt::CaseSensitive);
+    itsString.replace(QString("&ugrave;"), QString("ù"), Qt::CaseSensitive);
+    itsString.replace(QString("&uacute;"), QString("ú"), Qt::CaseSensitive);
+    itsString.replace(QString("&ucirc;"), QString("û"), Qt::CaseSensitive);
+    itsString.replace(QString("&uuml;"), QString("ü"), Qt::CaseSensitive);
+    itsString.replace(QString("&yacute;"), QString("ý"), Qt::CaseSensitive);
+    itsString.replace(QString("&thorn;"), QString("þ"), Qt::CaseSensitive);
+    itsString.replace(QString("&yuml;"), QString("ÿ"), Qt::CaseSensitive);
 
     itsString.replace(QString("&#8203;"), QString(""), Qt::CaseInsensitive);
     itsString.replace(QString("&#x2F;"), QString("/"), Qt::CaseInsensitive);
@@ -1229,18 +1237,21 @@ void PQString::replace(const int start, const int numChars, const QString newStr
 
 QString PQString::unQuoteHTML()
 {
-    QTextDocument text;
+    /*QTextDocument text;
     text.setHtml(itsString);
     itsString = text.toPlainText();
     // Run a second time to pick up unusual coding like "&amp;quot;"
     text.setHtml(itsString);
-    itsString = text.toPlainText();
+    itsString = text.toPlainText();*/
 
-    QRegExp rx("(\\\\u[0-9a-fA-F]{4})");
-    int pos = 0;
-    while ((pos = rx.indexIn(itsString, pos)) != -1)
+    static QRegularExpression re("\\\\u([0-9a-fA-F]{4})");
+    static QRegularExpressionMatch match;
+
+    match = re.match(itsString);
+    while (match.hasMatch())
     {
-        itsString.replace(pos++, 6, QChar(rx.cap(1).right(4).toUShort(nullptr, 16)));
+        itsString.replace(match.captured(0), QChar(match.captured(1).toUShort(nullptr, 16)));
+        match = re.match(itsString);
     }
 
     // Second process to catch anything left
@@ -1362,13 +1373,13 @@ bool PQString::removeEnding(const std::wstring target)
 {
     int itsLength = itsString.length();
     int removeLength = static_cast<int>(target.size());
-    if (removeLength > itsLength)
-        return false;
+    if (removeLength > itsLength){
+        return false;}
 
 	bool matched = true;
 
-    for (int i = 0; i < removeLength; i++)
-        matched = matched && (itsString.at(itsLength - removeLength + i) == target[static_cast<unsigned long long>(i)]);
+    for (int i = 0; i < removeLength; i++){
+        matched = matched && (itsString.at(itsLength - removeLength + i) == target[static_cast<unsigned long long>(i)]);}
 
 	if (matched)
 	{
@@ -1475,7 +1486,7 @@ bool PQString::removePossessive()
 
 bool PQString::cleanUpEnds()
 {
-	bool changesMade;
+    bool changesMade = false;
     PQString firstChar, lastChar;
 
     firstChar = itsString.left(1);
@@ -1664,7 +1675,7 @@ bool PQString::isForeignLanguage() const
 bool PQString::startsWithClick(bool includeVoided) const
 {
     QString firstWord;
-    QStringList linkWords = QString("click|view|video|watch|http|blankedoutsentence").split("|");
+    QStringList linkWords = QString("click|view|video|watch|http|livestream|stream|book|reserve|blankedoutsentence").split("|");
     if (includeVoided)
         linkWords.append("voidedoutsentence");
 
@@ -1689,7 +1700,7 @@ bool  PQString::containsVowel() const
     int i = 0;
     int j = 0;
     int length = itsString.length();
-    QLatin1String vowels("aeiouéèô");
+    QString vowels("aeiouéèô");
 
     while (!hasVowel && (i < length))
     {
@@ -1911,9 +1922,9 @@ int PQString::findPosition(const PQString &criteria, int direction, unsigned int
 	// Start actual search
     unsigned int numMatched, i, j;
     int firstCharPos;							// must go to -1 in backwards search
-	bool initialMatch, matched;
+    bool initialMatch, matched;
 	numMatched = 0;
-	initialMatch = matched = false;
+    matched = false;
 
 	if (direction == 1)	// forward
 	{
@@ -2136,7 +2147,8 @@ unsigned int PQString::drawOutNumber() const
 	return result;
 }
 
-QString PQString::diacriticLetters = QString::fromLatin1("ŠŒŽšœžŸ¥µÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýÿ") + QChar(263) + QChar(265) + QChar(269) + QChar(0x0160);
+//QString PQString::diacriticLetters = QString::fromLatin1("ŠŒŽšœžŸ¥µÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýÿ") + QChar(263) + QChar(265) + QChar(269) + QChar(0x0160);
+QString PQString::diacriticLetters = QString("ŠŒŽšœžŸ¥µÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýÿ") + QChar(263) + QChar(265) + QChar(269) + QChar(0x0160);
 
 QList<QString> PQString::noDiacriticLetters = QList<QString>() <<"S"<<"OE"<<"Z"<<"s"<<"oe"<<"z"<<"Y"<<"Y"<<"u"<<"A"<<"A"<<"A"<<"A"<<"A"<<"A"<<"AE"<<"C"<<"E"
                                                                <<"E"<<"E"<<"E"<<"I"<<"I"<<"I"<<"I"<<"D"<<"N"<<"O"<<"O"<<"O"<<"O"<<"O"<<"O"<<"U"<<"U"<<"U"<<"U"

@@ -15,12 +15,13 @@
 #include <QDebug>
 #include <QCoreApplication>
 #include <QRandomGenerator>
+#include <QStringConverter>
 
 #include "../Include/Penser/OQString.h"
 #include "../Include/Internet/qSourceFile.h"
 #include "../Internet/qWebStructures.h"
 
-enum CHARSET {UTF8, ISO88591, ISO88595, Windows1252};
+enum CHARSET {UTF8, ISO88591, ISO88595, Windows1252, USASCII};
 
 
 class DownloadWorkerBR3 : public QObject

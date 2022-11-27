@@ -8,6 +8,7 @@ PostalCodes::PostalCodes()
 PostalCodes::~PostalCodes()
 {
     delete p;
+    p = nullptr;
 }
 
 POSTALCODE_INFO PostalCodes::lookup(QString pc)

@@ -2,7 +2,7 @@
 
 #include "PQStream.h"
 
-PQStream::PQStream() : PQString(), position(0), EOS(true)
+PQStream::PQStream() : PQString(), EOS(true), position(0)
 {
 }
 
@@ -24,7 +24,6 @@ PQStream::PQStream(const std::wstring &source) : PQString(source), position(0)
 
 PQStream::~PQStream()
 {
-
 }
 
 void PQStream::forward(unsigned int numPosition)
@@ -287,8 +286,10 @@ PQString PQStream::readHTMLContent(unsigned int maxChar)
             {
                 if ((singleChar == quote) || (singleChar == closeTag))
                     started = true;
-                else;
-                // Disregard;
+                else
+                {
+                // Disregard
+                };
             }
         }
         lastChar = singleChar;
@@ -320,7 +321,8 @@ PQString PQStream::readNextBetween(unsigned int param)
        }
 
         currentCharType = ANSI[numANSI].charType_defns;
-        if (endPoint = (currentCharType & param) == param)
+        endPoint = (currentCharType & param) == param;
+        if (endPoint)
             numParam++;
         if ((numParam == 1) && !endPoint)
             heldSoFar += singleChar;
@@ -370,7 +372,8 @@ PQStream& PQStream::operator= (const std::wstring &rhs)
 
 PQStream& PQStream::operator= (const QByteArray &rhs)
 {
-    itsString = QString(QTextCodec::codecForMib(106)->toUnicode(rhs));
+    //itsString = QString(QTextCodec::codecForMib(106)->toUnicode(rhs));
+    itsString = QString(rhs);
 
     position = 0;
     if (itsString.length() > 0)

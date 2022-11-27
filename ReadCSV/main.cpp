@@ -4,12 +4,12 @@
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlDriver>
 #include <QtSql/QSqlQuery>
-#include <QTextCodec>
+//#include <QTextCodec>
 #include <QDebug>
 #include <iostream>
 
 #include "../UpdateFuneralHomes/Include/globalVars.h"
-#include "../UpdateFuneralHomes/Include/dataStructure.h"
+//#include "../UpdateFuneralHomes/Include/dataStructure.h"
 #include "../UpdateFuneralHomes/Include/dataRecord.h"
 #include "../UpdateFuneralHomes/Include/matchRecord.h"
 #include "../Include/PMySQL/pMySQL.h"
@@ -21,12 +21,6 @@ int main(int argc, char *argv[])
 {
     Q_UNUSED(argc);
     Q_UNUSED(argv);
-
-    /*******************************************/
-    /*           Set Locale to UTF-8           */
-    /*******************************************/
-
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 
     /*******************************************/
     /*       Override default test mode        */
@@ -45,7 +39,7 @@ int main(int argc, char *argv[])
     GLOBALVARS globals;
 
     // Setup the MySQL connection with database manager 'db'
-    if (!createConnection(globals.db, QString("deceasedUpdater")))
+    if (!createConnection(QString("deceasedUpdater")))
     {
         qDebug() << "Error connecting to SQL database 'death_audits'";
         globals.logMsg(ErrorConnection, QString("Error connecting to SQL database death_audits"));

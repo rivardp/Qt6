@@ -52,6 +52,7 @@ public:
     void  sentenceReadDateOfService(QDate &DOSD, LANGUAGE lang);
     void contentReadSpouseName(LANGUAGE lang = language_unknown);
     bool sentenceReadSpouseName(LANGUAGE lang);
+    bool sentenceReadYearsMarried(LANGUAGE lang);
     bool clean(LANGUAGE lang = language_unknown);
     bool truncateAfterParentReference(LANGUAGE lang = language_unknown, bool firstSentence = false);
     bool truncateAfterChildReference(LANGUAGE lang = language_unknown, bool firstSentence = false);
@@ -154,15 +155,15 @@ protected:
     LANGUAGE contentLanguage;
     GENDER contentGender;
 
-    QList<int> sentenceStartPositions;
-    int lastSentenceStartPosition;
-    bool realSentenceEncountered;
-
     unsigned int numEnglishDates;
 	unsigned int numFrenchDates;
 	unsigned int numSpanishDates;
     unsigned int numMaleWords;
     unsigned int numFemaleWords;
+
+    QList<int> sentenceStartPositions;
+    int lastSentenceStartPosition;
+    bool realSentenceEncountered;
 
     static GLOBALVARS *globals;
     MAKEDATE dateToday;

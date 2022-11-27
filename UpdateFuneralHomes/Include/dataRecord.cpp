@@ -316,7 +316,7 @@ void dataRecord::addMaidenName(const PQString &mn)
 {
     bool alreadyThere;
     QString names = mn.getString();
-    QList<QString> nameList = names.split(QString("-"), QString::SkipEmptyParts, Qt::CaseSensitive);
+    QList<QString> nameList = names.split(QString("-"), Qt::SkipEmptyParts, Qt::CaseSensitive);
 
     for (int i = 0; i < nameList.size(); i++)
     {
@@ -406,6 +406,13 @@ void dataRecord::clearDOB()
     DOBfullyCredible = false;
 }
 
+void dataRecord::clearDOD()
+{
+    QDate newDOD;
+    DOD = newDOD;
+    DODfullyCredible = false;
+}
+
 void dataRecord::setDOB(const QDate &dob, const bool forceOverride, const bool fullyCredible)
 {
     bool error, dateError, rangeErrorHigh, rangeErrorLow;
@@ -414,7 +421,7 @@ void dataRecord::setDOB(const QDate &dob, const bool forceOverride, const bool f
     if (datesLocked)
         return;
 
-    if (dob.isValid() && (dob <= globals.today))
+    if (dob.isValid() && (dob <= globals.today) && (dob > QDate(1900,1,1)))
 	{
 		// Match against existing data if it exists
         dateError = DOB.isValid() && (DOB != dob);
@@ -760,7 +767,7 @@ void dataRecord::setDOD(const QDate &dod, const bool forceOverride, const bool f
         error = DOD.isValid() && ((DOD != dod) || (dod > globals.today));
         if (error && (DOD != dod))
         {
-            if ((dod > globals.today) || ((DOD.year() == globals.today.year()) && (dod.year() < globals.today.year())))
+            if ((DOD > globals.today) || ((DOD.year() == globals.today.year()) && (dod.year() < globals.today.year()) && (dod.year() >= (globals.today.year() - 25))))
                 overrideOverride = true;
         }
 
@@ -806,8 +813,8 @@ void dataRecord::setDOBandDOD(const DATES &dates, const bool forceOverride)
 {
     bool problem = false;
 
-    if (datesLocked)
-        return;
+    if (datesLocked){
+        return;}
 
 	if (dates.potentialDOB.isValid() && dates.potentialDOD.isValid())
 	{
@@ -901,9 +908,20 @@ void dataRecord::setDOBandDOD(const DATES &dates, const bool forceOverride)
         YOD = static_cast<unsigned int>(DOD.year());
 }
 
+void dataRecord::setTypoDOB(const QDate &dob)
+{
+    typoDOB = dob;
+}
+
+void dataRecord::setTypoDOD(const QDate &dod)
+{
+    typoDOD = dod;
+}
+
 void dataRecord::setAgeAtDeath(const unsigned int num, const bool fullyCredible, const bool override)
 {
     bool consistent;
+    unsigned int existingAgeAtDeath = ageAtDeath;
 
     if (datesLocked)
         return;
@@ -917,8 +935,29 @@ void dataRecord::setAgeAtDeath(const unsigned int num, const bool fullyCredible,
 
         if (DOBfullyCredible && DODfullyCredible)
         {
-            ageAtDeath = tempAgeAtDeath;
-            ageAtDeathFullyCredible = true;
+            if ((DOB == DOD) && (num > 0))
+            {
+                // Assume there was an error in structured dates
+                if (YOB > (YOD - num))
+                {
+                    // YOB wrong
+                    clearDOB();
+                    YOB = 0;
+                    ageAtDeath = num;
+                    setMinMaxDOB();
+                }
+                else
+                {
+                    // YOD wrong
+                    clearDOD();
+                    YOD = 0;
+                }
+            }
+            else
+            {
+                ageAtDeath = tempAgeAtDeath;
+                ageAtDeathFullyCredible = true;
+            }
         }
         else
         {
@@ -933,11 +972,19 @@ void dataRecord::setAgeAtDeath(const unsigned int num, const bool fullyCredible,
                 }
                 else
                 {
-                    ageAtDeath = tempAgeAtDeath;
-                    if (((tempAgeAtDeath - num) == 1) || ((num - tempAgeAtDeath) == 1))
+                    if (tempAgeAtDeath == existingAgeAtDeath)
+                    {
+                        // Likely an interpretation error reading sentences
                         wi.dateFlag = 9;
+                    }
                     else
-                        wi.dateFlag = 19;
+                    {
+                        ageAtDeath = tempAgeAtDeath;
+                        if (((tempAgeAtDeath - num) == 1) || ((num - tempAgeAtDeath) == 1))
+                            wi.dateFlag = 9;
+                        else
+                            wi.dateFlag = 19;
+                    }
                 }
             }
             else
@@ -1030,6 +1077,30 @@ void dataRecord::setAgeAtDeath(const unsigned int num, const bool fullyCredible,
         return;
     }
 
+    if (DOD.isValid() && !DOB.isValid() && typoDOB.isValid() && (num > 0))
+    {
+        QDate tempDate;
+
+        int mthDOD = DOD.month();
+        int dayDOD = DOD.day();
+        int mthDOB = typoDOB.month();
+        int dayDOB = typoDOB.day();
+
+        bool earlierDOB = (mthDOB < mthDOD) || ((mthDOB == mthDOD) && (dayDOB < dayDOD));
+
+        if (earlierDOB)
+            tempDate = QDate(YOD - num, mthDOB, dayDOB);
+        else
+            tempDate = QDate(YOD - num - 1, mthDOB, dayDOB);
+
+        if (tempDate.isValid())
+        {
+            DOB = tempDate;
+            ageAtDeath = num;
+            ageAtDeathFullyCredible = false;
+        }
+    }
+
     consistent = ((num == ageAtDeath) || (ageAtDeath == 0));
     if (consistent || override)
     {
@@ -1106,8 +1177,8 @@ void dataRecord::setAlternates(const NAMEINFO &nameInfo, bool bestOf)
 
     LANGUAGE lang = getLanguage();
     GENDER gender = getGender();
-    if (gender == genderUnknown)
-        gender = getWorkingGender();
+    if (gender == genderUnknown){
+        gender = getWorkingGender();}
 
 	switch (type)
 	{
@@ -1478,6 +1549,17 @@ void dataRecord::setYOB(const unsigned int yob, const bool forceOverride, const 
                 minDOB = minDate;
                 maxDOB = maxDate;
             }
+            else
+            {
+                if (errorA && (YOB == YOD) && (yob < YOB))
+                {
+                    // Assume original information is wrong
+                    DOB.setDate(0,0,0);
+                    YOB = yob;
+                    minDOB = minDate;
+                    maxDOB = maxDate;
+                }
+            }
         }
     }
     else
@@ -1532,11 +1614,6 @@ void dataRecord::setYOD(const unsigned int yod, const bool forceOverride, const 
         globals.logMsg(ErrorRecord, errMsg);
         globals.globalDr->wi.dateFlag = 3;
     }
-}
-
-void dataRecord::setCycle(const unsigned int num)
-{
-    cycle = num;
 }
 
 void dataRecord::setTitle(const PQString &Title)
@@ -2079,7 +2156,8 @@ void dataRecord::xport(QString filename, int extraOptParam)
     if(globals.output->open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append))
     {
         QTextStream outputStream(globals.output);
-        outputStream.setCodec("UTF-8");
+        //outputStream.setCodec("UTF-8");
+        outputStream.setEncoding(QStringEncoder::Utf8);
 
         // Before exporting, check for problematic double quotes in names
         // checkNames deletes any double quotes found
@@ -2151,7 +2229,7 @@ void dataRecord::xport(QString filename, int extraOptParam)
         outputStream << wi.confirmTreatmentName << comma;
         outputStream << postalCodeInfo.getPostalCode() << comma << priorUnmatched << comma << previouslyLoaded << comma;
         outputStream << extraOptParam << comma;
-        outputStream << endl;
+        outputStream << Qt::endl;
 
         globals.output->close();
     }
@@ -2655,7 +2733,7 @@ bool dataRecord::isASimilarName(const OQString &name)
             {
                 if (name.getLength() > target.getLength())
                 {
-                    target = target;
+                    target = target.getString();
                     searchIn = name;
                 }
                 else
@@ -2794,6 +2872,8 @@ void dataRecord::clear()
  workingGender = genderUnknown;
  DOB.setDate(0,0,0);
  DOD.setDate(0,0,0);
+ typoDOB.setDate(0,0,0);
+ typoDOD.setDate(0,0,0);
  YOB = 0;
  YOD = 0;
  deemedYOD = 0;
@@ -2845,62 +2925,6 @@ void dataRecord::clearFirstNames()
 void dataRecord::clearMiddleNames()
 {
     middleNames.clear();
-}
-
-dataRecord& dataRecord::operator= (const dataRecord &rhs)
-{
-    this->clear();
-
-    familyName = rhs.familyName;
-    familyNameAlt1 = rhs.familyNameAlt1;
-    familyNameAlt2 = rhs.familyNameAlt2;
-    familyNameAlt3 = rhs.familyNameAlt3;
-    firstName = rhs.firstName;
-    firstNameAKA1 = rhs.firstNameAKA1;
-    firstNameAKA2 = rhs.firstNameAKA2;
-    middleNames = rhs.middleNames;
-    middleNameUsedAsFirstName = rhs.middleNameUsedAsFirstName;
-    parentsLastName = rhs.middleNameUsedAsFirstName;
-    maidenNames = rhs.maidenNames;
-    suffix = rhs.suffix;
-    prefix = rhs.prefix;
-    gender = rhs.gender;
-    workingGender = rhs.workingGender;
-    DOB = rhs.DOB;
-    DOD = rhs.DOD;
-    YOB = rhs.YOB;
-    YOD = rhs.YOD;
-    deemedYOD = rhs.deemedYOD;
-    ageAtDeath = rhs.ageAtDeath;
-    minDOB = rhs.minDOB;
-    maxDOB = rhs.maxDOB;
-    DOBfullyCredible = rhs.DOBfullyCredible;
-    DODfullyCredible = rhs.DODfullyCredible;
-    YOBfullyCredible = rhs.YOBfullyCredible;
-    YODfullyCredible = rhs.YODfullyCredible;
-    ageAtDeathFullyCredible = rhs.ageAtDeathFullyCredible;
-    datesLocked = rhs.datesLocked;
-    sourceID = rhs.sourceID;
-    firstRecorded = rhs.firstRecorded;
-    lastUpdated = rhs.lastUpdated;
-    language = rhs.language;
-    DOS = rhs.DOS;
-    commentDate = rhs.commentDate;
-    cycle = rhs.cycle;
-    numUnmatched = rhs.numUnmatched;
-    priorUnmatched = rhs.priorUnmatched;
-    previouslyLoaded = rhs.previouslyLoaded;
-    title = rhs.title;
-    titleKey = rhs.titleKey;
-    neeEtAlEncountered = rhs.neeEtAlEncountered;
-    ageNextReference = rhs.ageNextReference;
-    maleHyphenated = rhs.maleHyphenated;
-    spouseName = rhs.spouseName;
-    postalCodeInfo = rhs.postalCodeInfo;
-
-    globals = rhs.globals;
-
-    return *this;
 }
 
 void dataRecord::removeUnnecessaryInitials()
@@ -4146,8 +4170,8 @@ bool dataRecord::setPostalCode(QString &pc)
 {
     postalCodeInfo.clear();
 
-    PostalCodes pcDatabase;
-    postalCodeInfo = pcDatabase.lookup(pc);
+    databaseSearches dbSearch;
+    dbSearch.fillInPostalCodeInfo(&globals, postalCodeInfo, pc);
 
     return postalCodeInfo.isValid();
 }
@@ -4242,19 +4266,6 @@ int dataRecord::reorderLee()
 bool SOURCEID::operator ==(SOURCEID const& newSource) const
 {
     return  (provider == newSource.provider) && (providerKey == newSource.providerKey) && (ID == newSource.ID) && (URL == newSource.URL) && (deceasedNumber == newSource.deceasedNumber);
-}
-
-SOURCEID& SOURCEID::operator =(SOURCEID newSource)
-{
-    provider = newSource.provider;
-    providerKey = newSource.providerKey;
-    ID = newSource.ID.getString();
-    URL = newSource.URL;
-    publishDate = newSource.publishDate;
-
-    deceasedNumber = newSource.deceasedNumber;
-
-    return *this;
 }
 
 void SOURCEID::clear()

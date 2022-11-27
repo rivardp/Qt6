@@ -17,6 +17,8 @@ void readLine(QFile &filename, dataRecord &dr, GLOBALVARS gv)
     int num, y, m, d;
     QString comma(",");
     char buffer[1024];
+    //QTextStream test(&filename);
+   // QString testLine = test.readLine();
 
     qint64 lineLength = filename.readLine(buffer, sizeof(buffer));
     if (lineLength != -1)
@@ -222,7 +224,7 @@ void readLine(QFile &filename, dataRecord &dr, GLOBALVARS gv)
 bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
 {
     GLOBALVARS gv = dr.globals;
-    dataRecord drCopy = dr;
+    dataRecord drCopy(dr);
     dataRecord drDB;
     databaseSearches dbSearch;
     POSTALCODE_INFO pcInfo;
@@ -313,8 +315,10 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
     if (deleteRecord)
     {
         success = query.prepare("DELETE FROM deceased WHERE deceasedNumber = :deceasedNumber");
+        if (!success)
+            qDebug() << "Improperly structured query statement";
         query.bindValue(":deceasedNumber", QVariant(runCode));
-        success = query.exec();
+        query.exec();
         query.clear();
     }
 
@@ -439,7 +443,6 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
     // Determine number of records required per distinct deceasedID (one per last name variation)
     QList<QString> lastNames;
     QString tempName;
-    //QString cycleLastName, cycleDOB;
     lastNames.append(drCopy.getLastName().getString());
     tempName = drCopy.getLastNameAlt1().getString();
     if (tempName.size() > 0)
@@ -502,12 +505,12 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
     query.bindValue(":DOD", QVariant(dateSQL.getString()));
 
     if (drCopy.getYOB() == 0)
-        query.bindValue(":YOB", QVariant(QVariant::Int));
+        query.bindValue(":YOB", QVariant(QMetaType::fromType<int>()));
     else
         query.bindValue(":YOB", QVariant(drCopy.getYOB()));
 
     if (drCopy.getYOD() == 0)
-        query.bindValue(":YOD", QVariant(QVariant::Int));
+        query.bindValue(":YOD", QVariant(drCopy.getYOB()));
     else
         query.bindValue(":YOD", QVariant(drCopy.getYOD()));
 
@@ -640,6 +643,8 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
             /********************************/
 
             success = overrideQuery.prepare("SELECT firstLoaded FROM death_audits.deceased WHERE deceasedNumber = :deceasedNumber AND lastName = :lastName");
+            if (!success)
+                qDebug() << "Improperly structured query statement";
 
             overrideQuery.bindValue(":lastName", QVariant(lastNames.value(i - 1)));
             overrideQuery.bindValue(":deceasedNumber", QVariant(drCopy.getDeceasedNumber()));
@@ -686,9 +691,9 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
                 {
                     QString DBerrorDesc = error.databaseText();
                     QString DriverErrorDesc = error.driverText();
-                    errorMessage << QString(" - ") << DBerrorDesc;
+                    errorMessage << QString(" - ") << DBerrorDesc << " - " << DriverErrorDesc;
                 }
-                QString lastQ = query.lastQuery();
+                //QString lastQ = query.lastQuery();
 
                 gv.logMsg(ErrorSQL, errorMessage, static_cast<int>(error.type()));
             }
@@ -709,7 +714,7 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
 
 bool loadSourceID(const SOURCEID &sid, GLOBALVARS gv)
 {
-    QSqlQuery query, overrideQuery;
+    QSqlQuery query;
     QSqlError error;
     PQString errorMessage, dateSQL;
     bool success;
@@ -727,6 +732,8 @@ bool loadSourceID(const SOURCEID &sid, GLOBALVARS gv)
 
     success = query.prepare("INSERT INTO death_audits.deceasedidinfo (deceasedNumber, providerID, providerKey, ID, url, publishDate) "
                             "VALUES(:deceasedNumber, :providerID, :providerKey, :ID, :url, :publishDate)");
+    if (!success)
+        qDebug() << "Improperly structured query statement";
 
     query.bindValue(":deceasedNumber", QVariant(sid.deceasedNumber));
     query.bindValue(":providerID", QVariant(sid.provider));
@@ -744,6 +751,8 @@ bool loadSourceID(const SOURCEID &sid, GLOBALVARS gv)
         query.clear();
         success = query.prepare("UPDATE death_audits.deceasedidinfo SET publishDate = :publishDate "
                                 "WHERE deceasedNumber = :deceasedNumber AND providerID = :providerID AND providerKey = :providerKey AND ID = :ID and url = :url");
+        if (!success)
+            qDebug() << "Improperly structured query statement";
 
         query.bindValue(":deceasedNumber", QVariant(sid.deceasedNumber));
         query.bindValue(":providerID", QVariant(sid.provider));
@@ -1046,6 +1055,8 @@ bool updateRecord(const dataRecord &dr, const double weight, const PQString upda
                                 "DOB = :DOB, minDOB = :minDOB, maxDOB = :maxDOB, DOD = :DOD, YOB = :YOB, YOD = :YOD, "
                                 "ageAtDeath = :ageAtDeath, DOS = :DOS, weight = :weight, lastUpdated = :lastUpdated "
                                 "WHERE lastName = :lastName AND deceasedNumber = :deceasedNumber");
+    if (!success)
+        qDebug() << "Improperly structured query statement";
 
     query.bindValue(":firstName", QVariant(dr.getFirstName().getString()));
     query.bindValue(":middleNames", QVariant(dr.getMiddleNames().getString()));
@@ -1081,12 +1092,12 @@ bool updateRecord(const dataRecord &dr, const double weight, const PQString upda
     query.bindValue(":DOD", QVariant(dateSQL.getString()));
 
     if (YOB == 0)
-        query.bindValue(":YOB", QVariant(QVariant::Int));
+        query.bindValue(":YOB", QVariant(QMetaType::fromType<int>()));
     else
         query.bindValue(":YOB", QVariant(YOB));
 
     if (YOD == 0)
-        query.bindValue(":YOD", QVariant(QVariant::Int));
+        query.bindValue(":YOD", QVariant(QMetaType::fromType<int>()));
     else
         query.bindValue(":YOD", QVariant(YOD));
 

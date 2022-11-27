@@ -3,8 +3,9 @@
 #ifndef OQSTREAM_H
 #define OQSTREAM_H
 
-#include <QTextCodec>
-#include <QDate>
+//#include <QTextCodec>
+//#include <QDate>
+#include <QDateTime>
 #include "OQString.h"
 
 class OQStream:public OQString
@@ -12,6 +13,7 @@ class OQStream:public OQString
 
 public:
     OQStream();
+    OQStream(const OQStream &source);
     OQStream(const OQString source);
     OQStream(const PQString source);
     OQStream(const QString source);
@@ -30,7 +32,7 @@ public:
     bool consecutiveMovesTo(const int maxMove, const QString &string1, const QString &string2, const QString &string3 = QString(), const QString &string4 = QString());
 
     bool isEOS() const;
-    bool contains(const QString &string);
+    bool contains(const QString &string, bool ignoreBookendedLetters = false);
     bool hasAllWordsCapitalized(bool mustBeAlpha = true);
     bool streamIsJustDates();
     int firstDifferenceFrom(QString comparisonString);
@@ -81,6 +83,7 @@ public:
     void replace(const QString target, const QString newString, const Qt::CaseSensitivity caseSensitive = Qt::CaseSensitive);    // Replace parts of string with new string
     void replace(const int start, const int numChars, const QString newString);    // Replace parts of string with new string
     void replaceHTMLentities();   // Replaces &nbsp; and other entities with real character
+    void removeLinks();           // Remove links and the tag wording
     void removeSpecialChar();     // Remove escape character (\), ampersand (&) and double quote (") since they will interfere with streams
     bool removeHyphens();
     void removeBlankSentences();  // Replaces all ". ." with "."

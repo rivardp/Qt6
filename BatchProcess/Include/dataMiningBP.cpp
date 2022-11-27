@@ -68,7 +68,7 @@ void MINER::processObits()
     dr.setGlobals(*globals);
 
     QString providerString, keyString, idString;
-    QString fullLine, PDFfileName, HTMLfileName, tempString, target, stringDate;
+    QString fullLine, HTMLfileName, tempString, target, stringDate;
     QString baseClientDirectory, recordName;
     QString divider("||");
     PQString URL;
@@ -79,7 +79,6 @@ void MINER::processObits()
 
     POSTALCODE_INFO pcInfo;
     databaseSearches dbSearch;
-    PostalCodes pcDatabase;
     QString pcLocation;
 
     QFile* inputFile;
@@ -222,7 +221,7 @@ void MINER::processObits()
                     pcInfo.clear();
                     if (pcLocation.length() > 0)
                     {
-                        pcInfo = pcDatabase.lookup(pcLocation);
+                        dbSearch.fillInPostalCodeInfo(globals, pcInfo, pcLocation);
                         if (pcInfo.isValid())
                             dr.setPostalCode(pcInfo);
                     }
@@ -239,7 +238,6 @@ void MINER::processObits()
                 baseClientDirectory = globals->baseDirectory.getString() + QString("\\") + providerString + QString(" ") + keyString + QString("\\");
                 recordName = providerString + QString(" ") + keyString + QString(" ") + idString;
                 HTMLfileName = baseClientDirectory + QString("Obituaries\\") + recordName + QString(".htm");
-                PDFfileName = baseClientDirectory + QString("PDFs\\") + recordName + QString(".pdf");
 
                 // Read in the HTML file
                 inputFile = new QFile;
@@ -278,7 +276,7 @@ void MINER::processObits()
         if(file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         {
             outputStream = new QTextStream(file);
-            *outputStream << QString("BatchProcess completed running and exited normally at ") << QDateTime::currentDateTime().toString("h:mm") << endl;
+            *outputStream << QString("BatchProcess completed running and exited normally at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
         }
 
         delete outputStream;
@@ -328,6 +326,8 @@ void MINER::processDefdMessages()
             // Potential good information message
             if (((globals->globalDr->getYOB() > 0) || (globals->globalDr->getMinDOB() != QDate(1875,1,1))) && globals->globalDr->getDOD().isValid())
                 ignore = true;
+            else
+                ignore = false;
 
             if (!ignore)
             {

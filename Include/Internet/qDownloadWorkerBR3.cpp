@@ -21,7 +21,7 @@ void DownloadWorkerBR3::initiate()
     qDebug() << "initiate() slot triggered from the thread.start()";
 
     networkMgr = new QNetworkAccessManager(this);
-    connect(networkMgr, SIGNAL(finished(QNetworkReply*)), this, SLOT(downloadFinished(QNetworkReply*)));
+    QObject::connect(networkMgr, SIGNAL(finished(QNetworkReply*)), this, SLOT(downloadFinished(QNetworkReply*)));
 }
 
 void DownloadWorkerBR3::processDownloads()
@@ -37,6 +37,8 @@ void DownloadWorkerBR3::processDownloads()
         currentRequest = iter.next();
         redirectURL.clear();
         iter.remove();
+        networkMgr->clearConnectionCache();
+        //networkMgr->clearAccessCache();
         startNextDownload();
     }
 
@@ -72,6 +74,8 @@ void DownloadWorkerBR3::startNextDownload()
     qDebug() << "Network request sent";
 
     QNetworkRequest networkRequest(currentRequest.instructions.qUrl);
+    networkRequest.setTransferTimeout(30000);
+
     networkRequest.setRawHeader("User-Agent", "Crawl Obits");
     //networkRequest.setRawHeader("Accept", "text/html,application/xhtml+xml,application/xml,application/signed-exchange");
     if (currentRequest.instructions.followRedirects)
@@ -86,8 +90,8 @@ void DownloadWorkerBR3::startNextDownload()
         int index;
 
         index = currentRequest.instructions.POSTformRequest.indexOf("=");
-        param1Name.append(currentRequest.instructions.POSTformRequest.left(index));
-        param1Value.append(currentRequest.instructions.POSTformRequest.right(currentRequest.instructions.POSTformRequest.length() - index - 1));
+        param1Name.append(currentRequest.instructions.POSTformRequest.left(index).toUtf8());
+        param1Value.append(currentRequest.instructions.POSTformRequest.right(currentRequest.instructions.POSTformRequest.length() - index - 1).toUtf8());
 
         postData.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name="+param1Name));
         postData.setBody(param1Value);
@@ -114,7 +118,7 @@ void DownloadWorkerBR3::startNextDownload()
             int index = tempURL.lastIndexOf("?");
             currentRequest.instructions.qUrl = tempURL.left(index);
             networkRequest.setUrl(currentRequest.instructions.qUrl);
-            messageBody.append(tempURL.right(tempURL.length() - index - 1));
+            messageBody.append(tempURL.right(tempURL.length() - index - 1).toUtf8());
 
             QSslConfiguration config = networkRequest.sslConfiguration();
             config.setPeerVerifyMode(QSslSocket::VerifyNone);
@@ -129,7 +133,7 @@ void DownloadWorkerBR3::startNextDownload()
         }
     }
 
-    connect(networkReply, SIGNAL(redirected(const QUrl&)), this, SLOT(handleRedirection(const QUrl&)));
+    QObject::connect(networkReply, SIGNAL(redirected(const QUrl&)), this, SLOT(handleRedirection(const QUrl&)));
 
     currentDownloadReplies.append(networkReply);
 }
@@ -173,6 +177,7 @@ void DownloadWorkerBR3::downloadFinished(QNetworkReply *netReply)
                 break;
 
             case 302:   // Temporary redirection
+            case 303:
                 headerList = netReply->rawHeaderList();
                 foreach(QByteArray head, headerList) {
                     qDebug() << head << ":" << netReply->rawHeader(head);
@@ -180,7 +185,11 @@ void DownloadWorkerBR3::downloadFinished(QNetworkReply *netReply)
                 location = netReply->rawHeader("Location");
                 if (location.isValid())
                     redirectURL = location.toString();
-
+                if (statusCode == 303)
+                {
+                    currentRequest.instructions.verb = QString("GET");
+                    redirectURL.clear();
+                }
                 break;
 
             default:
@@ -190,9 +199,12 @@ void DownloadWorkerBR3::downloadFinished(QNetworkReply *netReply)
         }
 
         // Determine charset encoding
+        QStringConverter::Encoding encoding;
+
         CHARSET charset = UTF8;
         OQString quote("\"");
         QByteArray encodedString = netReply->readAll();
+
         OQStream tempStream(QString::fromUtf8(encodedString));
         OQString word, nextChar;
         if (tempStream.moveTo(QString("charset=")))
@@ -209,6 +221,10 @@ void DownloadWorkerBR3::downloadFinished(QNetworkReply *netReply)
                 charset = ISO88595;
             if (word == OQString("windows-1252"))
                 charset = Windows1252;
+
+            // problem with 1144 with charset commented out
+            if (tempStream.moveTo("-->", 10))
+                charset = ISO88591;
         }
 
         // Fix problem with encoding from site
@@ -217,29 +233,32 @@ void DownloadWorkerBR3::downloadFinished(QNetworkReply *netReply)
         if (currentRequest.instructions.providerID == 1144)
             charset = ISO88591;
 
-        // Convert to UTF-8 where necessary
-        QTextCodec *codec = nullptr;
-        switch (charset)
+        switch(charset)
         {
         case ISO88591:
-            codec = QTextCodec::codecForName("ISO 8859-1");
-            break;
-
         case ISO88595:
-            codec = QTextCodec::codecForName("ISO 8859-5");
+            encoding = QStringConverter::Latin1;
             break;
 
         case Windows1252:
-            codec = QTextCodec::codecForName("Windows-1252");
+        case USASCII:
+            encoding = QStringConverter::System;
             break;
 
-        case UTF8:
         default:
-            codec = QTextCodec::codecForName("UTF-8");
-            break;
+            encoding = QStringConverter::Utf8;
         }
 
-        QString decodedString = codec->toUnicode(encodedString);
+        //std::optional<QStringConverter::Encoding> encoding = QStringConverter::encodingForHtml(encodedString);
+        auto toUtf16 = QStringDecoder(encoding);
+
+        // Fix problem with encoding from site
+        /*if (((currentRequest.instructions.providerID == 1044) || (currentRequest.instructions.providerID == 2067)) && (currentRequest.instructions.providerKey == 1))
+            charset = UTF8;
+        if (currentRequest.instructions.providerID == 1144)
+            charset = ISO88591;*/
+
+        QString decodedString = toUtf16(encodedString);
         QString cleanString = PQString(decodedString).replaceLigatures();
 
         if (cleanString.size() > 0)
@@ -248,7 +267,6 @@ void DownloadWorkerBR3::downloadFinished(QNetworkReply *netReply)
             if (qFile->open(QIODevice::WriteOnly | QIODevice::Text))
             {
                 QTextStream streamFileOut(qFile);
-                streamFileOut.setCodec("UTF-8");
                 streamFileOut << cleanString;
                 streamFileOut.flush();
 

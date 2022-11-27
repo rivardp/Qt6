@@ -4,7 +4,6 @@
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlDriver>
 #include <QtSql/QSqlQuery>
-#include <QTextCodec>
 #include <QDebug>
 
 #include "../UpdateFuneralHomes/Include/globalVars.h"
@@ -19,19 +18,13 @@ int main(int argc, char *argv[])
     Q_UNUSED(argv)
 
     /*******************************************/
-    /*           Set Locale to UTF-8           */
-    /*******************************************/
-
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
-
-    /*******************************************/
     /*           Run initial setup             */
     /*******************************************/
 
     GLOBALVARS globals;
 
     // Setup the MySQL connection with database manager 'db'
-    if (!createConnection(globals.db, QString("deceasedUpdater")))
+    if (!createConnection(QString("deceasedUpdater")))
     {
         qDebug() << "Error connecting to SQL database 'death_audits'";
         globals.logMsg(ErrorConnection, QString("Error connecting to SQL database death_audits"));

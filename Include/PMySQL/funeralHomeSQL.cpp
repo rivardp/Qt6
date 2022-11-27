@@ -16,8 +16,8 @@ void fhRecordStructure::clear()
     fhWWW.clear();
     fhURL.clear();
     fhURLforUpdate.clear();
-    fhSearchCode = NULL;
-    fhRunStatus = NULL;
+    fhSearchCode = 0;
+    fhRunStatus = 0;
     fhLastUpdate = qNullDate;
     fhLastRun = qNullDate;
     fhSpecialCode = 0;
@@ -28,9 +28,12 @@ bool fhRecordStructure::lookupFHID(unsigned int providerID)
     bool result;
 
     QSqlQuery query;
-    bool success = query.isValid();
+    bool success;
 
-    query.prepare("SELECT providerKey FROM death_audits.funeralHomeData WHERE providerID = :providerID AND providerKey = :providerKey");
+    success = query.prepare("SELECT providerKey FROM death_audits.funeralHomeData WHERE providerID = :providerID AND providerKey = :providerKey");
+    if (!success)
+        qDebug() << "Invalid query";
+
     query.bindValue(":providerID", QVariant(providerID));
     query.bindValue(":providerKey", QVariant(providerKey));
     success = query.isValid();

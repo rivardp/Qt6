@@ -18,7 +18,7 @@
 #include "../Include/Internet/qSourceFile.h"
 #include "../Internet/qWebStructures.h"
 
-enum CHARSET {UTF8, ISO88591, ISO88595, USASCII};
+enum CHARSET {UTF8, ISO88591, ISO88595, Windows1252, USASCII};
 
 
 class DownloadWorker : public QObject
@@ -35,6 +35,7 @@ class DownloadWorker : public QObject
     void download(DOWNLOADREQUEST &dr);
     bool processingDownload();
     bool lastDownloadSuccessful();
+    bool isGzipped(QNetworkReply *reply);
 
     PQString redirectURL;
 

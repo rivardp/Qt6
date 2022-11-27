@@ -7,7 +7,7 @@ DEFINES += \
 
 CONFIG += c++11
 
-LIBS += user32.lib
+#LIBS += user32.lib
 
 TARGET = ReadNicknames
 CONFIG += console gui
@@ -19,7 +19,6 @@ SOURCES += main.cpp \
     ../Include/PMySQL/pMySQL.cpp \
     ../Include/Penser/QtUtilities.cpp \
     ../PostalCodes/postalCodeInfo.cpp \
-    ../PostalCodes/postalcodes.cpp \
     Include/readNicknames.cpp \
     ../Include/Penser/PQStream.cpp \
     Include/globalVarsReadNicknames.cpp \
@@ -41,7 +40,6 @@ DEFINES += QT_DEPRECATED_WARNINGS
 HEADERS += \
     ../Include/Penser/QtUtilities.h \
     ../PostalCodes/postalCodeInfo.h \
-    ../PostalCodes/postalcodes.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
     ../Include/PMySQL/pMySQL.h \
     Include/readNicknames.h \

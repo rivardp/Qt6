@@ -6,6 +6,14 @@ OQStream::OQStream() : OQString(), position(0), EOS(true)
 {
 }
 
+OQStream::OQStream(const OQStream &source) : OQString(source), position(0)
+{
+    if (itsString.length() > 0)
+        EOS = false;
+    else
+        EOS = true;
+}
+
 OQStream::OQStream(const OQString source) : OQString(source), position(0)
 {
     if (itsString.length() > 0)
@@ -320,14 +328,29 @@ bool OQStream::isEOS() const
 	return EOS;
 }
 
-bool OQStream::contains(const QString &string)
+bool OQStream::contains(const QString &string, bool ignoreBookendedLetters)
 {
-    int origPosition = position;
+    QString tempString = itsString;
+
+    QRegularExpression target;
+
+    if (ignoreBookendedLetters)
+    {
+        target.setPattern("(\\(.+\\))");
+        tempString.replace(target, "");
+
+        target.setPattern("(\".+\")");
+        tempString.replace(target, "");
+    }
+
+    bool found = tempString.contains(string);
+
+    /*int origPosition = position;
     bool origEOS = EOS;
     beg();
     bool found = moveTo(string);
     position = origPosition;
-    EOS = origEOS;
+    EOS = origEOS;*/
 
     return found;
 }
@@ -393,9 +416,17 @@ int OQStream::firstDifferenceFrom(QString comparisonString)
     int length = static_cast<int>(getLength());
     bool diffEncountered = false;
 
-    while ((i < length) && !diffEncountered)
+    if ((length == 0) && (comparisonString.length() == 0))
+        return -1;
+    else
     {
-        diffEncountered = (itsString[i] != comparisonString[i]);
+        if ((length == 0) || (comparisonString.length() == 0))
+            return 0;
+    }
+
+    while ((i < length) && !diffEncountered && (result < 0))
+    {
+        diffEncountered = (itsString.at(i) != comparisonString.at(i));
         if (diffEncountered || ((i + 1) == comparisonString.length()))
             result = i;
         i++;
@@ -438,6 +469,9 @@ QChar OQStream::getQChar()
 
 OQString OQStream::getWord(const bool considerParentheses, unsigned int secondaryBreakChar, const bool secondaryBreakInParentheses)
 {
+    if (EOS)
+        return OQString();
+
     bool wordStarted = false;
     bool wordEnded = false;
     bool ignoreSecondaryBreak = false;
@@ -1009,6 +1043,28 @@ OQString OQStream::readQuotedMetaContent()
     return result;
 }
 
+void OQStream::removeLinks()
+{
+    QRegularExpression targetI;
+    QRegularExpressionMatch match;
+
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::InvertedGreedinessOption);
+    targetI.setPattern("<a href=\"(.*)(\">)(.*)(?!<a)(watch|click|view|video|stream|book|reserve|http|sign|@)(.*)(?!<a)</a>");
+
+    // Coding for debugging
+    match = targetI.match(this->itsString);
+    while (match.hasMatch())
+    {
+        /*QString cap1 = match.captured(0);
+        QString cap2 = match.captured(1);
+        QString cap3 = match.captured(2);
+        QString cap4 = match.captured(3);
+        QString cap5 = match.captured(4);*/
+        itsString.replace(targetI, "");
+        match = targetI.match(this->itsString);
+    }
+}
+
 OQStream& OQStream::removeHTMLtags(int insertPeriods)
 {
     itsString.replace("<br", " <br");
@@ -1164,7 +1220,8 @@ OQStream& OQStream::operator= (const std::wstring &rhs)
 
 OQStream& OQStream::operator= (const QByteArray &rhs)
 {
-    itsString = QString(QTextCodec::codecForMib(106)->toUnicode(rhs));
+    //itsString = QString(QTextCodec::codecForMib(106)->toUnicode(rhs));
+    itsString = QString(rhs);
 
     position = 0;
     EOS = (itsString.length() == 0);

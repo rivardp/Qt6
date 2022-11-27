@@ -100,7 +100,7 @@ void WebView::addFileToQueue()
     entry.append(outputs.maidenNames);
     entry.append("||");
     entry.append(outputs.pubDate);
-    outputStream << entry << endl;
+    outputStream << entry << Qt::endl;
 
     emit finishedTask(3);
 }

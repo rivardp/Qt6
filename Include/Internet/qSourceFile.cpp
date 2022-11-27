@@ -34,7 +34,8 @@ void qSourceFile::openFile(QString &file)
     QFile source(file);
     if(source.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        itsString = QString(QTextCodec::codecForMib(106)->toUnicode(source.readAll()));
+        //itsString = QString(QTextCodec::codecForMib(106)->toUnicode(source.readAll()));
+        itsString = QString(source.readAll());
         position = 0;
         if (itsString.length() > 0)
             EOS = false;

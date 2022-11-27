@@ -4,7 +4,7 @@
 #define QSOURCEFILE_H
 
 #include <QFile>
-#include <QTextCodec>
+//#include <QTextCodec>
 #include <QTextStream>
 #include "../Include/Penser/PString.h"
 #include "../Include/Penser/OQString.h"

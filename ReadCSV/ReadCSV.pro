@@ -7,7 +7,7 @@ DEFINES += \
 
 CONFIG += c++11
 
-LIBS += user32.lib
+#LIBS += user32.lib
 
 TARGET = ReadCSV
 CONFIG += console gui
@@ -20,7 +20,6 @@ SOURCES += main.cpp \
     ../Include/PMySQL/pMySQL.cpp \
     ../Include/Penser/QtUtilities.cpp \
     ../PostalCodes/postalCodeInfo.cpp \
-    ../PostalCodes/postalcodes.cpp \
     Include/globalVarsReadCSV.cpp \
     ../UpdateFuneralHomes/Include/dataStructure.cpp \
     Include/readCSV.cpp \
@@ -47,9 +46,11 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 HEADERS += \
     ../Include/Actuary/PQDate.h \
+    ../Include/Penser/OQStream.h \
+    ../Include/Penser/OQString.h \
     ../Include/Penser/QtUtilities.h \
     ../PostalCodes/postalCodeInfo.h \
-    ../PostalCodes/postalcodes.h \
+    ../UpdateFuneralHomes/Include/enums.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
     ../Include/PMySQL/pMySQL.h \
     ../UpdateFuneralHomes/Include/dataStructure.h \
@@ -57,8 +58,6 @@ HEADERS += \
     ../Include/Penser/PQStream.h \
     ../Include/Penser/PQString.h \
     ../UpdateFuneralHomes/Include/matchRecord.h \
-    ../Include/Penser/OStream.h \
-    ../Include/Penser/OQString.h \
     ../Include/Penser/PString.h \
     Include/globals.h \
     ../Include/PMySQL/databaseSearches.h \

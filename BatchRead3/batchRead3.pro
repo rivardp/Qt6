@@ -9,11 +9,9 @@ TEMPLATE = app
 
 DEFINES += \
     UNICODE \
-    _UNICODE
-#    QT_NO_SSL
+    _UNICODE \
 
-
-LIBS += user32.lib
+#LIBS += user32.lib
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -32,7 +30,6 @@ HEADERS += \
     ../Include/PMySQL/pMySQL.h \
     ../Include/Penser/QtUtilities.h \
     ../PostalCodes/postalCodeInfo.h \
-    ../PostalCodes/postalcodes.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
     Include/dataMiningBR3.h \
     ../Include/Unstructured/qUnstructuredContent.h \
@@ -58,7 +55,6 @@ SOURCES += main.cpp \
     ../Include/PMySQL/pMySQL.cpp \
     ../Include/Penser/QtUtilities.cpp \
     ../PostalCodes/postalCodeInfo.cpp \
-    ../PostalCodes/postalcodes.cpp \
     Include/globalVarsBR3.cpp \
     Include/dataMiningBR3.cpp \
     ../Include/Unstructured/qUnstructuredContent.cpp \

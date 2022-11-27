@@ -179,7 +179,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
             AdditionalInfo = ": ";
         }
 
-        *outputStream << "SQL" << AdditionalInfo << msg << endl;
+        *outputStream << "SQL" << AdditionalInfo << msg << Qt::endl;
         FHsqlError->close();
         break;
 
@@ -187,7 +187,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         if(FHurlError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHurlError);
 
-        *outputStream << "URL Error: " << msg << endl;
+        *outputStream << "URL Error: " << msg << Qt::endl;
         FHurlError->close();
         break;
 
@@ -195,7 +195,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         if(FHrunTimeError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHrunTimeError);
 
-        *outputStream << "Run Time Error: " << msg << endl;
+        *outputStream << "Run Time Error: " << msg << Qt::endl;
         FHrunTimeError->close();
         break;
 
@@ -203,7 +203,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         if(FHconnectionError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHconnectionError);
 
-        *outputStream << "Connection Error: " << msg << endl;
+        *outputStream << "Connection Error: " << msg << Qt::endl;
         FHconnectionError->close();
         break;
 
@@ -211,7 +211,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         if(FHrecordError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHrecordError);
 
-        *outputStream << "Individual Record Error: " << msg << endl;
+        *outputStream << "Individual Record Error: " << msg << Qt::endl;
         FHrecordError->close();
         break;
 
@@ -229,7 +229,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
 
         }
 
-        *outputStream << "Action Required" << AdditionalInfo << msg << endl;
+        *outputStream << "Action Required" << AdditionalInfo << msg << Qt::endl;
         FHactionRequired->close();
         break;
 
@@ -237,7 +237,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         if(FHrunSummary->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHrunSummary);
 
-        *outputStream << msg << endl;
+        *outputStream << msg << Qt::endl;
         FHrunSummary->close();
         break;
 
@@ -245,7 +245,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         if(FHauditListing->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHauditListing);
 
-        *outputStream << msg << endl;
+        *outputStream << msg << Qt::endl;
         FHauditListing->close();
         break;
 

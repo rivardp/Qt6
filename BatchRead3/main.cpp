@@ -3,7 +3,7 @@
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlDriver>
 #include <QtSql/QSqlQuery>
-#include <QTextCodec>
+//#include <QTextCodec>
 #include <QDebug>
 
 #include "../UpdateFuneralHomes/Include/globalVars.h"
@@ -18,12 +18,6 @@ int main(int argc, char *argv[])
     /******************************************/
 
     QApplication app(argc, argv);
-
-    /*******************************************/
-    /*           Set Locale to UTF-8           */
-    /*******************************************/
-
-    QTextCodec::setCodecForLocale(QTextCodec::codecForName("UTF-8"));
 
     /*******************************************/
     /*           Run initial setup             */
@@ -49,7 +43,7 @@ int main(int argc, char *argv[])
     }
 
     // Setup the MySQL connection with database manager 'db'
-    if (!createConnection(globals.db, QString("deceasedUpdater")))
+    if (!createConnection(QString("deceasedUpdater")))
     {
         qDebug() << "Error connecting to SQL database 'death_audits'";
         globals.logMsg(ErrorConnection, QString("Error connecting to SQL database death_audits"));
@@ -72,7 +66,7 @@ int main(int argc, char *argv[])
         if(file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         {
             outputStream = new QTextStream(file);
-            *outputStream << QString("BatchRead started at ") << QDateTime::currentDateTime().toString("h:mm") << endl;
+            *outputStream << QString("BatchRead started at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
         }
 
         delete outputStream;

@@ -16,17 +16,18 @@
 #include <QList>
 
 #include "../UpdateFuneralHomes/Include/dataStructure.h"
-#include "../Include/Actuary/PQDate.h"
+//#include "../Include/Actuary/PQDate.h"
 #include "../Include/Penser/OQStream.h"
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 #include "../UpdateFuneralHomes/Include/tableLookup.h"
 #include "../UpdateFuneralHomes/Include/providers.h"
 #include "../PostalCodes/postalCodeInfo.h"
-#include "../PostalCodes/postalcodes.h"
 
 class SOURCEID
 {
 public:
+    SOURCEID() = default;
+
     PROVIDER provider;
     unsigned int providerKey;
     PQString ID;
@@ -36,7 +37,6 @@ public:
     unsigned int deceasedNumber;
 
     bool operator ==(SOURCEID const& newSource) const;
-    SOURCEID& operator =(SOURCEID newSource);
 
     void clear();
 };
@@ -45,8 +45,9 @@ class dataRecord
 {
 
 public:
-	dataRecord();
-	~dataRecord();
+    dataRecord();
+    dataRecord(const dataRecord &) = default;
+    ~dataRecord();
 
     void setFamilyName(const PQString &name);
     void setFamilyNames(QList<OQString> &nameList);
@@ -67,6 +68,8 @@ public:
     void setMinMaxDOB();
     void setDOD(const QDate &dod, const bool forceOverride = false, const bool fullyCredible = false);
     void setDOBandDOD(const DATES &dates, const bool forceOverride = false);
+    void setTypoDOB(const QDate &dob);
+    void setTypoDOD(const QDate &dod);
     void setLanguage(const LANGUAGE lang);
     void setAlternates(const QList<NAMEINFO> &nameInfoList, bool bestOf = false);
     void setAlternates(const NAMEINFO &nameInfo, bool bestOf = false);
@@ -74,7 +77,6 @@ public:
     void setYOB(const unsigned int yob, const bool forceOverride = false, const bool fullyCredible = false);
     void setYOD(const unsigned int yod, const bool forceOverride = false, const bool fullyCredible = false);
     void setAgeAtDeath(const unsigned int num, const bool fullyCredible = false, const bool override = false);
-    void setCycle(const unsigned int num);
     void setUnmatched(const unsigned int num);
     void setPriorUnmatched(const unsigned int num);
     void setPreviouslyLoaded(const unsigned int num);
@@ -105,6 +107,7 @@ public:
 
     void clear();
     void clearDOB();
+    void clearDOD();
     void clearLastNames();
     void clearFirstNames();
     void clearMiddleNames();
@@ -222,8 +225,6 @@ public:
 	bool missingDOB() const;
 	bool missingDOD() const;
 
-    dataRecord& operator= (const dataRecord &rhs);
-
     GLOBALVARS globals;
     WARNINGINFO wi;
 
@@ -262,6 +263,8 @@ private:
 	LANGUAGE  language;
     QDate DOS;
     QDate commentDate;
+    QDate typoDOB;
+    QDate typoDOD;
 
     SOURCEID sourceID;
 

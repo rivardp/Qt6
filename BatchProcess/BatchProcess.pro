@@ -1,16 +1,17 @@
 TEMPLATE = app
 
-QT += sql core webenginewidgets
+QT += sql core network widgets
 
 DEFINES += \
     UNICODE \
     _UNICODE \
 
-LIBS += user32.lib
+#LIBS += user32.lib
 
 TARGET = BatchProcess
 
 SOURCES += main.cpp \
+    ../Include/Internet/qDownloadWorkerBR3.cpp \
     ../Include/Penser/PString.cpp \
     ../Include/Penser/PQString.cpp \
     ../Include/Penser/OQString.cpp \
@@ -20,7 +21,6 @@ SOURCES += main.cpp \
     ../Include/Unstructured/qUnstructuredContent.cpp \
     ../Include/Unstructured/qMakeDate.cpp \
     ../PostalCodes/postalCodeInfo.cpp \
-    ../PostalCodes/postalcodes.cpp \
     ../UpdateFuneralHomes/Include/dataStructure.cpp \
     Include/dataMiningBP.cpp \
     Include/globalVarsBP.cpp \
@@ -32,6 +32,7 @@ SOURCES += main.cpp \
     ../Include/PMySQL/funeralHomeSQL.cpp
 
 HEADERS += \
+    ../Include/Internet/qDownloadWorkerBR3.h \
     ../Include/Penser/PString.h \
     ../Include/Penser/PQString.h \
     ../Include/Penser/OQString.h \
@@ -41,7 +42,6 @@ HEADERS += \
     ../Include/Unstructured/qUnstructuredContent.h \
     ../Include/Unstructured/qMakeDate.h \
     ../PostalCodes/postalCodeInfo.h \
-    ../PostalCodes/postalcodes.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
     ../UpdateFuneralHomes/Include/dataStructure.h \
     ../UpdateFuneralHomes/Include/providers.h \

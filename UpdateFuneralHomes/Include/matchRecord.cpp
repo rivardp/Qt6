@@ -3,9 +3,9 @@
 
 MATCHRECORD::MATCHRECORD() :  recordID(0), score(0), netScore(0), inconsistencyCount(0), inconsistencyScore(0), rankScore(0),
                               newInfoAvailable(false), isAnalyzed(false),
-                              matchedLNAME(false), matchedLNAMEALT(false), matchedDOB(false), matchedFNAME(false),
-                              matchedDOD(false), matchedGENDER(false), matchedDODinfo(false), matchedDOBinfo(false),
-                              matchedPREFIX(false), matchedSUFFIX(false)
+                              pcDistance(9999), matchedLNAME(false), matchedLNAMEALT(false), matchedDOB(false),
+                              matchedFNAME(false), matchedDOD(false), matchedGENDER(false), matchedDODinfo(false),
+                              matchedDOBinfo(false), matchedPREFIX(false), matchedSUFFIX(false)
 {
 }
 
@@ -28,6 +28,7 @@ void MATCHRECORD::clear()
     closeDOBrange = false;
     potentialNumDataMatches = 0;
     numNameMatches = 0;
+    pcDistance = 9999;
 
     matchedLNAME = false;
     matchedLNAMEALT = false;
@@ -52,7 +53,7 @@ void MATCHRECORD::clear()
     inconsistentDOD = false;
     inconsistentAgeAtDeath = false;
     inconsistentSpouseName = false;
-    inconsistentPC = false;
+    inconsistentPC = false;    
 }
 
 void MATCHRECORD::setID(unsigned int id)
@@ -174,6 +175,7 @@ void MATCHRECORD::analyze()
 
     matchKey = mkNone;
     newRecord = true;
+    sufficientlyMatched = false;
 
     inconsistencyCount = countDataItems(inconsistencyScore);
     dataCount = countDataItems(score) + inconsistencyCount;
@@ -208,7 +210,7 @@ void MATCHRECORD::analyze()
 
     if (!inconsistentDOB && !inconsistentDOD && !inconsistentAgeAtDeath)
     {
-        if (matchedDOB && matchedLNAME && matchedFNAME)
+        if ((matchedDOB || consistentPC) && matchedLNAME && matchedFNAME)
         {
             if (matchedDOD)
                 matchKey = mkKeyDOD;
@@ -347,7 +349,7 @@ void MATCHRECORD::analyze()
                 newRecord = false;
         }
 
-        if ((newRecord && (potentialNumDataMatches >= 6) && sameDataProvided) || matchedIDnumber)
+        if (newRecord && (potentialNumDataMatches >= 6) && sameDataProvided)
         {
             sufficientlyMatched = true;
             newRecord = false;
@@ -805,11 +807,19 @@ void MATCHRECORD::comparePostalCodes(POSTALCODE_INFO &pc1, POSTALCODE_INFO &pc2)
     if (!pc1.isValid() || !pc2.isValid())
         return;
 
-    double distance = pc1.distanceTo(pc2);
-    if (distance <= 25)
+    pcDistance = pc1.distanceTo(pc2);
+    if (pcDistance <= 25)
         addToScore(mPC);
-    if (distance > 1500)
+    if (pcDistance > 1500)
+    {
         addToInconsistencyScore(mPC);
+        sameDataProvided = false;
+    }
+    else
+    {
+        if (pcDistance > 200)
+            sameDataProvided = false;
+    }
 }
 
 MATCHRESULT::MATCHRESULT() : bestScore(0), bestNetScore(0), bestID(0), bestNetID(0), bestMatchKeyID(0)
@@ -839,8 +849,10 @@ void MATCHRESULT::update(unsigned int id, int score, int numInconsistency, int s
         // Update criteria based on net score
         if ((score - inconsistencyCost * numInconsistency) > getNetScore(id))
             setScore(id, score, numInconsistency, scoreInconsistency, newInfo, lastName);
-        else;
+        else
+        {
             // Leave current scores
+        }
     }
     else
         addScore(id, score, numInconsistency, scoreInconsistency, newInfo, lastName);
@@ -854,8 +866,10 @@ void MATCHRESULT::update(MATCHRECORD &mr)
         // Update criteria based on net score
         if (mr.matchKey > getMatchKey(mr.recordID))
             setScore(mr);
-        else;
+        else
+        {
             // Leave current scores
+        }
     }
     else
         addScore(mr);
@@ -1250,6 +1264,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
     bool success;
     bool execute = false;
     bool matchedID = false;
+    bool matchedFamilyID = false;
     MATCHRECORD matchRecord;
 
     PQString DOBdateSQL, DODdateSQL;
@@ -1275,7 +1290,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
 
     // Before comparing data, check if a perfect ID match exists
     success = query.prepare("SELECT deceasedNumber, publishDate FROM death_audits.deceasedidinfo "
-                            "WHERE providerID = :providerID AND providerKey = :providerKey AND ID = :ID");
+                            "WHERE providerID = :providerID AND ID = :ID");
     query.bindValue(":providerID", QVariant(recProviderID));
     query.bindValue(":providerKey", QVariant(recProviderKey));
     query.bindValue(":ID", QVariant(recID));
@@ -1283,17 +1298,31 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
     success = query.exec();
     if (success && (query.size() > 0))
     {
-        // Only a single match will be attempted
-        query.next();
-        deceasedNumber = query.value(0).toUInt();
-        DBpubDate = query.value(1).toDate();
-        matchedID = true;
-        queryPassStart = 0;
-        queryPassEnd = 0;
+        while (query.next() && !matchedID)
+        {
+            if (query.value(1).toUInt() == recProviderKey)
+            {
+                // Only a single match will be attempted
+                query.next();
+                deceasedNumber = query.value(0).toUInt();
+                DBpubDate = query.value(2).toDate();
+                matchedID = true;
+                queryPassStart = 0;
+                queryPassEnd = 0;
 
-        // If ID matches, need to update pubdate regardless to avoid reprocessing every time
-        if (DBpubDate.isValid() && dr.getPublishDate().isValid() && (dr.getPublishDate() > DBpubDate))
-            matchRecord.newInfoAvailable = true;
+                // If ID matches, need to update pubdate regardless to avoid reprocessing every time
+                if (DBpubDate.isValid() && dr.getPublishDate().isValid() && (dr.getPublishDate() > DBpubDate))
+                    matchRecord.newInfoAvailable = true;
+            }
+        }
+
+        if (!matchedID)
+        {
+            matchedFamilyID = true;
+            deceasedNumber = 0;
+            queryPassStart = 1;
+            queryPassEnd = 4;
+        }
     }
     else
     {
@@ -1541,9 +1570,15 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                         }
 
                         // Step 5 - Allow for likely matches in certain conditions to avoid recent obits from reappearing
-                        if (!matchRecord.isNewRecord() && (matchRecord.getMatchKey() >= mkDODname))
+                        if (!matchRecord.isNewRecord() && (matchRecord.getMatchKey() >= mkDODname) && dr.globals.globalDr->getDOD().isValid())
                         {
-                            if (dr.globals.today < dr.getDOD().addDays(60))
+                            if (dr.globals.today.toJulianDay() < dr.getDOD().addDays(60).toJulianDay())
+                                matchRecord.setSufficientlyMatched(true);
+                        }
+
+                        if (!matchRecord.isNewRecord() && (matchRecord.getMatchKey() >= mkNoKey) && matchRecord.hasNoMajorInconsistencies())
+                        {
+                            if (matchedFamilyID)
                                 matchRecord.setSufficientlyMatched(true);
                         }
 
@@ -1574,7 +1609,6 @@ int initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESU
     bool success;
     MATCHRECORD matchRecord;
     databaseSearches dbSearch;
-    PostalCodes pcDatabase;
     POSTALCODE_INFO inputPCinfo, dbPCinfo;
 
     PQString minDOBdateSQL, maxDOBdateSQL, noDOBdateSQL, tempName;
@@ -1864,7 +1898,7 @@ int initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESU
             }
             queryPC.clear();
 
-            dbPCinfo = pcDatabase.lookup(dbPostalCode);
+            dbSearch.fillInPostalCodeInfo(&gv, dbPCinfo, dbPostalCode);
             inputPCinfo = drInput.getPostalCodeInfo();
             rankingScore += calcProximityScore(inputPCinfo, dbPCinfo);
 
@@ -1882,7 +1916,7 @@ int initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESU
     // initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESULT &matchScore)
     if (!reverseRun && (matchScore.getBestRankScore() < 1750) && drInput.getDOB().isValid() && (OQString(drInput.getLastName()).isAGivenName(errorMessage) && OQString(drInput.getFirstName()).isALastName(errorMessage)))
     {
-        dataRecord reverseInput = drInput;
+        dataRecord reverseInput(drInput);
         dataRecord reverseBestMatch;
         MATCHRESULT reverseMatchScore;
 
@@ -1914,9 +1948,9 @@ void updateList(QStringList &listName, PQString string, bool removeAccents, bool
         if (string.getLength() > 0)
         {
             if (removeAccents)
-                tempList = string.getUnaccentedString().split(' ', QString::SkipEmptyParts);
+                tempList = string.getUnaccentedString().split(' ', Qt::SkipEmptyParts);
             else
-                tempList = string.getString().split(' ', QString::SkipEmptyParts);
+                tempList = string.getString().split(' ', Qt::SkipEmptyParts);
         }
 
         if (tempList.size() > 0)
@@ -2067,7 +2101,7 @@ void addNameVariations(QList<QString> &nameList, QList<QString> &expandedNameLis
         {
             query.next();
             unparsedList = query.value(0).toString();
-            listOfNames = unparsedList.split(" ", QString::SkipEmptyParts);
+            listOfNames = unparsedList.split(" ", Qt::SkipEmptyParts);
             while (listOfNames.size() > 0)
             {
                 newName = listOfNames.takeFirst();
@@ -2085,7 +2119,7 @@ void addNameVariations(QList<QString> &nameList, QList<QString> &expandedNameLis
         {
             query.next();
             unparsedList = query.value(0).toString();
-            listOfNames = unparsedList.split(" ", QString::SkipEmptyParts);
+            listOfNames = unparsedList.split(" ", Qt::SkipEmptyParts);
             while (listOfNames.size() > 0)
             {
                 newName = listOfNames.takeFirst();
@@ -2150,4 +2184,9 @@ int calcProximityScore(POSTALCODE_INFO &pc1, POSTALCODE_INFO &pc2)
     }
 
     return result;
+}
+
+bool MATCHRECORD::hasNoMajorInconsistencies() const
+{
+    return !(inconsistentDOB || inconsistentDOD || inconsistentAgeAtDeath);
 }

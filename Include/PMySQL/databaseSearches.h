@@ -20,7 +20,6 @@
 #include "../Internet/qWebStructures.h"
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 #include "../PostalCodes/postalCodeInfo.h"
-#include "../PostalCodes/postalcodes.h"
 
 class databaseSearches
 {
@@ -39,10 +38,11 @@ public:
 
     QString IDforLastDeathPreceding(const QDate &DOD, const unsigned int providerID, const unsigned int providerKey, GLOBALVARS *gv);
     QDate getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey);
-    QString lookupPostalCode(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey);                // looks in postalcode hash
+    QString lookupPostalCode(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey);                // looks in postalcode database
     QString pcLookup(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString location);      // looks in funeralhomelocation database
     POSTALCODE_INFO pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString place);   // looks in postalcodeplaces, and then funeralhome data if multiples exist
 
+    bool fillInPostalCodeInfo(GLOBALVARS *gv, POSTALCODE_INFO &pci, QString pc);
     bool savePostalCodeInfo(int deceasedNumber, int providerID, int providerKey, POSTALCODE_INFO &pc);
     POSTALCODE_INFO getPostalCodeInfo(int deceasedNumber, GLOBALVARS *gv);
 

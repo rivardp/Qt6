@@ -40,6 +40,8 @@ void DownloadWorker::processDownloads()
         iter.remove();
         if (currentRequest.instructions.qUrl.isValid())  // Redundant check for  now - see download(url,file) for first check
         {
+            networkMgr->clearConnectionCache();
+            networkMgr->clearAccessCache();
             startNextDownload();
         }
         else
@@ -63,7 +65,8 @@ void DownloadWorker::appendToQueue(const QList<DOWNLOADREQUEST> &newRequestList)
         // Don't add anything to the queue until the existing queue is processed
     }
 
-    for (auto end = newRequestList.size(), i = 0; i != end; ++i)
+    int i, end;
+    for (end = newRequestList.size(), i = 0; i != end; ++i)
     {
          currentDownloadQueue += newRequestList;
     }
@@ -77,6 +80,12 @@ void DownloadWorker::startNextDownload()
     qDebug() << "Creating network request";
 
     QNetworkRequest networkRequest(currentRequest.instructions.qUrl);
+
+    /******************/
+    /*     TimeOut    */
+    /******************/
+
+    networkRequest.setTransferTimeout(30000);
 
     /******************/
     /*      Verb      */
@@ -338,7 +347,6 @@ void DownloadWorker::startNextDownload()
         if (currentRequest.instructions.verb == "OPTIONS")
         {
             networkMgr->sendCustomRequest(networkRequest, "OPTIONS", QByteArray());
-           //networkMgr->sendCustomRequest(networkRequest, "OPTIONS");
         }
         else
         {
@@ -359,7 +367,7 @@ void DownloadWorker::startNextDownload()
                     int index = tempURL.lastIndexOf("?");
                     currentRequest.instructions.qUrl = tempURL.left(index);
                     networkRequest.setUrl(currentRequest.instructions.qUrl);
-                    messageBody.append(tempURL.right(tempURL.length() - index - 1));
+                    messageBody.append(tempURL.right(tempURL.length() - index - 1).toUtf8());
                 }
                 networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, messageBody.count());
 
@@ -437,6 +445,8 @@ void DownloadWorker::downloadFinished(QNetworkReply *netReply)
         }
 
         // Determine charset encoding
+        QStringConverter::Encoding encoding;
+
         CHARSET charset = UTF8;
         OQString quote("\"");
         QByteArray encodedString = netReply->readAll();
@@ -462,31 +472,27 @@ void DownloadWorker::downloadFinished(QNetworkReply *netReply)
                 charset = ISO88591;
         }
 
-        // Convert to UTF-8 where necessary
-        QTextCodec *codec = nullptr;
         switch (charset)
         {
         case ISO88591:
-            codec = QTextCodec::codecForName("ISO 8859-1");
-            break;
-
         case ISO88595:
-            codec = QTextCodec::codecForName("ISO 8859-5");
+            encoding = QStringConverter::Latin1;
             break;
 
+        case Windows1252:
         case USASCII:
-            //codec = QTextCodec::codecForName("US-ASCII");
-            // Issue with specific single site coded wrong
-            codec = QTextCodec::codecForName("WINDOWS-1252");
+            encoding = QStringConverter::System;
             break;
 
-        case UTF8:
         default:
-            codec = QTextCodec::codecForName("UTF-8");
-            break;
+            encoding = QStringConverter::Utf8;
         }
 
-        QString decodedString = codec->toUnicode(encodedString);
+        //std::optional<QStringConverter::Encoding> encoding = QStringConverter::encodingForHtml(encodedString);
+        auto toUtf16 = QStringDecoder(encoding);
+
+        QString decodedString = toUtf16(encodedString);
+        QString cleanString = PQString(decodedString).replaceLigatures();
 
         if (decodedString.size() > 0)
         {
@@ -494,7 +500,6 @@ void DownloadWorker::downloadFinished(QNetworkReply *netReply)
             if (qFile->open(QIODevice::WriteOnly | QIODevice::Text))
             {
                 QTextStream streamFileOut(qFile);
-                streamFileOut.setCodec("UTF-8");
                 streamFileOut << decodedString;
                 streamFileOut.flush();
 
@@ -567,4 +572,20 @@ bool DownloadWorker::processingDownload()
 bool DownloadWorker::lastDownloadSuccessful()
 {
     return downloadSuccessful;
+}
+
+bool DownloadWorker::isGzipped(QNetworkReply *reply)
+{
+    bool isGzipped = false;
+
+    QList rhplist = reply->rawHeaderPairs();
+    std::pair<QByteArray, QByteArray> pair;
+    QListIterator<std::pair<QByteArray, QByteArray>> iter(rhplist);
+    while (iter.hasNext() && !isGzipped)
+    {
+      pair = iter.next();
+      if ((pair.first=="Content-Encoding") && (pair.second=="gzip"))
+        isGzipped = true ;
+    }
+    return isGzipped;
 }

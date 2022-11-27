@@ -166,7 +166,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
                 AdditionalInfo = ": ";
             }
 
-            *outputStream << "SQL" << AdditionalInfo << msg << endl;
+            *outputStream << "SQL" << AdditionalInfo << msg << Qt::endl;
             FHsqlError->close();
         }
         break;
@@ -176,7 +176,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         {
             outputStream = new QTextStream(FHurlError);
 
-            *outputStream << "URL Error: " << msg << endl;
+            *outputStream << "URL Error: " << msg << Qt::endl;
             FHurlError->close();
         }
         break;
@@ -186,7 +186,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         {
             outputStream = new QTextStream(FHrunTimeError);
 
-            *outputStream << "Run Time Error: " << msg << endl;
+            *outputStream << "Run Time Error: " << msg << Qt::endl;
             FHrunTimeError->close();
         }
         break;
@@ -196,7 +196,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         {
             outputStream = new QTextStream(FHconnectionError);
 
-            *outputStream << "Connection Error: " << msg << endl;
+            *outputStream << "Connection Error: " << msg << Qt::endl;
             FHconnectionError->close();
         }
         break;
@@ -206,7 +206,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         {
             outputStream = new QTextStream(FHrecordError);
 
-            *outputStream << "Individual Record Error: " << msg << endl;
+            *outputStream << "Individual Record Error: " << msg << Qt::endl;
             FHrecordError->close();
         }
         break;
@@ -226,7 +226,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
                 AdditionalInfo = ": ???";
             }
 
-            *outputStream << "Action Required" << AdditionalInfo << msg << endl;
+            *outputStream << "Action Required" << AdditionalInfo << msg << Qt::endl;
             FHactionRequired->close();
         }
         break;
@@ -236,7 +236,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         {
             outputStream = new QTextStream(FHrunSummary);
 
-            *outputStream << "UpdateDeceased stat: " << msg << endl;
+            *outputStream << "UpdateDeceased stat: " << msg << Qt::endl;
             FHrunSummary->close();
         }
         break;
@@ -246,7 +246,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
         {
             outputStream = new QTextStream(FHauditListing);
 
-            *outputStream << msg << endl;
+            *outputStream << msg << Qt::endl;
             FHauditListing->close();
         }
         break;
@@ -281,17 +281,20 @@ bool GLOBALVARS::runSetups()
     today = QDate::currentDate();
     setupSuccessful = today.isValid();
     if (!setupSuccessful)
-        QMessageBox::warning(nullptr, "Setup Problem", "Unable to retrieve current date", "Ok");
+        //QMessageBox::warning(nullptr, "Setup Problem", "Unable to retrieve current date", "Ok");
+        QMessageBox mb(QMessageBox::Warning, "Setup Problem", "Unable to retrieve current date");
     todaySQL << today.toString("yyyy/MM/dd") << QString(" 0:0:0");
 
     successfulStep = setupDirectoryStructure();
     if (!successfulStep)
-        QMessageBox::warning(nullptr, "Setup Problem", "Unable to establish directory structure", "Ok");
+        //QMessageBox::warning(nullptr, "Setup Problem", "Unable to establish directory structure", "Ok");
+        QMessageBox mb(QMessageBox::Warning, "Setup Problem", "Unable to establish directory structure");
     setupSuccessful = setupSuccessful && successfulStep;
 
     successfulStep = createAllOutputFiles(today);
     if (!successfulStep)
-        QMessageBox::warning(nullptr, "Setup Problem", "Unable to create output files", "Ok");
+        //QMessageBox::warning(nullptr, "Setup Problem", "Unable to create output files", "Ok");
+        QMessageBox mb(QMessageBox::Warning, "Setup Problem", "Unable to create output files");
     setupSuccessful = setupSuccessful && successfulStep;
 
     batchRunFlag = determineIfBatchRun();
@@ -303,10 +306,14 @@ bool GLOBALVARS::determineIfBatchRun()
 {
     bool isBatchRun = false;
 
-    QDateTime batchStart, thisStart;
+    QDateTime batchStart, thisStart, dateForName;
+
+    dateForName = QDateTime::currentDateTime();
+    if (dateForName.time() > QTime(21, 30))
+        dateForName = dateForName.addDays(1);
 
     QString targetFileName(QString("C:\\Obits\\Batch Read\\Nightly Obit Run Log for "));
-    targetFileName += QDate::currentDate().toString("yyyyMMdd");
+    targetFileName += dateForName.toString("yyyyMMdd");
     targetFileName += QString(".log");
 
     if(QFileInfo::exists(targetFileName))

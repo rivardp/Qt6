@@ -138,6 +138,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
 {
     QString AdditionalInfo;
     QTextStream *outputStream = nullptr;
+    QFile *eliminateWarning = new QFile;
 
     switch (messageType)
     {
@@ -147,6 +148,8 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
     case ErrorSQL:
         if(FHsqlError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHsqlError);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
         switch(msgInfo)
         {
@@ -170,45 +173,56 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
             AdditionalInfo = ": ";
         }
 
-        *outputStream << "SQL" << AdditionalInfo << msg << endl;
+        *outputStream << "SQL" << AdditionalInfo << msg << Qt::endl;
         FHsqlError->close();
         break;
 
     case ErrorURL:
         if(FHurlError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHurlError);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
-        *outputStream << "URL Error: " << msg << endl;
+        *outputStream << "URL Error: " << msg << Qt::endl;
         FHurlError->close();
         break;
 
     case ErrorRunTime:
         if(FHrunTimeError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHrunTimeError);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
-        *outputStream << "Run Time Error: " << msg << endl;
+        *outputStream << "Run Time Error: " << msg << Qt::endl;
         FHrunTimeError->close();
         break;
 
     case ErrorConnection:
         if(FHconnectionError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHconnectionError);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
-        *outputStream << "Connection Error: " << msg << endl;
+        *outputStream << "Connection Error: " << msg << Qt::endl;
         FHconnectionError->close();
         break;
 
     case ErrorRecord:
         if(FHrecordError->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHrecordError);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
-        *outputStream << "Individual Record Error: " << msg << endl;
+        *outputStream << "Individual Record Error: " << msg << Qt::endl;
         FHrecordError->close();
         break;
 
     case ActionRequired:
         if(FHactionRequired->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHactionRequired);
+        else
+            outputStream = new QTextStream(eliminateWarning);
+
         switch(msgInfo)
         {
         case 1:
@@ -220,23 +234,27 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
 
         }
 
-        *outputStream << "Action Required" << AdditionalInfo << msg << endl;
+        *outputStream << "Action Required" << AdditionalInfo << msg << Qt::endl;
         FHactionRequired->close();
         break;
 
     case RunSummary:
         if(FHrunSummary->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHrunSummary);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
-        *outputStream << "ReadCSV stat: " << msg << endl;
+        *outputStream << "ReadCSV stat: " << msg << Qt::endl;
         FHrunSummary->close();
         break;
 
     case AuditListing:
         if(FHauditListing->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
             outputStream = new QTextStream(FHauditListing);
+        else
+            outputStream = new QTextStream(eliminateWarning);
 
-        *outputStream << msg << endl;
+        *outputStream << msg << Qt::endl;
         FHauditListing->close();
         break;
 
@@ -252,6 +270,7 @@ void GLOBALVARS::logMsg(msgType messageType, QString msg, int msgInfo)
     }       
 
     delete outputStream;
+    delete eliminateWarning;
 }
 
 void GLOBALVARS::logMsg(msgType messageType, PQString msg, int msgInfo)
@@ -270,18 +289,21 @@ bool GLOBALVARS::runSetups()
 
     today = QDate::currentDate();
     setupSuccessful = today.isValid();
-    if (!setupSuccessful)
-        QMessageBox::warning(nullptr, "Setup Problem", "Unable to retrieve current date", "Ok");
+    if (!setupSuccessful)        
+        //QMessageBox::warning(nullptr, "Setup Problem", "Unable to retrieve current date", "Ok");
+        QMessageBox mb(QMessageBox::Warning, "Setup Error", "Unable to retrieve current date");
     todaySQL << today.toString("yyyy/MM/dd") << QString(" 0:0:0");
 
     successfulStep = setupDirectoryStructure();
     if (!successfulStep)
-        QMessageBox::warning(nullptr, "Setup Problem", "Unable to establish directory structure", "Ok");
+        //QMessageBox::warning(nullptr, "Setup Problem", "Unable to establish directory structure", "Ok");
+        QMessageBox mb(QMessageBox::Warning, "Setup Error", "Unable to establish directory structure");
     setupSuccessful = setupSuccessful && successfulStep;
 
     successfulStep = createAllOutputFiles(today);
     if (!successfulStep)
-        QMessageBox::warning(nullptr, "Setup Problem", "Unable to create output files", "Ok");
+        //QMessageBox::warning(nullptr, "Setup Problem", "Unable to create output files", "Ok");
+        QMessageBox mb(QMessageBox::Warning, "Setup Error", "Unable to create output files");
     setupSuccessful = setupSuccessful && successfulStep;
 
     return setupSuccessful;
