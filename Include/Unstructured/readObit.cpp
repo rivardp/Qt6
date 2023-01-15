@@ -140,46 +140,14 @@ void readObit::read()
          readUnstructuredContent(UseFirstDateAsDOD);
     if (1)
     {
+        readImageNameInfo();
         globals->globalDr->setMinMaxDOB();
         globals->globalDr->runDateValidations();
         finalNameCleanup();
         runNameValidations();
         runGenderValidation();
         runRecordValidation();
-
-        // Attempts to fix name issues and warnings
-        if ((globals->globalDr->wi.nameReversalFlag >= 10) && (globals->globalDr->wi.nameReversalFlag < 20))
-            runAlternateNameProcessing1();
-
-        if (globals->globalDr->getLastName().getLength() == 0)
-        {
-            bool revised = false;
-            revised = reorderNames();
-
-            if (revised)
-            {
-                globals->globalDr->wi.resetNonDateValidations();
-                runNameValidations();
-                runGenderValidation();
-                runRecordValidation();
-            }
-        }
-
-        if ((globals->globalDr->getLastName().getLength() > 0) && (globals->globalDr->getFirstName().getLength() == 0) && (globals->globalDr->getMiddleNames().getLength() > 0))
-        {
-            QString firstName, middleNames;
-            PQString errMsg;
-            unstructuredContent origMiddleNames(globals->globalDr->getMiddleNames());
-
-            firstName = origMiddleNames.getWord().getString();
-            if (OQString(firstName).isAGivenName(errMsg))
-            {
-                globals->globalDr->setFirstNames(firstName);
-                globals->globalDr->clearMiddleNames();
-                while(!origMiddleNames.isEOS()){
-                    globals->globalDr->setMiddleNames(origMiddleNames.getWord());}
-            }
-        }
+        fixNameIssues();
     }
 }
 
@@ -732,6 +700,19 @@ void readObit::readInObitText()
                 uc.replaceHTMLentities();
                 uc.cleanUpEnds();
                 uc.removeBookEnds(QUOTES);
+            }
+            break;
+
+        case 4:
+            if (consecutiveMovesTo(50, "og:description", "content="))
+                uc = readQuotedMetaContent();
+            break;
+
+        case 5:
+            if (consecutiveMovesTo(1000, "tribute-book-obit", "View Tribute Book"))
+            {
+                consecutiveMovesTo(100, "<p", ">");
+                uc = getUntil("</div>");
             }
             break;
         }
@@ -1428,7 +1409,7 @@ void readObit::readInObitText()
 
     case BrandAgent:
     {
-        if (consecutiveMovesTo(50, "ptb_entry_content", "articleBody", ">"))
+        if (consecutiveMovesTo(50, "message-view-body-content", ">"))
         {
             uc = getUntil("</div>");
             runStdProcessing(uc, false);
@@ -1862,8 +1843,8 @@ void readObit::readInObitText()
 
     case Saguenay:
     {
-        if (consecutiveMovesTo(2000, "class=\"content-page\"", "content-avis", "<p>"))
-            uc = getUntil("</div>");
+        if (consecutiveMovesTo(25, "description", "content="))
+            uc = readQuotedMetaContent();
     }
         break;
 
@@ -2095,14 +2076,14 @@ void readObit::readInObitText()
 
     case Reactif:
     {
-        if (moveTo("class=\"deces-text\""))
+        if (consecutiveMovesTo(50, "class=\"deces-text\"", ">"))
             uc = getUntil("</article>");
     }
         break;
 
     case Boite:
     {
-        if (moveTo("class=\"wpfh-obituary-content\""))
+        if (consecutiveMovesTo(50, "class=\"wpfh-obituary-content\"", ">"))
             uc = getUntil("</div>");
     }
         break;
@@ -2965,12 +2946,12 @@ void readObit::readInObitText()
 
     case TurnerFamily:
         if (moveTo("class=\"entry-content\">"))
-            uc = getUntil("<!-- .entry-content -->");
+            uc = getUntilEarliestOf("<!-- .entry-content -->", "<section");
         break;
 
     case VanHeck:
         if (consecutiveMovesTo(50, "class=\"entry-content\"", ">"))
-            uc = getUntil("<!-- .entry-content -->");
+            uc = getUntilEarliestOf("<!-- .entry-content -->", "<section");
         break;
 
     case TBK:
@@ -3316,8 +3297,8 @@ void readObit::readInObitText()
 
     case Laurent:
     {
-        if (consecutiveMovesTo(75, "id=\"texte-deces\"", ">"))
-            uc = getUntil("<div class=");
+        if (consecutiveMovesTo(500, "class=\"details\"", "<hr/>"))
+            uc = getUntil("</div>");
     }
         break;
 
@@ -3571,6 +3552,13 @@ void readObit::readInObitText()
     }
         break;
 
+    case MLBW:
+    {
+        if (consecutiveMovesTo(150, "461d092", "<div", ">"))
+            uc = getUntil("</div>");
+    }
+        break;
+
 
     default:
         PQString errMsg;
@@ -3702,7 +3690,6 @@ void readObit::readInObitTitle()
         }
         break;
 
-    case BlackPress:
     case BrowseAll:
     case Frazer:
     case Alternatives:
@@ -3799,6 +3786,7 @@ void readObit::readInObitTitle()
     case Passages:
     case CooperativeFuneraire:
     case GreatWest:
+    case BlackPress:
     case Aberdeen:
     case ConnellyMcKinley:
     case Codesign:
@@ -3812,6 +3800,7 @@ void readObit::readInObitTitle()
     case Websites:
     case Coop:
     case Citrus:
+    case MLBW:
     case SandFire:
     case Linkhouse:
     case ChadSimpson:
@@ -3888,17 +3877,28 @@ void readObit::readInObitTitle()
         break;
 
     case FuneralTech:
-        if (style == 3)
+        switch(style)
         {
-            if (moveTo("<title>"))
-                titleStream = getUntilEarliestOf("</title>", " - ");
-        }
-        else
-        {
+        case 0:
+        case 1:
+        case 2:
+        case 5:
             moveTo("<title>");
             conditionalMoveTo("Obituary of ", "</title>");
                 titleStream = getUntilEarliestOf("|", "<");
+            break;
+
+        case 3:
+            if (moveTo("<title>"))
+                titleStream = getUntilEarliestOf("</title>", " - ");
+            break;
+
+        case 4:
+            if (consecutiveMovesTo(100, "class=\"deceased-info\"", "<h"))
+                titleStream = readNextBetween(BRACKETS);
+            break;
         }
+
         break;
 
     case Burke:
@@ -3938,6 +3938,25 @@ void readObit::readInObitTitle()
         break;
 
     case DignityMemorial:
+        if (consecutiveMovesTo(100, "og:title", "content="))
+        {
+            titleStream = readQuotedMetaContent();
+            if (titleStream.left(5) == PQString("Find "))
+            {
+                // Most likely means a deleted obituary, so pull name from URL
+                QString tempString = globals->globalDr->getURL();
+                int indexA = tempString.lastIndexOf("/");
+                int indexB = tempString.lastIndexOf("-");
+                if ((indexA >=0) && (indexB >= 0))
+                {
+                    indexA++;
+                    tempString.replace("-", " ");
+                    titleStream = tempString.mid(indexA, indexB - indexA);
+                }
+            }
+        }
+        break;
+
     case Cible:
     case YAS:
     case Ancient:
@@ -5516,6 +5535,10 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
             locations = QString("campbell").split(QString("|"));
             break;
 
+        case 5:
+            locations = QString("maple").split(QString("|"));
+            break;
+
         case 22:
             locations = QString("langley").split(QString("|"));
             break;
@@ -5524,8 +5547,13 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
             locations = QString("langley").split(QString("|"));
             break;
 
+        case 64:
+            locations = QString("nelson|star").split(QString("|"));
+            break;
+
         case 68:
-            locations = QString("vernon").split(QString("|"));
+        case 73:
+            locations = QString("vernon|morningstar|salmon|arm").split(QString("|"));
             break;
 
         case 71:
@@ -6593,6 +6621,20 @@ void readObit::readMessages()
         if (commentDate == globals->today)
             commentDate.setDate(0,0,0);
         break;
+
+    case MLBW:
+        commentDate = globals->today;
+        while (consecutiveMovesTo(1000, "id=\"plume-temoignage\"", ">Date "))
+        {
+            tempUC = getUntil("<");
+            tempDate = tempUC.readDateField();
+            if (tempDate.isValid() && (tempDate < commentDate))
+                commentDate = tempDate;
+        }
+        if (commentDate == globals->today)
+            commentDate.setDate(0,0,0);
+        break;
+
     }
 
     if (commentDate.isValid())
@@ -7000,7 +7042,6 @@ void readObit::fillInDatesFifthPass()
     dates = ucCleaned.contentPullBackToBackDates(globals->globalDr->getLanguage());
     processNewDateInfo(dates, 5);
 }
-
 
 void readObit::fillInDatesSixthPass()
 {
@@ -7413,6 +7454,27 @@ bool readObit::useFirstSentenceSingleDate()
     }
 
     return implemented;
+}
+
+QDate readObit::getFirstSentenceSingleDate()
+{
+    ucCleaned.beg();
+    unstructuredContent sentence;
+    OQString cleanString;
+    int numDates;
+    QList<QDate> dateList;
+    QDate resultDate;
+
+    while (!ucCleaned.isEOS() && (((sentence.getLength() == 0) || sentence.isJustSavedNames() || sentence.startsWithClick(true)) || sentence.streamIsJustDates()))
+    {
+        sentence = ucCleaned.getSentence();
+    }
+
+    numDates = sentence.pullOutDates(globals->globalDr->getLanguage(), dateList, 3, cleanString, false);
+    if (numDates == 1)
+        resultDate = dateList[0];
+
+    return resultDate;
 }
 
 void readObit::readStructuredContent()
@@ -7984,6 +8046,20 @@ void readObit::readStructuredContent()
             tempUC = readNextBetween(BRACKETS);
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
         }
+        else
+        {
+            // Most likely means a deleted obituary, so pull name from URL
+            QString tempString = globals->globalDr->getURL();
+            int indexA = tempString.lastIndexOf("/");
+            int indexB = tempString.lastIndexOf("-");
+            if ((indexA >=0) && (indexB >= 0))
+            {
+                indexA++;
+                tempString.replace("-", " ");
+                tempUC = tempString.mid(indexA, indexB - indexA);
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            }
+        }
 
         // Look for date information if necessary
         if (globals->globalDr->missingDOB() || globals->globalDr->missingDOD())
@@ -8001,6 +8077,14 @@ void readObit::readStructuredContent()
             loadValue(QString("obituary-dod"), tempDate, dateFormat);
             if (tempDate.isValid())
                 globals->globalDr->setDOD(tempDate);
+        }
+
+        // Look for funeral date
+        beg();
+        if (consecutiveMovesTo(100, "class=\"service-date\"", "class=\"date\""))
+        {
+            tempUC = readNextBetween(BRACKETS);
+            tempUC.processDateField(dfDOS);
         }
 
         break;
@@ -8140,7 +8224,6 @@ void readObit::readStructuredContent()
                             tempUC.processYearField(dfDOB);
                         else
                         {
-                            tempUC.processDateField(dfDOB);
                             DOBfound = true;
                         }
                     }
@@ -8149,14 +8232,29 @@ void readObit::readStructuredContent()
 
                     if (moveTo("class=\"dod\""))
                     {
-                        tempUC = readNextBetween(BRACKETS);
-                        if (tempUC.getLength() == 4)
-                            tempUC.processYearField(dfDOD);
+                        tempTempUC = readNextBetween(BRACKETS);
+                        if (tempTempUC.getLength() == 4)
+                            tempTempUC.processYearField(dfDOD);
                         else
                         {
-                            tempUC.processDateField(dfDOD);
                             DODfound = true;
                         }
+                    }
+
+                    if (DOBfound)
+                    {
+                        if (DODfound)
+                        {
+                            tempUC = tempUC + OQString(" - ") + tempTempUC;
+                            fillInDatesStructured(tempUC);
+                        }
+                        else
+                            tempUC.processDateField(dfDOB);
+                    }
+                    else
+                    {
+                        if (DODfound)
+                            tempTempUC.processDateField(dfDOD);
                     }
 
                     backward(getPosition() - position);
@@ -8484,6 +8582,21 @@ void readObit::readStructuredContent()
                     tempUC.removeHTMLtags();
                     tempUC.simplify();
                     fillInDatesStructured(tempUC);
+                }
+            }
+            break;
+
+        case 4:
+        case 5:
+            if (consecutiveMovesTo(100, "class=\"deceased-info\"", "<h"))
+            {
+                tempUC = readNextBetween(BRACKETS);
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+
+                if (moveTo("<h3", 50))
+                {
+                    tempUC = readNextBetween(BRACKETS);
+                    tempUC.processStructuredYears();
                 }
             }
             break;
@@ -9996,7 +10109,7 @@ void readObit::readStructuredContent()
 
     case BrandAgent:
     {
-        if (consecutiveMovesTo(300, "class=\"post-title entry-title\"", "href", ">"))
+        if (consecutiveMovesTo(300, "class=\"ptb_post_title ptb_entry_title\"", "href", ">"))
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
@@ -10836,15 +10949,18 @@ void readObit::readStructuredContent()
 
     case Saguenay:
     {
-        if (consecutiveMovesTo(2000, "class=\"content-page\"", "content-avis", "<h"))
+        if (consecutiveMovesTo(2000, "class=\"content-page\"", "<h2"))
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
 
-            if (moveTo("<h", 100))
+            if (moveTo("<h5", 100))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processDateField(dfDOD);
+                if ((tempUC.getLength() == 11) && (tempUC.middle(5,1) == PQString("-")))
+                    tempUC.processStructuredYears();
+                else
+                    tempUC.processDateField(dfDOD);
             }
         }
     }
@@ -11183,6 +11299,7 @@ void readObit::readStructuredContent()
 
             if (consecutiveMovesTo(100, "class=\"post_content\"", "<p"))
             {
+                conditionalMoveTo("<em", "<p", 0);
                 tempUC = readNextBetween(BRACKETS);
                 tempUC.processStructuredYears();
             }
@@ -13393,6 +13510,13 @@ void readObit::readStructuredContent()
         break;
 
     case Brunet:
+        if (moveTo("class=\"page__title\""))
+        {
+            tempUC = readNextBetween(BRACKETS);
+            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        }
+
+        beg();
         if (style == 0)
         {
             if (conditionalMoveTo("Date of birth", "Date of death", 0))
@@ -13428,86 +13552,7 @@ void readObit::readStructuredContent()
                     forward(9);
                 tempUC = getUntil("<");
                 tempUC.processDateField(dfDOD);
-            }
-
-            /*rxTarget.setPattern("\\b(janvier\\s?/\\s?January)\\b");
-            itsString.replace(rxTarget, "janvier");
-            rxTarget.setPattern("\\b(février\\s?/\\s?February)\\b");
-            itsString.replace(rxTarget, "février");
-            rxTarget.setPattern("\\b(mars\\s?/\\s?March)\\b");
-            itsString.replace(rxTarget, "mars");
-            rxTarget.setPattern("\\b(avril\\s?/\\s?April)\\b");
-            itsString.replace(rxTarget, "avril");
-            rxTarget.setPattern("\\b(mai\\s?/\\s?May)\\b");
-            itsString.replace(rxTarget, "mai");
-            rxTarget.setPattern("\\b(juin\\s?/\\s?June)\\b");
-            itsString.replace(rxTarget, "juin");
-            rxTarget.setPattern("\\b(juillet\\s?/\\s?July)\\b");
-            itsString.replace(rxTarget, "juillet");
-            rxTarget.setPattern("\\b(août\\s?/\\s?August)\\b");
-            itsString.replace(rxTarget, "août");
-            rxTarget.setPattern("\\b(septembre\\s?/\\s?September)\\b");
-            itsString.replace(rxTarget, "septembre");
-            rxTarget.setPattern("\\b(octobre\\s?/\\s?October)\\b");
-            itsString.replace(rxTarget, "octobre");
-            rxTarget.setPattern("\\b(novembre\\s?/\\s?November)\\b");
-            itsString.replace(rxTarget, "novembre");
-            rxTarget.setPattern("\\b(décembre\\s?/\\s?December)\\b");
-            itsString.replace(rxTarget, "décembre");
-            beg();
-
-            target = QString("view=article&id=") + globals->globalDr->getID().getString() + QString("&catid=13");
-            if (moveTo(target))
-            {
-                moveTo("<h");
-                tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
-
-                while(conditionalMoveTo(">Date", "</div>", 2))
-                {
-                    tempTempUC = getWord();
-                    if (tempTempUC == OQString("of"))
-                    {
-                        tempUC.setContentLanguage(english);
-                        tempTempUC = getWord();
-                        if (tempTempUC.right(1) == OQString(":"))
-                        {
-                            tempTempUC.dropRight(1);
-                            backward(2);
-                        }
-                        moveTo(":");
-                        tempUC = getUntil("<");
-                        if (tempTempUC == OQString("birth"))
-                            tempUC.processDateField(dfDOB);
-                        else
-                            tempUC.processDateField(dfDOD);
-                    }
-                    else
-                    {
-                        tempUC.setContentLanguage(french);
-                        tempTempUC = getWord();
-                        if (tempTempUC.right(1) == OQString(":"))
-                        {
-                            tempTempUC.dropRight(1);
-                            backward(2);
-                        }
-                        else
-                        {
-                            if (tempTempUC.right(2) == OQString("/of"))
-                            {
-                                tempTempUC.dropRight(3);
-                                backward(2);
-                            }
-                        }
-                        moveTo(":");
-                        tempUC = getUntil("<");
-                        if (tempTempUC == OQString("naissance"))
-                            tempUC.processDateField(dfDOB);
-                        else
-                            tempUC.processDateField(dfDOD);
-                    }
-                }
-            }*/
+            }            
         }
         else
         {
@@ -14376,10 +14421,16 @@ void readObit::readStructuredContent()
         break;
 
     case Laurent:
-        if (consecutiveMovesTo(100, "class=\"titre-deces\"", "<span"))
+        if (consecutiveMovesTo(100, "class=\"details\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
+
+            if (conditionalMoveTo("Décédé(e) le ", "<hr/>"))
+            {
+                tempUC = getUntil("<");
+                tempUC.processDateField(dfDOD);
+            }
         }
         break;
 
@@ -14803,6 +14854,32 @@ void readObit::readStructuredContent()
         }
         break;
 
+    case MLBW:
+        if (consecutiveMovesTo(250, "fb37a48", "<h2"))
+        {
+            tempUC = readNextBetween(BRACKETS);
+            if (consecutiveMovesTo(250, "ea90534", "<h2"))
+            {
+                tempUC += readNextBetween(BRACKETS);
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            }
+            else
+                beg();
+
+            if (conditionalMoveTo(">Né(e) le ", ">décédé(e) le ", 0))
+            {
+                tempUC = getUntil("<");
+                tempUC.processDateField(dfDOB);
+            }
+
+            if (moveTo(">décédé(e) le "))
+            {
+                tempUC = getUntil("<");
+                tempUC.processDateField(dfDOD);
+            }
+        }
+        break;
+
 
     default:
         PQString errMsg;
@@ -14960,13 +15037,28 @@ void readObit::readStyle()
             style = 3;
         else
         {
-            if (moveTo("deceased-info"))
-                style = 1;
+            beg();
+            if (moveTo("ogden.funeraltechweb.com"))
+                style = 5;
             else
             {
                 beg();
-                if (moveTo("class=\"obituary-text\""))
-                    style = 2;
+                if (consecutiveMovesTo(100, "<title", "Obituary / Nécrologie"))
+                {
+                    style = 4;
+                }
+                else
+                {
+                    beg();
+                    if (moveTo("deceased-info"))
+                        style = 1;
+                    else
+                    {
+                        beg();
+                        if (moveTo("class=\"obituary-text\""))
+                            style = 2;
+                    }
+                }
             }
         }
         break;
@@ -16369,6 +16461,14 @@ bool readObit::processNewDateInfo(DATES &dates, unsigned int pass)
         }
     }
 
+    // Look for obvious error in YOD being entered as YOB
+    if (newDOBinfo && newDODinfo && (dates.potentialDOB.year() == dates.potentialDOD.year()) && (dates.potentialDOD.year() < (globals->today.year() - 5)))
+    {
+        QDate firstDate = getFirstSentenceSingleDate();
+        if (firstDate.isValid() && (firstDate.month() == dates.potentialDOD.month()) && (firstDate.day() == dates.potentialDOD.day()))
+            dates.potentialDOD = firstDate;
+    }
+
     excludeInfo = ((pass == 8) && (dates.potentialDOD != origDOD)) || !dates.hasDateInfo();
     nonFixableDOBerror = (newDOBinfo && !newDODinfo && origDOD.isValid() && (dates.potentialDOB > origDOD)) ||
                          (newYOBinfo && !newYODinfo && (((origDOD.isValid() && (dates.potentialYOB > origDOD.year())) ||
@@ -16654,6 +16754,26 @@ bool readObit::isLocation(OQString word)
     }
 
     return allMatched;
+}
+
+void readObit::treatmentNameCleanup()
+{
+    if (globals->globalDr->wi.confirmTreatmentName.length() == 0)
+        return;
+
+    OQStream tempStream(globals->globalDr->wi.confirmTreatmentName);
+    OQString word;
+    bool matched = true;
+
+    while (matched && !tempStream.isEOS())
+    {
+        word = tempStream.getWord();
+        if (!globals->globalDr->isASavedName(word))
+            matched = false;
+    }
+
+    if (matched)
+        globals->globalDr->wi.confirmTreatmentName.clear();
 }
 
 void readObit::finalNameCleanup()
@@ -16997,7 +17117,7 @@ int readObit::runNameValidations()
         }
 
         // Add points if it is a location
-        if (name.isLocation())
+        if (name.isLocation() || name.isFoundIn(routes, 1))
             warningScore += 10;
 
         if (count > 0)
@@ -17039,7 +17159,7 @@ int readObit::runNameValidations()
             {
                 warningScore += 10;
 
-                if ((gender == Female) && ((name == "April") || (name == "June") || (name == "Avril")))
+                if ((gender == Female) && ((name == "April") || (name == "June") || (name == "Avril") || (name == "May")))
                     warningScore -= 5;
             }
 
@@ -17258,6 +17378,67 @@ int readObit::runGenderValidation()
     }
     else
         return 1;
+}
+
+void readObit::fixNameIssues()
+{
+    // Attempts to fix name issues and warnings
+    if ((globals->globalDr->wi.nameReversalFlag >= 10) && (globals->globalDr->wi.nameReversalFlag < 20))
+        runAlternateNameProcessing1();
+
+    if (globals->globalDr->getLastName().getLength() == 0)
+    {
+        bool revised = false;
+        revised = reorderNames();
+
+        if (revised)
+        {
+            globals->globalDr->wi.resetNonDateValidations();
+            runNameValidations();
+            runGenderValidation();
+            runRecordValidation();
+        }
+    }
+
+    if ((globals->globalDr->getLastName().getLength() > 0) && (globals->globalDr->getFirstName().getLength() == 0) && (globals->globalDr->getMiddleNames().getLength() > 0))
+    {
+        QString firstName, middleNames;
+        PQString errMsg;
+        unstructuredContent origMiddleNames(globals->globalDr->getMiddleNames());
+
+        firstName = origMiddleNames.getWord().getString();
+        if (OQString(firstName).isAGivenName(errMsg))
+        {
+            globals->globalDr->setFirstNames(firstName);
+            globals->globalDr->clearMiddleNames();
+            while(!origMiddleNames.isEOS()){
+                globals->globalDr->setMiddleNames(origMiddleNames.getWord());}
+        }
+    }
+
+    if ((globals->globalDr->getGender() == Male) && !globals->globalDr->getMaleHyphenated() && (globals->globalDr->getMiddleNames().getLength() == 0) && (globals->globalDr->getLastNameAlt1().getLength() > 0) && (globals->globalDr->getLastNameAlt2().getLength() == 0))
+    {
+        NAMESTATS nameStat1, nameStat2;
+        databaseSearches dbSearch;
+
+        PQString lastName1 = globals->globalDr->getLastName();
+        PQString lastName2 = globals->globalDr->getLastNameAlt1();
+
+        dbSearch.nameStatLookup(lastName1.getString(), globals, nameStat1, Male);
+        dbSearch.nameStatLookup(lastName2.getString(), globals, nameStat2, Male);
+
+        if (nameStat1.isLikelySurname && nameStat2.isLikelyGivenName)
+        {
+            globals->globalDr->setMiddleNames(lastName2);
+            globals->globalDr->removeFromLastNames(lastName2);
+        }
+
+        if (nameStat2.isLikelySurname && nameStat1.isLikelyGivenName)
+        {
+            globals->globalDr->setMiddleNames(lastName1);
+            globals->globalDr->removeFromLastNames(lastName1);
+        }
+    }
 }
 
 void readObit::determinePotentialFirstName()
@@ -17889,6 +18070,13 @@ void readObit::readInCustomAddress()
         }
         break;
 
+    case 2152:
+        if (consecutiveMovesTo(1000, "8e1bd6b", "</span>", "</span>"))
+        {
+            backward(14);
+            pc = getUntil("<").getString();
+        }
+
 
     default:
         break;
@@ -17896,4 +18084,64 @@ void readObit::readInCustomAddress()
 
     if ((pc.length() >= 6) && (pc.length() <= 7))
         globals->globalDr->setPostalCode(pc);
+}
+
+void readObit::readImageNameInfo()
+{
+    QString tempString;
+    int yod, mod, dod;
+    QDate potentialDate;
+    bool validDate = false;
+
+    switch(globals->globalDr->getProvider())
+    {
+    case DignityMemorial:
+    case WebCemeteries:
+        if (!globals->globalDr->getDOD().isValid())
+        {
+            beg();
+            if (consecutiveMovesTo(150, "meta property=\"og:image\"", globals->globalDr->getID().getString()))
+            {
+                forward(1);
+                tempString = getUntil("_").getString();
+                if (tempString.length() == 8)
+                {
+                    yod = tempString.left(4).toInt();
+                    mod = tempString.mid(4,2).toInt();
+                    dod = tempString.right(2).toInt();
+                    potentialDate = QDate(yod,mod,dod);
+                    if (potentialDate.isValid())
+                    {
+                        validDate = true;
+                        if (globals->globalDr->getDOB().isValid())
+                        {
+                            if (potentialDate < globals->globalDr->getDOB())
+                                validDate = false;
+                        }
+                        else
+                        {
+                            if (globals->globalDr->getYOB() > 0)
+                            {
+                                if (potentialDate.year() < static_cast<int>(globals->globalDr->getYOB()))
+                                    validDate = false;
+                            }
+                        }
+
+                        if (globals->globalDr->getYOD() > 0)
+                        {
+                            if (potentialDate.year() != static_cast<int>(globals->globalDr->getYOD()))
+                                validDate = false;
+                        }
+
+                        if (validDate)
+                            globals->globalDr->setDOD(potentialDate);
+                    }
+                }
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
 }

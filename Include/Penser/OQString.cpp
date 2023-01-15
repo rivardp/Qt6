@@ -376,9 +376,13 @@ bool OQString::removeLeadingNeeEtAl(OQString nextWord, LANGUAGE language)
     if (nextWord.lower() == OQString("le"))
         return false;
     else
-        return removeLeadingNeeEtAl(language);
+    {
+        if ((nextWord.getLength() == 0) && (itsString == "Born"))
+            return false;
+        else
+            return removeLeadingNeeEtAl(language);
+    }
 }
-
 
 bool OQString::removeLeadingNeeEtAl(LANGUAGE language)
 {
@@ -619,7 +623,20 @@ void OQString::removeAllSuffixPrefix()
         itsString.replace("Right ", "", Qt::CaseSensitive);
     }
 
-    itsString.replace("(|)", "");
+    itsString.replace("\\(|\\)", "");
+    itsString.replace("''", "");
+    itsString.replace("  ", " ");
+
+    target.setPattern("\\(,");
+    itsString.replace(target, "(");
+    target.setPattern(",\\)");
+    itsString.replace(target, ")");
+    target.setPattern("\\(\\.");
+    itsString.replace(target, "(");
+    target.setPattern("\\.\\)");
+    itsString.replace(target, ")");
+    target.setPattern("\\(\\s+?\\)");
+    itsString.replace(target, "");
 }
 
 void OQString::removeSuffixPrefix(const QList<QString> &list)
@@ -806,7 +823,7 @@ void OQString::compressCompoundNames(const LANGUAGE lang)
 
             if (end < last)
             {
-                // Need to obtain next word for aboriginal check
+                // Need to obtain next word for aboriginal check and other exceptions
                 bool cancel;
                 int tempEnd = itsString.indexOf(space, start, Qt::CaseInsensitive);
                 if (tempEnd == -1)
@@ -814,6 +831,8 @@ void OQString::compressCompoundNames(const LANGUAGE lang)
                 nextWord = itsString.mid(start, tempEnd - start);
                 cancel = nextWord.removeBookEnds(PARENTHESES | QUOTES, true);
                 cancel = cancel || nextWord.removeLeading(PARENTHESES | QUOTES);
+                cancel = cancel || (nextWord.lower() == PQString("obituary"));
+                cancel = cancel || ((word.lower() == PQString("van")) && (nextWord.getLength() < 5));
 
                 if (cancel || !(isCompound || cleanWord.isAboriginalName(nextWord)))
                     result += space;
@@ -1055,6 +1074,10 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     // Standardize abbreviated dates
     targetS.setPattern(QString("(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|jan|janv|fév|févr|mar|avr|juil|sept|oct|nov|déc)\\.?\\s?(\\d)"));
     itsString.replace(targetS, "\\1 \\2");
+
+    // Address unusual date format
+    targetS.setPattern(" of ([1|2][0|9][0-9][0-9])");
+    itsString.replace(targetS, " \\1");
 
     // Fix malformed dates
     targetS.setPattern("\\b(January|February|March|April|May|June|July|August|September|October|November|December) (\\d\\d?)\\.\\s?([1-2][0|9][0-9][0-9])\\b");  // period instead of comma
@@ -2139,6 +2162,14 @@ bool OQString::isAbbreviation() const
     return isFoundIn(provAbbreviations, 1) || isFoundIn(otherAbbreviations, 1) || (isAllCaps(false) && !containsVowel() && !isNumeric());
 }
 
+bool OQString::isProvince() const
+{
+    OQString simplified = getUnaccentedString();
+    simplified.replace("-", " ");
+
+    return isProvAbbreviation() || simplified.isFoundIn(provLong, 1);
+}
+
 bool OQString::isProvAbbreviation() const
 {
     return isFoundIn(provAbbreviations, 1);
@@ -2157,6 +2188,32 @@ bool OQString::isUncapitalizedName() const
 bool OQString::isNoVowelName() const
 {
     return isFoundIn(noVowelNames, 1);
+}
+
+bool OQString::isSpousalReference(const LANGUAGE lang) const
+{
+    bool result = false;
+    OQString word = itsString;
+
+    switch (lang)
+    {
+    case french:
+        if ((word == OQString("mari")) || (word == OQString("femme")) || (word == OQString("partenaire")) || (word == OQString("conjoint")) || (word == OQString("conjointe")) || (word == OQString("époux")) || (word == OQString("épouse")))
+            result = true;
+        break;
+
+    case spanish:
+        if ((word == OQString("marido")) || (word == OQString("esposa")))
+            result = true;
+        break;
+
+    default:
+        if ((word == OQString("husband")) || (word == OQString("wife")) || (word == OQString("partner")) || (word == OQString("soulmate")) || (word == OQString("spouse")))
+            result = true;
+        break;
+    }
+
+    return result;
 }
 
 bool OQString::isHyphenatedName() const
@@ -3925,8 +3982,11 @@ QList<dayOfWeekInfo> OQString::daysOfWeekSpanish = QList<dayOfWeekInfo> ()
     << dayOfWeekInfo("miercoles", 4 )
     << dayOfWeekInfo("sabado", 7 );
 
-QList<QString> OQString::provAbbreviations      = QList<QString> () << "ab" << "bc" << "mb" << "nb" << "nf" << "nl" << "ns" << "on" << "pei" << "qc" << "sk";
-QList<QString> OQString::otherAbbreviations      = QList<QString> () << "fr" << "mt" << "sts";
+QList<QString> OQString::provAbbreviations  = QList<QString> () << "ab" << "bc" << "mb" << "nb" << "nf" << "nfld" << "nl" << "ns" << "on" << "pe" << "pei" << "qc" << "sask" << "sk";
+QList<QString> OQString::provLong           = QList<QString> () << "alberta" << "british columbia" << "colombie britannique" << "ile du prince eduoard"
+                                                                << "manitoba" << "new brunswick" << "newfoundland" << "nouveau brunswick" << "nouvelle ecosse" << "nova scotia" << "ontario"
+                                                                << "prince edward island" << "quebec" << "saskatchewan" << "terreneuve";
+QList<QString> OQString::otherAbbreviations = QList<QString> () << "fr" << "mt" << "sts";
 
 QList<QString> OQString::aboriginalNames = QList<QString> () << "alone" << "bad" << "bare" << "bear" << "bears" << "big" << "bird" << "black" << "bone" << "bow" << "brave" << "bruised" << "bull"
                                                              << "calf" << "canoe" << "cat" << "chief" << "child" << "crazy" << "crop" << "cross" << "crow" << "day" << "duck"
@@ -3959,6 +4019,7 @@ QList<QString> OQString::godReferences   = QList<QString> ()  << "dieu" << "god"
 QList<QString> OQString::locations       = QList<QString> ()  << "beaverbank" << "bedford" << "blytheswood" << "dartmouth"
                                                               << "eastern" << "halifax" << "port" << "porters" << "sambro"
                                                               << "st. john's";
+QList<QString> OQString::routes          = QList<QString> ()  << "ave" << "avenue" << "blvd" << "boulevard" << "cres" << "crescent" << "dr" << "drive" << "hwy" << "highway" << "rd" << "road" << "st" << "street";
 
 QList<QString> OQString::femaleTitlesEnglish   = QList<QString> () << "miss" << "mlle" << "mrs" << "ms" ;
 QList<QString> OQString::femaleTitlesFrench    = QList<QString> () << "dame" << "madame" << "mademoiselle" << "mlle" << "mme";
@@ -3977,7 +4038,7 @@ QList<QString> OQString::precedingIndicators = QList<QString> () << "before atta
                                                                  << "on her" << "on his" << "prior to" << "short of" << "shy of";
 
 QList<QString> OQString::prefixesAbbreviatedEnglish = QList<QString> () << "aalu" << "adm" << "arch" << "bish" << "br"
-                                                                        << "capt" << "cdr" << "cdt" << "cfp" << "clu" << "cmdr" << "cnd" << "col" << "cpl" << "cpsm" << "cpt" << "cst" << "csv" << "cwo"
+                                                                        << "capt" << "cdr" << "cdt" << "cfp" << "clu" << "cmdr" << "cnd" << "col" << "cpl" << "cpo" << "cpsm" << "cpt" << "cst" << "csv" << "cwo"
                                                                         << "dc" << "dr" << "facog" << "fcsse" << "feic" << "flmi" << "flt" << "fr" << "frcs" << "gen" << "gov"
                                                                         << "hon" << "lcdr" << "lcol" << "llb" << "lt"
                                                                         << "maj" << "mcpl" << "mdiv" << "msgr" << "mwa" << "mwo" << "ofm" << "omm" << "prof" << "pssf" << "pvt"
@@ -3987,7 +4048,7 @@ QList<QString> OQString::prefixesAbbreviatedFrench  = QList<QString> () << "dre"
 QList<QString> OQString::prefixesAbbreviatedSpanish = QList<QString> () << "testest";
 
 QList<QString> OQString::prefixesFullEnglish = QList<QString> () << "admiral" << "archbishop" << "baby" << "bishop" << "brigadier" << "brother"
-                                                                 << "cadet" << "colonel" << "canon" << "captain" << "commander" << "colonel" << "constable" << "corporal"
+                                                                 << "cadet" << "canon" << "captain" << "colonel" << "commander" << "constable" << "corporal"
                                                                  << "deacon" << "doctor" << "father" << "flt" << "frère" << "general" << "governor"
                                                                  << "honorable" << "honourable" << "justice" << "lieutenant"
                                                                  << "madame" << "major" << "master" << "monsignor" << "officer" << "padre" << "pastor" << "private" << "professor"
@@ -4005,15 +4066,15 @@ QList<QString> OQString::saints          = QList<QString> () << "saint" << "st" 
 
 QList<QString> OQString::suffixesDegree  = QList<QString> () << "a" << "comm" << "ed" << "phys" << "s" << "sc" << "voc";  // Preceded by "B" or "M"
 
-QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "ba" << "bcomm" << "bed" << "bmsc" << "bpe"
+QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "acii" << "ba" << "bcomm" << "bed" << "bmsc" << "bpe"
                                                                     << "bs" << "bsc" << "bscn" << "bve" << "bvoced"
-                                                                    << "ca" << "cd" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmm" << "cpa" << "crcs" << "csb" << "csc" << "csj" << "cssr"
+                                                                    << "ca" << "cd" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmm" << "cpa" << "crcs" << "crm" << "csb" << "csc" << "csj" << "cssr"
                                                                     << "dds" << "dip" << "doctor" << "dsm" << "dvm" << "eng" << "esq"
-                                                                    << "facs" << "fca" <<  "fcia" << "fcscj" << "fj" << "fma" << "fr" << "frcp" << "frcpc" << "frcsc" << "fsa" << "gclj" << "gm"
+                                                                    << "facs" << "fca" << "fcahs" <<  "fcia" << "fcscj" << "fiic" << "fj" << "fma" << "fr" << "frcp" << "frcpc" << "frcsc" << "fsa" << "gclj" << "gm"
                                                                     << "honors" << "honours" << "ing" << "juris" << "kstj"
                                                                     << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "med" << "meng" << "msc" << "ndsc"
                                                                     << "obgyn" << "ocad" << "offm" << "ohc" << "olm" << "omi" << "omri" << "osb" << "osbm"<< "pc" << "peng" << "pgeo" << "phd"
-                                                                    << "qc" << "qffq" << "rcmp" << "ret" << "ret'd" << "retd" << "rev" << "rn" << "rndm" << "sdb" << "sgm" << "ssmi"
+                                                                    << "qc" << "qffq" << "rcmp" << "ret" << "ret'd" << "retd" << "rev" << "rn" << "rndm" << "sdb" << "sgm" << "ssm" << "ssmi"
                                                                     << "ue" << "wwi" << "wwii";
 QList<QString> OQString::suffixesDropFrench     = suffixesDropEnglish;
 QList<QString> OQString::suffixesDropSpanish    = QList<QString> () << "testtest";
@@ -4035,12 +4096,12 @@ QList<QString> OQString::ignoreWordsEnglish2 = QList<QString> () << "as" << "at"
 QList<QString> OQString::ignoreWordsEnglish3 = QList<QString> () << "age" << "all" << "and" << "are" << "but" << "cow" << "dad" << "due" << "for"
                                                                  << "had" << "has" << "its" << "mom" << "new" << "not" << "off" << "old" << "our" << "sad" << "say"
                                                                  << "the" << "was" << "way" << "who" << "you";
-QList<QString> OQString::ignoreWordsEnglish4 = QList<QString> () << "aged" << "also" << "away" << "best" << "born" << "care" << "dada" << "dadi" << "dear" << "deep" << "died" << "down" << "from" << "gift"
+QList<QString> OQString::ignoreWordsEnglish4 = QList<QString> () << "aged" << "also" << "away" << "best" << "born" << "care" << "dada" << "dadi" << "dear" << "deep" << "died" << "down" << "from" << "gift" << "good"
                                                                  << "have" << "held" << "here" << "high" << "home" << "into" << "late" << "left" << "life" << "lock" << "lost"
                                                                  << "made" << "many" << "mass" << "miss" << "nana" << "nani" << "near" << "once" << "ones" << "papa"
                                                                  << "rest" << "safe" << "sale" << "side" << "that" << "they" << "this" << "urne"
                                                                  << "wall" << "went" << "when" << "wife" << "with" << "year" << "your";
-QList<QString> OQString::ignoreWordsEnglish5 = QList<QString> () << "after" << "began" << "civil" << "click" << "covid" << "death" << "ended" << "first" << "grand" << "great" << "happy" << "honey"
+QList<QString> OQString::ignoreWordsEnglish5 = QList<QString> () << "after" << "began" << "civil" << "click" << "covid" << "death" << "early" << "ended" << "first" << "grand" << "great" << "happy" << "honey"
                                                                  << "known" << "lodge" << "loved" << "lower" << "never" << "peace" << "phone" << "place" << "royal"
                                                                  << "sadly" << "spent" << "story" << "thank" << "there" << "these" << "third" << "those" << "uncle"
                                                                  << "watch" << "while" << "would" << "years";
@@ -4059,10 +4120,10 @@ QList<QString> OQString::ignoreWordsEnglish7 = QList<QString> () << "adoring" <<
                                                                  << "through" << "tuesday" << "updated" << "quietly";
 QList<QString> OQString::ignoreWordsEnglish8 = QList<QString> () << "although" << "announce" << "ceremony" << "children" << "daughter" << "deceased" << "departed" << "donation"
                                                                  << "formerly" << "hospital"
-                                                                 << "lovingly" << "measures" << "memorial" << "memoriam" << "monument" << "obituary" << "password" << "peaceful" << "precious"
+                                                                 << "lovingly" << "measures" << "memorial" << "memoriam" << "memories" << "monument" << "obituary" << "password" << "peaceful" << "precious"
                                                                  << "rejoined" << "resident" << "response" << "reunited" << "saturday" << "silently" << "suddenly" << "survived"
                                                                  << "thursday" << "together" << "tomorrow" << "visiting";
-QList<QString> OQString::ignoreWordsEnglish9 = QList<QString> () << "announces" << "beautiful" << "christmas" << "cremation" << "departure" << "donations" << "everybody" << "following"
+QList<QString> OQString::ignoreWordsEnglish9 = QList<QString> () << "announces" << "beautiful" << "cherished" << "christmas" << "cremation" << "departure" << "donations" << "everybody" << "following"
                                                                  << "heartfelt" << "interment" << "inurnment" << "long-time" << "professor"
                                                                  << "relatives" << "wednesday" ;
 QList<QString> OQString::ignoreWordsEnglish10 = QList<QString> () << "celebrated" << "courageous" << "graciously" << "internment" << "livestream" << "originally" << "peacefully"
@@ -4087,7 +4148,7 @@ QList<QString> OQString::ignoreWordsFrench10 = QList<QString> () << "prédécéd
 QList<QString> OQString::ignoreWordsFrench11 = QList<QString> () << "considérant";
 QList<QString> OQString::ignoreWordsFrench12 = QList<QString> () << "condoléances" << "conformément";
 QList<QString> OQString::ignoreWordsFrench13 = QList<QString> () << "veuillez-vous";
-QList<QString> OQString::ignoreWordsFrench14 = QList<QString> () << "internationxxx";
+QList<QString> OQString::ignoreWordsFrench14 = QList<QString> () << "éventuellement";
 
 QList<QString> OQString::ignoreWordsSpanish1 = QList<QString> () << "dummy";
 QList<QString> OQString::ignoreWordsSpanish2 = QList<QString> () << "spanishdummy";

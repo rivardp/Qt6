@@ -955,7 +955,15 @@ void dataRecord::setAgeAtDeath(const unsigned int num, const bool fullyCredible,
             }
             else
             {
-                ageAtDeath = tempAgeAtDeath;
+                if ((num != tempAgeAtDeath) && (num == (tempAgeAtDeath + 20)) && (YOD == (static_cast<uint>(globals.today.year()) - 20)))
+                {
+                    ageAtDeath = num;
+                    DOD = QDate(DOD.year() + 20, DOD.month(), DOD.day());
+                    YOD = DOD.year();
+                }
+                else
+                    ageAtDeath = tempAgeAtDeath;
+
                 ageAtDeathFullyCredible = true;
             }
         }
@@ -1172,7 +1180,7 @@ void dataRecord::setAlternates(const NAMEINFO &nameInfo, bool bestOf)
     name = nameInfo.name;
     type = nameInfo.type;
 
-    if ((name.getLength() == 0) || (name == PQString("Retired")) || (name == PQString("Ret'd")) || (name == PQString("Retd")) || (name == PQString("\"\"")))
+    if ((name.getLength() == 0) || (name == PQString("Retired")) || (name == PQString("Ret'd")) || (name == PQString("Retd")) || (name == PQString("\"\"")) || (name == PQString(",")))
 		return;
 
     LANGUAGE lang = getLanguage();
@@ -3828,6 +3836,17 @@ int dataRecord::runDateValidations()
     {
         if (!minDOB.isValid() || !maxDOB.isValid() || (DOB < minDOB) || (DOB > maxDOB))
             wi.dateFlag = 16;
+    }
+    else
+    {
+        if (DOD.isValid() && ((maxDOB.toJulianDay() - minDOB.toJulianDay()) < 365) && (ageAtDeath == 0))
+        {
+            int minAge, maxAge;
+            maxAge = static_cast<int>(elapse(minDOB, DOD));
+            minAge = static_cast<int>(elapse(maxDOB, DOD));
+            if (minAge == maxAge)
+                ageAtDeath = minAge;
+        }
     }
 
     if ((wi.dateFlag != 16) && minDOB.isValid() && (YOB > 0))

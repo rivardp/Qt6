@@ -115,6 +115,7 @@ public:
     bool isSpanishTitle(GENDER gender = genderUnknown) const;
     bool isSaint() const;
     bool isGodReference() const;
+    bool isSpousalReference(const LANGUAGE lang = language_unknown) const;
     bool isAbbreviation() const;
     bool isProvAbbreviation() const;
     bool isCompoundName() const;
@@ -175,6 +176,7 @@ public:
     bool isPronoun() const;
     bool isAboriginalName(OQString nextWord, bool firstCall = true) const;
     bool areParentWords(LANGUAGE lang = language_unknown, GENDER gender = genderUnknown) const;
+    bool isProvince() const;
 
     bool isGenderWord(GENDER gender = genderUnknown, LANGUAGE language = language_unknown) const;
     bool isMaleGenderWord(LANGUAGE language = language_unknown) const;
@@ -239,8 +241,6 @@ protected:
     static QList<QString> femaleTitlesSpanish;
     static QList<QString> saints;
     static QList<QString> godReferences;
-    static QList<QString> provAbbreviations;
-    static QList<QString> otherAbbreviations;
 
     static QList<QString> ordinalsEnglish;
     static QList<QString> ordinalsFrench;
@@ -335,6 +335,10 @@ protected:
     static QList<QString> problematicFemaleMiddleNames;
 
     static QList<QString> locations;
+    static QList<QString> routes;
+    static QList<QString> provAbbreviations;
+    static QList<QString> provLong;
+    static QList<QString> otherAbbreviations;
 
     // The variables below contain repeats of ignoreWords above
     static QList<QString> deathWordsEnglish;

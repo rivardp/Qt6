@@ -61,6 +61,7 @@ public:
     void readTitleInfo();
     void readStructuredContent();
     void readUnstructuredContent(bool UseFirstDateAsDOD);
+    void readImageNameInfo();
     void readParentsLastName();
     void readStyle();
     void readGender();
@@ -71,9 +72,11 @@ public:
     void validateJustInitialNames();
     void removeProblematicWordsFromJIN();
     void finalNameCleanup();
+    void treatmentNameCleanup();
     int  runNameValidations();
     int  runGenderValidation();
     int  runRecordValidation();
+    void fixNameIssues();
     void determinePotentialFirstName();
     void runStdProcessing(unstructuredContent &uc, bool insertPeriods);
     void addressMissingGender();
@@ -105,6 +108,7 @@ public:
     void fillInDatesEleventhPass();
     void assignFirstDateToDOD();
     bool useFirstSentenceSingleDate();
+    QDate getFirstSentenceSingleDate();
 
     bool missingDateInfo() const;
     bool isLocation(OQString word);

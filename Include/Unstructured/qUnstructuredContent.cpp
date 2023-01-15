@@ -2320,10 +2320,16 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                     if (sList5.count() >= 2)
                     {
                         QStringList locationWords = globals->globalObit->getLocationWords(globals->globalDr->getProvider(), globals->globalDr->getProviderKey());
-                        locationWords += QString("county|drive|road|rd|street|st|rue|secteur").split("|");
+                        locationWords += QString("ave|avenue|county|drive|highway|road|route|rd|street|st|rue|secteur").split("|");
                         for (int j= 0; j < locationWords.count(); j++)
                         {
                             if (sList5.contains(locationWords.at(j)))
+                                abandon = true;
+                        }
+
+                        if (!abandon)
+                        {
+                            if (dbSearch.areAllLocations(sList5, globals))
                                 abandon = true;
                         }
                     }
@@ -3031,22 +3037,31 @@ DATES unstructuredContent::readDOBandDOD(bool reliable)
         {
             if (dateList[0].year() == dateList[1].year())
             {
-                if (dateList[0].year() >= 2012)
+                if (dateList[1].year() >= (globals->today.year() - 2))
                 {
-                    // Assume entered YOD instead of YOB in date
-                    globals->globalDr->setTypoDOB(dateList[0]);
-                    if (globals->globalDr->getYOB() == static_cast<unsigned int>(dateList[0].year()))
-                    {
-                        globals->globalDr->setYOB(0, true);
-                        globals->globalDr->setMinDOB(QDate(1875,1,1));
-                    }
+                    // Assume YOD was also entered as YOB
+                    // Perhaps DOB will get picked up in unstructured read
                     dateList.removeFirst();
                 }
                 else
                 {
-                    // Assume entered YOB instead of YOD in date
-                    globals->globalDr->setTypoDOD(dateList[1]);
-                    dateList.removeLast();
+                    if (dateList[0].year() >= 2012)
+                    {
+                        // Assume entered YOD instead of YOB in date
+                        globals->globalDr->setTypoDOB(dateList[0]);
+                        if (globals->globalDr->getYOB() == static_cast<unsigned int>(dateList[0].year()))
+                        {
+                            globals->globalDr->setYOB(0, true);
+                            globals->globalDr->setMinDOB(QDate(1875,1,1));
+                        }
+                        dateList.removeFirst();
+                    }
+                    else
+                    {
+                        // Assume entered YOB instead of YOD in date
+                        globals->globalDr->setTypoDOD(dateList[1]);
+                        dateList.removeLast();
+                    }
                 }
             }
             else
@@ -3064,7 +3079,7 @@ DATES unstructuredContent::readDOBandDOD(bool reliable)
         if (dateList.size() == 3)
         {
             errMsg << "Investigate three date grouping for: " << globals->globalDr->getURL();
-            globals->globalDr->wi.dateFlag = 13;
+            globals->globalDr->wi.dateFlag = 10;
         }
     }
 
@@ -3386,7 +3401,7 @@ PQString unstructuredContent::processAllNames()
     OQString space(" ");
     OQStream existingMiddleNames;
     bool wordMatched, hasBookEnds, possibleName, hasComma, standAloneComma, hasPeriod, skipWordLookup;
-    bool compoundException, deException, inParentheses, inQuotes;
+    bool compoundException, deException, delException, inParentheses, inQuotes;
 	unsigned int position = 1;
 	unsigned int commaPositionAfter = 0;
 	unsigned int numRotate = 0;
@@ -3478,11 +3493,14 @@ PQString unstructuredContent::processAllNames()
         // check for compound name that wasn't led by "nee "
 		temp = word;
         deException = false;
+        delException = false;
         if (((originalWord == OQString("de")) || (originalWord == OQString("du"))) && (globals->globalDr->getLanguage() == french))
             deException = true;
+        if ((word == OQString("Del")) && globals->globalDr->isAFirstName(word))
+            delException = true;
         compoundException = (originalWord == OQString("E.")) ||
                            ((originalWord == OQString("E")) && globals->globalDr->isAnInitial(originalWord)) ||
-                             deException;		// Includes "St.", but exclude "E."
+                             deException || delException;		// Includes "St.", but exclude "E."
 
         isAboriginal = !hasComma && word.isAboriginalName(peekAtWord());
         compoundName = (word.isCompoundName() && !compoundException && !isEOS()) || (isAboriginal && !hasBookEnds) || word.isSaint();
@@ -4625,16 +4643,17 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     // The  logic is aligned with justInitialNames contained in determineLanguageAndGender
     // It is assumed that the first words are names
 
-    QRegularExpression re;
-    re.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
-    re.setPattern("-? ?celebration of life ?(-|for|of)?");
-    itsString.replace(re, "");
-    re.setPattern(" ?achat columbarium ?");
-    itsString.replace(re, "");
-    re.setPattern("\\bP\\.?\\s?ENG\\b");
-    itsString.replace(re, "");
-    re.setPattern("a\\.k\\.a\\.");
-    itsString.replace(re,"aka");
+    QRegularExpression targetI, target;
+    QRegularExpressionMatch match;
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+    targetI.setPattern("-? ?celebration of life ?(-|for|of)?");
+    itsString.replace(targetI, "");
+    targetI.setPattern(" ?achat columbarium ?");
+    itsString.replace(targetI, "");
+    targetI.setPattern("\\bP\\.?\\s?ENG\\b");
+    itsString.replace(targetI, "");
+    targetI.setPattern("a\\.k\\.a\\.");
+    itsString.replace(targetI,"aka");
 
     this->removeHTMLtags();
     this->unQuoteHTML();
@@ -4652,12 +4671,25 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     QString comma(",");
     QString period(".");
     QString space(" ");
+    QString removedString;
+    int removedNumber;
     unsigned int numCommas = 0;
     bool dividerBeforeWord = false;
     bool dividerAfterWord = false;
     bool namesFinished = false;
     bool keepWord, isSurname, hyphenatedName, noCommas;
     bool removed = false;
+
+    // Remove "(Age xx)
+    targetI.setPattern(" ?\\(age (\\d+)\\)");
+    match = targetI.match(itsString);
+    if (match.hasMatch())
+    {
+        removedString = match.captured(1);
+        removedNumber = removedString.toInt();
+        globals->globalDr->setAgeAtDeath(removedNumber);
+        itsString.replace(targetI, "");
+    }
 
     // Remove trailing aka
     indexA = itsString.indexOf(" aka ", Qt::CaseInsensitive);
@@ -4701,9 +4733,6 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
 
     // Deal with multiple commas (ignoring commas within parentheses or quotes)
     QString placeHolder("§");
-    QString removedString;
-    QRegularExpression target;
-    QRegularExpressionMatch match;
 
     target.setPattern("(\\(.+?\\))");
     match = target.match(itsString);
@@ -5451,14 +5480,23 @@ void unstructuredContent::pickOffNames()
                                 {
                                     // Save, but don't count as a separate name
                                     bool include = true;
+                                    OQString checkNext = peekAtWord();
+                                    OQString checkForLocation = originalWord + checkNext;
+
                                     if ((globals->globalDr->getLanguage() == french) && (word == OQString("le")))
                                     {
-                                        OQString checkNext = peekAtWord();
                                         if (checkNext.isNumeric())
                                         {
                                             keepGoing = false;
                                             include = false;
                                         }
+                                    }
+
+                                    // For French obits, check for deLocation
+                                    if (globals->websiteLocationWords.contains(checkForLocation.lower().getString()))
+                                    {
+                                        include = false;
+                                        keepGoing = false;
                                     }
 
                                     if (include)
@@ -5947,12 +5985,29 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                             wordRemoved = true;
                         else
                         {
-                            // Keep word if not last word
-                            // If last, more checking
-                            if (!isEOS())
+                            QList<OQString> WordList = word.createList();
+                            QList<OQString> wordList = WordList;
+
+                            if (isEOS())
                             {
-                                QList<OQString> WordList = word.createList();
-                                QList<OQString> wordList = WordList;
+                                OQString tempString = wordList.at(0).lower();
+
+                                if (wordList.size() == 2)
+                                {
+                                    if ((tempString == PQString("aka")) || (tempString == PQString("a.k.a.")))
+                                    {
+                                        globals->globalDr->setFirstNames(wordList.at(1));
+                                        wordRemoved = true;
+                                    }
+                                }
+                                else
+                                {
+                                    if ((wordList.size() >= 2) && (tempString == PQString("revised")))
+                                        wordRemoved = true;
+                                }
+                            }
+                            else
+                            {
                                 if ((wordList.size() == 1) && (gender == Male) && (word.getLength() < 12) && !word.isSuffix() && !word.isPrefix())
                                 {
                                     // Word length cutoff intended to catch long aborigional names
@@ -5963,6 +6018,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                                 {
                                     bool containsNeeEtAl = false;
                                     bool containsAltName = false;
+                                    bool containsIrrelevant = false;
                                     while (wordList.size() > 0)
                                     {
                                         word = wordList.takeFirst().lower();
@@ -5970,6 +6026,8 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                                             containsNeeEtAl = true;
                                         if (word.isAltNameIndicator())
                                             containsAltName = true;
+                                        if ((word == PQString("revised")) || (word == PQString("celebration")))
+                                            containsIrrelevant = true;
                                     }
 
                                     if (containsNeeEtAl)
@@ -6050,6 +6108,12 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                                         }
                                     }
 
+                                    if (containsIrrelevant)
+                                    {
+                                        wordList.clear();
+                                        wordRemoved = true;
+                                    }
+
                                     if (wordList.size() > 0)
                                     {
                                         if (word.getString().contains(" or ", Qt::CaseInsensitive))
@@ -6091,7 +6155,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                 }
             }
 
-            if (!wordRemoved && !word.isAltNameIndicator())
+            if (!wordRemoved && (!word.isAltNameIndicator() || ((word == OQString("Born") && EOS))))
             {
                 newString += originalWord;
                 newString += space;
@@ -7934,7 +7998,10 @@ bool unstructuredContent::sentenceKeyWordsAndDates(const LANGUAGE lang, DATES &r
             if (!skipDeath)
             {
                 resultDates.potentialDOD = dateList[0];
-                minDate.setDate(1990,1,1);
+                if (globals->globalDr->getYOD() > 0)
+                    minDate.setDate(globals->globalDr->getYOD(), 1, 1);
+                else
+                    minDate.setDate(1990,1,1);
                 maxDate = globals->today;
                 if ((resultDates.potentialDOD >= minDate) && (resultDates.potentialDOD <= maxDate) && !marriedFlag)
                     resultDates.fullyCredible = true;
@@ -8524,8 +8591,8 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
 
     unsigned int numDates;
 	unsigned int maxDates = 2;
-    unsigned int num;
-    long altNum = 0;
+    int num;
+    int altNum = 0;
 	bool limitWords = false;
     bool fullyCredible = false;
     QList<QDate> dateList;
@@ -8650,24 +8717,7 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                 word = word.postHyphen();
             currentHasComma = word.removeEnding(COMMA);
 
-            switch (lang)
-            {
-            case french:
-                if ((word == OQString("mari")) || (word == OQString("femme")) || (word == "partenaire"))
-                    spousalReference = true;
-                break;
-
-            case spanish:
-                if ((word == OQString("marido")) || (word == OQString("esposa")))
-                    spousalReference = true;
-                break;
-
-            default:
-                if ((word == OQString("husband")) || (word == OQString("wife")) || (word == OQString("partner")) || (word == OQString("soulmate")))
-                    spousalReference = true;
-                break;
-            }
-
+            spousalReference = word.isSpousalReference(lang);
             if (spousalReference)
             {
                 // Skip over everything until a comma or death word is encountered
@@ -8692,22 +8742,18 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
 
             word.removeEnding(";");
             hadOrdinal = word.removeOrdinal(lang);
-            nextWord = cleanContent.peekAtWord();
-            nextWord.removeEnding(PUNCTUATION);
-            nextWord.removeInternalPeriods();
+            nextWord = cleanContent.peekAtWord(false, 1, true);
+            peekTwoAhead = cleanContent.peekAtWord(false, 2, true);
+            peekThreeAhead = cleanContent.peekAtWord(false, 3, true);
+
             if (!precedingFlag)
-            {
-                peekTwoAhead = cleanContent.peekAtWord(false, 2);
-                peekThreeAhead = cleanContent.peekAtWord(false, 3);
                 precedingFlag = word.followedByPrecedingIndicators(nextWord, peekTwoAhead, peekThreeAhead, lang);
-            }
 
 			if (word.isAlpha())
 			{
 				// Check if the word matches one of the predefined age words
                 if (word.isAgeWord(lang))
                 {
-                    nextWord = cleanContent.peekAtWord(false, 1);
                     if ((nextWord == OQString("battle")) || (nextWord == OQString("illness")) || (nextWord == OQString("courageous")) || (nextWord == OQString("struggle")) ||
                         (nextWord == OQString("ago")) || (nextWord == OQString("since")) || (nextWord == OQString("have")))
                         contextError = true;
@@ -8720,11 +8766,9 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                     PQString errMsg;
                     if ((word.isAGivenName(errMsg) || word.isPronoun()))
                     {
-                        nextWord = cleanContent.peekAtWord(false, 1);
                         if ((nextWord == OQString("was")) || (nextWord == OQString(QString("était"))))
                         {
-                            nextWord = cleanContent.peekAtWord(false, 2);
-                            if (nextWord.isNumeric())
+                            if (peekTwoAhead.isNumeric())
                                 wordMatched = true;
                         }
                     }
@@ -8735,18 +8779,16 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                             contextChanged = true;
                             if (word == QString("came"))
                             {
-                                nextWord = cleanContent.peekAtWord(false, 1);
                                 if (nextWord == OQString("to"))
                                 {
-                                    nextWord = cleanContent.peekAtWord(false, 2);
-                                    if (nextWord == OQString("rest"))
+                                    if (peekTwoAhead == OQString("rest"))
                                         contextChanged = false;
                                 }
                             }
                         }
                         else
                         {
-                            if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))))
+                            if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))) || (word == OQString(QString("depuis"))))
                                 eventCheck = true;
                         }
                     }
@@ -8771,51 +8813,13 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                     {
                         numFound = true;
                         contextError = false;
-                        ageAtDeath = num;
                         fullyCredible = false;
 
                         // Run error checking to catch errors such as "..at the age of 3 months"
                         bool endOfSentence = word.removeEnding(QString(".")) || cleanContent.isEOS();
                         if (!endOfSentence)
-                        {
-                            if ((nextWord == QString("days")) || (nextWord == QString("day")) || (nextWord == QString("jours")) || (nextWord == QString("días")))
-                            {
-                                contextError = true;
-                                altNum = num / 365;
-                            }
-
-                            if ((nextWord == QString("months")) || (nextWord == QString("month")) || (nextWord == QString("mois")) || (nextWord == QString("meses")) || (nextWord == QString("mes")))
-                            {
-                                contextError = true;
-                                altNum = num / 12;
-                            }
-
-                            if ((nextWord == QString("anniversary")) || (nextWord == QString("lbs")) || (nextWord == QString("child")) || (nextWord == QString("am")) || (nextWord == QString("pm"))
-                                                                     || (nextWord == QString("a.m")) || (nextWord == QString("p.m")))
-                            {
-                                numFound = false;
-                                ageAtDeath = 0;
-                            }
-
-                            if (nextWord.isWrittenMonth(lang))
-                            {
-                                numFound = false;
-                                ageAtDeath = 0;
-                            }
-
-                            if (eventCheck)
-                            {
-                                OQString peekTwoAhead = cleanContent.peekAtWord(false, 2);
-                                if (peekTwoAhead == OQString("of"))
-                                    peekTwoAhead = cleanContent.peekAtWord(false, 3);
-                                if ((peekTwoAhead == OQString("battle")) || (peekTwoAhead == OQString("illness")) || (peekTwoAhead == OQString("courageous")) || (peekTwoAhead == OQString("struggle")) ||
-                                    (peekTwoAhead == OQString("ago")) || (peekTwoAhead == OQString("since")) || (peekTwoAhead == OQString("have")) || (peekTwoAhead == OQString("health")))
-                                {
-                                    contextError = true;
-                                    altNum = 0;
-                                }
-                            }
-                        }
+                            readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
+                        ageAtDeath = num;
 
                         // Check for special instances of "John Smith, 68, left us...."
                         if (lastHadComma && currentHasComma)
@@ -8838,9 +8842,6 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
             if (contextError && !preRead)
             {
                 ageAtDeath = static_cast<unsigned int>(altNum);
-                //PQString errMsg;
-                //errMsg << "Confirm age at death for: " << globals->globalDr->getURL();
-                //globals->logMsg(ErrorRecord, errMsg);
                 globals->globalDr->wi.ageFlag = 1;
             }
 
@@ -8883,12 +8884,12 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
     // Initially replicates the non-Naked function logic, so perhaps combine the two down the road if appropriate
 
     unsigned int numDates;
-    unsigned int num;
-    long altNum = 0;
+    int num;
+    int altNum = 0;
     bool limitWords = false;
     bool fullyCredible = false;
     QList<QDate> dateList;
-    OQString word, nextWord, doubleWord, cleanString;
+    OQString word, nextWord, doubleWord, cleanString, peekTwoAhead, peekThreeAhead;
     QString target;
     bool contextError = false;
     bool eventCheck = false;
@@ -8930,24 +8931,8 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
             currentHasComma = true;
         else
             currentHasComma = false;
-        switch (lang)
-        {
-        case french:
-            if ((word == OQString("mari")) || (word == OQString("femme")) || (word == "partenaire"))
-                spousalReference = true;
-            break;
 
-        case spanish:
-            if ((word == OQString("marido")) || (word == OQString("esposa")))
-                spousalReference = true;
-            break;
-
-        default:
-            if ((word == OQString("husband")) || (word == OQString("wife")) || (word == OQString("partner")) || (word == OQString("soulmate")))
-                spousalReference = true;
-            break;
-        }
-
+        spousalReference = word.isSpousalReference(lang);
         if (spousalReference)
         {
             // Drop everything until a comma or death word is encountered
@@ -8979,14 +8964,14 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
         word.removeEnding(",");
         word.removeEnding(";");
         hadOrdinal = word.removeOrdinal(lang);
-        nextWord = peekAtWord();
-        nextWord.removeEnding(PUNCTUATION);
+        nextWord = peekAtWord(false, 1, true);
+        peekTwoAhead = peekAtWord(false, 2, true);
+        peekThreeAhead = peekAtWord(false, 3, true);
         doubleWord = word + space + nextWord;
         if (doubleWord.isFoundIn(precedingIndicators, 1))
         {
             if ((word == OQString("in")) || (word == OQString("dans")))
             {
-                OQString peekTwoAhead = peekAtWord(false, 2);
                 if (peekTwoAhead.removeOrdinal(lang) || peekTwoAhead.isNumeric())
                     precedingFlag = true;
             }
@@ -9034,60 +9019,8 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
                     // Run error checking to catch errors such as "..at the age of 3 months"
                     bool endOfSentence = word.removeEnding(QString("."));
                     if (!endOfSentence)
-                    {
-                        /*
-
-                            if (eventCheck)
-                            {
-                                OQString peekTwoAhead = cleanContent.peekAtWord(false, 2);
-                                if (peekTwoAhead == OQString("of"))
-                                    peekTwoAhead = cleanContent.peekAtWord(false, 3);
-                                if ((peekTwoAhead == OQString("battle")) || (peekTwoAhead == OQString("illness")) || (peekTwoAhead == OQString("courageous")) || (peekTwoAhead == OQString("struggle")) ||
-                                    (peekTwoAhead == OQString("ago")) || (peekTwoAhead == OQString("since")) || (peekTwoAhead == OQString("have")) || (peekTwoAhead == OQString("health")))
-                                {
-                                    contextError = true;
-                                    altNum = 0;
-                                }
-                            }
-                        }
-
-
-                        */
-                        if ((nextWord == QString("days")) || (nextWord == QString("day")) || (nextWord == QString("jours")) || (nextWord == QString("días")))
-                        {
-                            contextError = true;
-                            altNum = num / 365;
-                        }
-
-                        if ((nextWord == QString("months")) || (nextWord == QString("month")) || (nextWord == QString("mois")) || (nextWord == QString("meses")) || (nextWord == QString("mes")))
-                        {
-                            contextError = true;
-                            altNum = num / 12;
-                        }
-
-                        if ((nextWord == QString("anniversary")) || (nextWord == QString("lbs")) || (nextWord == QString("child")) || (nextWord == QString("am")) || (nextWord == QString("pm"))
-                                                                 || (nextWord == QString("a.m")) || (nextWord == QString("p.m")))
-                        {
-                            numFound = false;
-                            ageAtDeath = 0;
-                        }
-
-                        if (nextWord.isWrittenMonth(lang))
-                        {
-                            numFound = false;
-                            ageAtDeath = 0;
-                        }
-
-                        if (eventCheck)
-                        {
-                            OQString peekTwoAhead = peekAtWord(false, 2);
-                            if (peekTwoAhead == OQString("of"))
-                                peekTwoAhead = peekAtWord(false, 3);
-                            if ((peekTwoAhead == OQString("battle")) || (peekTwoAhead == OQString("illness")) || (peekTwoAhead == OQString("courageous")) || (peekTwoAhead == OQString("struggle")) ||
-                                (peekTwoAhead == OQString("ago")) || (peekTwoAhead == OQString("since")) || (peekTwoAhead == OQString("have")) || (peekTwoAhead == OQString("health")))
-                                contextError = true;
-                        }
-                    }
+                        readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
+                    ageAtDeath = num;
 
                     // Check for special instances of "John Smith, 68, left us...."
                     if (lastHadComma && currentHasComma)
@@ -9110,9 +9043,6 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
         if (contextError)
         {
             ageAtDeath = static_cast<unsigned int>(altNum);
-            //PQString errMsg;
-            //errMsg << "Confirm age at death for: " << globals->globalDr->getURL();
-            //globals->logMsg(ErrorRecord, errMsg);
             globals->globalDr->wi.ageFlag = 1;
         }
 
@@ -9128,6 +9058,52 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
 
     return ageAtDeath;
 
+}
+
+void unstructuredContent::readAgeAtDeathPostNumChecks(bool &numFound, bool &contextError, bool eventCheck, int &num, int &altNum, OQString peek1, OQString peek2, OQString peek3, LANGUAGE lang)
+{
+    if (numFound && !contextError && ((peek1 == QString("days")) || (peek1 == QString("day")) || (peek1 == QString("jours")) || (peek1 == QString("días"))))
+    {
+        contextError = true;
+        altNum = num / 365;
+    }
+
+    if (numFound && !contextError &&  ((peek1 == QString("months")) || (peek1 == QString("month")) || (peek1 == QString("mois")) || (peek1 == QString("meses")) || (peek1 == QString("mes"))))
+    {
+        contextError = true;
+        altNum = num / 12;
+    }
+
+    if (numFound && !contextError &&  ((peek1 == QString("anniversary")) || (peek1 == QString("lbs")) || (peek1 == QString("child")) || (peek1 == QString("am")) || (peek1 == QString("pm"))
+                                            || (peek1 == QString("a.m")) || (peek1 == QString("p.m"))))
+    {
+        numFound = false;
+        num = 0;
+    }
+
+    if (numFound && !contextError &&  peek1.isWrittenMonth(lang))
+    {
+        numFound = false;
+        num = 0;
+    }
+
+    if (numFound && !contextError &&  peek2.isFoundIn(routes, 1))
+    {
+        numFound = false;
+        num = 0;
+    }
+
+    if (numFound && !contextError &&  eventCheck)
+    {
+        if (peek2 == OQString("of"))
+            peek2 = peek3;
+        if ((peek2 == OQString("battle")) || (peek2 == OQString("illness")) || (peek2 == OQString("courageous")) || (peek2 == OQString("struggle")) ||
+            (peek2 == OQString("ago")) || (peek2 == OQString("since")) || (peek2 == OQString("have")) || (peek2 == OQString("health")))
+        {
+            contextError = true;
+            altNum = 0;
+        }
+    }
 }
 
 void unstructuredContent::contentReadSpouseName(LANGUAGE lang)

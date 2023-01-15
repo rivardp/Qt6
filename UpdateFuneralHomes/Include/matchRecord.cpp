@@ -1282,7 +1282,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
 
     // Setup all the provider identification information
     unsigned int recProviderID, recProviderKey;
-    QString recID, DBid;
+    QString recID;
     recProviderID = static_cast<unsigned int>(dr.getProvider());
     recProviderKey = dr.getProviderKey();
     recID = dr.getID().getString();
@@ -1291,6 +1291,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
     // Before comparing data, check if a perfect ID match exists
     success = query.prepare("SELECT deceasedNumber, publishDate FROM death_audits.deceasedidinfo "
                             "WHERE providerID = :providerID AND ID = :ID");
+    if (!success)
+        qDebug() << "Problem with SQL statement in matchRecord - match";
     query.bindValue(":providerID", QVariant(recProviderID));
     query.bindValue(":providerKey", QVariant(recProviderKey));
     query.bindValue(":ID", QVariant(recID));
@@ -1381,6 +1383,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                                     "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
                                     "FROM death_audits.deceased "
                                     "WHERE (deceasedNumber = :deceasedNumber)");
+            if (!success)
+                qDebug() << "Problem with SQL statement in matchRecord - match";
             query.bindValue(":deceasedNumber", QVariant(deceasedNumber));
 
             execute = true;
@@ -1400,6 +1404,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
                                         "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND DOB = :DOB AND DOD = :DOD");
+                if (!success)
+                    qDebug() << "Problem with SQL statement in matchRecord - match";
                 query.bindValue(":DOB", QVariant(DOBdateSQL.getString()));
                 query.bindValue(":DOD", QVariant(DODdateSQL.getString()));
             }
@@ -1418,6 +1424,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
                                         "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND DOB = :DOB");
+                if (!success)
+                    qDebug() << "Problem with SQL statement in matchRecord - match";
                 query.bindValue(":DOB", QVariant(DOBdateSQL.getString()));
             }
             break;
@@ -1435,6 +1443,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
                                         "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND DOD = :DOD");
+                if (!success)
+                    qDebug() << "Problem with SQL statement in matchRecord - match";
                 query.bindValue(":DOD", QVariant(DODdateSQL.getString()));
             }
             break;
@@ -1446,6 +1456,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
                                         "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND (firstName = :firstName OR nameAKA1 = :firstName OR nameAKA2 = :firstname)");
+                if (!success)
+                    qDebug() << "Problem with SQL statement in matchRecord - match";
                 query.bindValue(":firstName", QVariant(recFirstNameList.at(0)));
             }
             break;
@@ -1615,7 +1627,7 @@ int initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESU
     QDate minDOBthreshold, maxDOBthreshold, inputDOB, tempDate, dbDOB, dbMinDOB, dbMaxDOB, dbDOD;
     QList<QString> dbFirstNames, dbMiddleNames, inputFirstNames, inputMiddleNames, dbSpouseName, inputSpouseName;
     QList<QString> expandedInputFirstNames, expandedDBfirstNames, expandedInputSpouseNames, expandedDBspouseNames;
-    QString spouseFirstName, dbSpouse, dbPostalCode;
+    QString dbSpouse, dbPostalCode;
     OQStream middlenames;
     PQString word;
     GENDER dbGender, inputGender;
@@ -1655,6 +1667,8 @@ int initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESU
     success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, gender, DOB, minDOB, maxDOB, DOD, deceasedNumber, spouseName  "
                             "FROM death_audits.deceased "
                             "WHERE lastName = :lastName AND (:minDOB >= minDOB) AND (:maxDOB <= maxDOB)");
+    if (!success)
+        qDebug() << "Problem with SQL statement in matchRecord - match";
     query.bindValue(":lastName", QVariant(drInput.getLastName().getString()));
     query.bindValue(":minDOB", QVariant(minDOBdateSQL.getString()));
     query.bindValue(":maxDOB", QVariant(maxDOBdateSQL.getString()));
@@ -1872,6 +1886,8 @@ int initialCheckRank(const dataRecord &drInput, dataRecord &bestMatch, MATCHRESU
             success = queryPC.prepare("SELECT postalCode, province, prov, latitude, longitude  "
                                     "FROM death_audits.deceasedlocation "
                                     "WHERE deceasedNumber = :deceasedNumber");
+            if (!success)
+                qDebug() << "Problem with SQL statement in matchRecord - match";
             queryPC.bindValue(":deceasedNumber", QVariant(dbID));
 
             success = queryPC.exec();
@@ -2095,6 +2111,8 @@ void addNameVariations(QList<QString> &nameList, QList<QString> &expandedNameLis
 
         // Add in nicknames first
         success = query.prepare("SELECT altNames FROM firstnames WHERE name = :name");
+        if (!success)
+            qDebug() << "Problem with SQL statement in matchRecord - addNameVariations";
         query.bindValue(":name", QVariant(name));
         success = query.exec();
         if (success && (query.size() == 1))
@@ -2113,6 +2131,8 @@ void addNameVariations(QList<QString> &nameList, QList<QString> &expandedNameLis
 
         // Add in formal names
         success = query.prepare("SELECT formalNames FROM nicknames WHERE nickname = :name");
+        if (!success)
+            qDebug() << "Problem with SQL statement in matchRecord - addNameVariations";
         query.bindValue(":name", QVariant(name));
         success = query.exec();
         if (success && (query.size() == 1))

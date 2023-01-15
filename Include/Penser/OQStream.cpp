@@ -332,25 +332,32 @@ bool OQStream::contains(const QString &string, bool ignoreBookendedLetters)
 {
     QString tempString = itsString;
 
-    QRegularExpression target;
-
     if (ignoreBookendedLetters)
     {
+        QRegularExpression target;
+        QRegularExpressionMatch match;
+
+        // Non-greedy match required in case of 2+ sets of parentheses or quotes
+        target.setPatternOptions(QRegularExpression::InvertedGreedinessOption);
+
         target.setPattern("(\\(.+\\))");
-        tempString.replace(target, "");
+        match = target.match(tempString);
+        while (match.hasMatch())
+        {
+            tempString.replace(target, "");
+            match = target.match(tempString);
+        }
 
         target.setPattern("(\".+\")");
-        tempString.replace(target, "");
+        match = target.match(tempString);
+        while (match.hasMatch())
+        {
+            tempString.replace(target, "");
+            match = target.match(tempString);
+        }
     }
 
     bool found = tempString.contains(string);
-
-    /*int origPosition = position;
-    bool origEOS = EOS;
-    beg();
-    bool found = moveTo(string);
-    position = origPosition;
-    EOS = origEOS;*/
 
     return found;
 }
@@ -897,13 +904,19 @@ OQString OQStream::getUntilEarliestOf(QString stop1, QString stop2, unsigned int
     return getUntil(target, maxNumChars, dropLast);
 }
 
-OQString OQStream::peekAtWord(const bool considerParentheses, const unsigned int howFar)
+OQString OQStream::peekAtWord(const bool considerParentheses, const unsigned int howFar, const bool cleanWord)
 {
     OQString word;
     int origPosition = this->position;		// Needed in case stream contains consecutive spaces
     for (unsigned int i = 0; i < howFar; i++)
         word = getWord(considerParentheses);
     this->backward(static_cast<unsigned int>(this->position - origPosition));  // EOS reset  by 'backward' if necessary
+
+    if (cleanWord)
+    {
+        word.removeEnding(PUNCTUATION);
+        word.removeInternalPeriods();
+    }
 
 	return word;
 }

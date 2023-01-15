@@ -27,6 +27,7 @@ public:
     int  surnameLookup(const QString name, GLOBALVARS *gv);
     bool areUniquelySurnames(QList<OQString> &listOfNames, GLOBALVARS *gv, GENDER gender = Female);
     bool areAllNames(QList<OQString> &listOfNames, GLOBALVARS *gv);
+    bool areAllLocations(QList<QString> &listOfNames, GLOBALVARS *gv);
     bool givenNameLookup(const QString name, GLOBALVARS *gv, GENDER gender = genderUnknown);
     bool givenNameLookup(const QString name, GLOBALVARS *gv, int &maleCount, int &femaleCount, GENDER gender = genderUnknown);
     bool nicknameLookup(const QString name, GLOBALVARS *gv);

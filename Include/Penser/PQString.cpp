@@ -1223,6 +1223,7 @@ void PQString::replaceHTMLentities()
 
     itsString.replace(QString("&#8203;"), QString(""), Qt::CaseInsensitive);
     itsString.replace(QString("&#x2F;"), QString("/"), Qt::CaseInsensitive);
+    itsString.replace(QString("&#x27;"), QString("'"), Qt::CaseInsensitive);
 }
 
 void PQString::replace(const QString target, const QString newString, const Qt::CaseSensitivity caseSensitive)
@@ -1491,7 +1492,7 @@ bool PQString::cleanUpEnds()
 
     firstChar = itsString.left(1);
 
-    while ((firstChar == QString(" ")) || (firstChar == QString("\n")) || (firstChar == QString("\t")) || (firstChar == QString(".")) || (firstChar == QString("¤")))
+    while ((firstChar == QString(" ")) || (firstChar == QString("\n")) || (firstChar == QString("\t")) || (firstChar == QString(".")) || (firstChar == QString("¤")) || (firstChar == QString("-")))
     {
         itsString.remove(0, 1);
         firstChar.clear();
@@ -1500,7 +1501,7 @@ bool PQString::cleanUpEnds()
     }
 
     lastChar = itsString.right(1);
-    while ((lastChar == QString(" ")) || (lastChar == QString("\n")) || (lastChar == QString("\t")) || (lastChar == QString(".")) || (lastChar == QString("¤")))
+    while ((lastChar == QString(" ")) || (lastChar == QString("\n")) || (lastChar == QString("\t")) || (lastChar == QString(".")) || (lastChar == QString("¤")) || (lastChar == QString("-")))
     {
         itsString.chop(1);
         lastChar.clear();

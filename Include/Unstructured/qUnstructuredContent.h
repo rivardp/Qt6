@@ -48,6 +48,7 @@ public:
     unsigned int sentenceReadNakedAgeAtDeath(bool updateDirectly = true);
     unsigned int contentReadAgeAtDeath(unsigned int maxSentences);
     unsigned int contentReadAgeAtDeath(QList<QString> firstName);
+    void readAgeAtDeathPostNumChecks(bool &numFound, bool &contextError, bool eventCheck, int &num, int &altNum, OQString peek1, OQString peek2, OQString peek3, LANGUAGE lang);
     void  readDateOfService(QDate &DOSD, LANGUAGE lang);
     void  sentenceReadDateOfService(QDate &DOSD, LANGUAGE lang);
     void contentReadSpouseName(LANGUAGE lang = language_unknown);

@@ -40,7 +40,7 @@ enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, Coopera
                Montcalm, Trahan, Laurent, Eternel, Ruel, Hamel, CremAlt, London, Dryden, Forest,
                JasonSmith, Lampman, ecoPassages, Peaceful, Ranger, People, Whitcroft, TriCity, LegacyCardstrom, Wiebe,
                Arimathea, GFournier, CharleVoix2, Harmonia, Omega, HeritageWP, Ouellet, HommageNB, Drake, CityLine,
-               Komitas, Driftwood};
+               Komitas, Driftwood, MLBW};
 
 // Search parameters
 

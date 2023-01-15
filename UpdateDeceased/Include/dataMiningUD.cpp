@@ -2654,61 +2654,50 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     }
         break; // 1051 WebSolutions
 
-    case 1052:  // Citrus
+    case 1052:  // Citrus  (see also 2152 MLBW)
     {
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
 
         URLbase = baseURL;
-        /*URLaddressTemplate  = URLbase + PQString("/fr/views/ajax?");
-        URLaddressTemplate  = URLbase + PQString("/fr/views/ajax?");
-        URLaddressTemplate += PQString("page=") + paramPlaceholder;
-        URLaddressTemplate += PQString("&view_name=necrologies&view_display_id=block&view_args=&view_path=node%2F67&view_base_path=null&view_dom_id=03c9bbcc17b496e6c68ba1c31b7c1d5e&pager_element=0");*/
-        //https://www.cflacolombe.ca/covid-19/?view_name=necrologies&view_display_id=block&view_args&view_path=node%2F67&view_base_path=null&view_dom_id=03c9bbcc17b496e6c68ba1c31b7c1d5e&pager_element=0
-        /*URLaddressTemplate  = URLbase + PQString("/wp-admin/admin-ajax.php");
-        URLaddressTemplate += PQString("?action=jet_engine_ajax&handler=get_listing&query%5Bpost_status%5D=publish&query%5Bfound_posts%5D=893&query%5Bmax_num_pages%5D=90&query%5Bpost_type%5D=necrologies");
-        URLaddressTemplate += PQString("&query%5Borderby%5D=&query%5Border%5D=DESC&query%5Bpaged%5D=0&query%5Bposts_per_page%5D=10&post_id=1882&queried_id=3407%7CWP_Post&element_id=3d3bc47");
-        URLaddressTemplate += PQString("&page=") + paramPlaceholder + PQString("&listing_type=elementor&isEditMode=false");*/
-
-        URLaddressTemplate  = URLbase + PQString("/wp-admin/admin-ajax.php");
-        /*URLaddressTemplate += PQString("?action=jet_engine_ajax&handler=listing_load_more&query%5Bpost_status%5D=publish&query%5Bfound_posts%5D=893&query%5Bmax_num_pages%5D=90&query%5Bpost_type%5D=necrologies");
-        URLaddressTemplate += PQString("&query%5Borderby%5D=&query%5Border%5D=DESC&query%5Bpaged%5D=0&query%5Bposts_per_page%5D=10&widget_settings%5Blisitng_id%5D=1909&widget_settings%5Bposts_num%5D=6&widget_settings%5Bcolumns%5D=1");
-        URLaddressTemplate += PQString("&widget_settings%5Bcolumns_tablet%5D=1&widget_settings%5Bcolumns_mobile%5D=1&widget_settings%5Bis_archive_template%5D=yes&widget_settings%5Bpost_status%5D%5B%5D=publish");
-        URLaddressTemplate += PQString("&widget_settings%5Buse_random_posts_num%5D=&widget_settings%5Bmax_posts_num%5D=9&widget_settings%5Bnot_found_message%5D=No+data+was+found&widget_settings%5Bis_masonry%5D=false");
-        URLaddressTemplate += PQString("&widget_settings%5Bequal_columns_height%5D=&widget_settings%5Buse_load_more%5D=yes&widget_settings%5Bload_more_id%5D=&widget_settings%5Bload_more_type%5D=scroll");
-        URLaddressTemplate += PQString("&widget_settings%5Buse_custom_post_types%5D=yes&widget_settings%5Bcustom_post_types%5D%5B%5D=necrologies&widget_settings%5Bhide_widget_if%5D=empty_query&widget_settings%5Bcarousel_enabled%5D=");
-        URLaddressTemplate += PQString("&widget_settings%5Bslides_to_scroll%5D=1&widget_settings%5Barrows%5D=true&widget_settings%5Barrow_icon%5D=fa+fa-angle-left&widget_settings%5Bdots%5D=&widget_settings%5Bautoplay%5D=true");
-        URLaddressTemplate += PQString("&widget_settings%5Bautoplay_speed%5D=5000&widget_settings%5Binfinite%5D=true&widget_settings%5Bcenter_mode%5D=&widget_settings%5Beffect%5D=slide&widget_settings%5Bspeed%5D=500");
-        URLaddressTemplate += PQString("&widget_settings%5Binject_alternative_items%5D=&widget_settings%5Bscroll_slider_enabled%5D=&widget_settings%5Bcustom_query%5D=false&widget_settings%5Bcustom_query_id%5D=");
-        URLaddressTemplate += PQString("&widget_settings%5B_element_id%5D=&post_id=false&queried_id=false&element_id=false&page=") + paramPlaceholder + PQString("&listing_type=false&isEditMode=false&addedPostCSS%5B%5D=1909");*/
-
-        URLaddressTemplate += PQString("?action=jet_engine_ajax&handler=listing_load_more&query%5Bpost_status%5D=publish&query%5Bfound_posts%5D=919&query%5Bmax_num_pages%5D=92&query%5Bpost_type%5D=necrologies&query%5Borderby%5D=");
-        URLaddressTemplate += PQString("&query%5Border%5D=DESC&query%5Bpaged%5D=0&query%5Bposts_per_page%5D=10&widget_settings%5Blisitng_id%5D=1909&widget_settings%5Bposts_num%5D=6&widget_settings%5Bcolumns%5D=1");
-        URLaddressTemplate += PQString("&widget_settings%5Bcolumns_tablet%5D=1&widget_settings%5Bcolumns_mobile%5D=1&widget_settings%5Bis_archive_template%5D=yes&widget_settings%5Bpost_status%5D%5B%5D=publish");
-        URLaddressTemplate += PQString("&widget_settings%5Buse_random_posts_num%5D=&widget_settings%5Bmax_posts_num%5D=9&widget_settings%5Bnot_found_message%5D=No+data+was+found&widget_settings%5Bis_masonry%5D=false");
-        URLaddressTemplate += PQString("&widget_settings%5Bequal_columns_height%5D=&widget_settings%5Buse_load_more%5D=yes&widget_settings%5Bload_more_id%5D=&widget_settings%5Bload_more_type%5D=scroll");
-        URLaddressTemplate += PQString("&widget_settings%5Buse_custom_post_types%5D=yes&widget_settings%5Bcustom_post_types%5D%5B%5D=necrologies&widget_settings%5Bhide_widget_if%5D=empty_query&widget_settings%5Bcarousel_enabled%5D=");
-        URLaddressTemplate += PQString("&widget_settings%5Bslides_to_scroll%5D=1&widget_settings%5Barrows%5D=true&widget_settings%5Barrow_icon%5D=fa+fa-angle-left&widget_settings%5Bdots%5D=&widget_settings%5Bautoplay%5D=true");
-        URLaddressTemplate += PQString("&widget_settings%5Bautoplay_speed%5D=5000&widget_settings%5Binfinite%5D=true&widget_settings%5Bcenter_mode%5D=&widget_settings%5Beffect%5D=slide&widget_settings%5Bspeed%5D=500");
-        URLaddressTemplate += PQString("&widget_settings%5Binject_alternative_items%5D=&widget_settings%5Bscroll_slider_enabled%5D=&widget_settings%5Bcustom_query%5D=false&widget_settings%5Bcustom_query_id%5D=");
-        URLaddressTemplate += PQString("&widget_settings%5B_element_id%5D=&post_id=false&queried_id=false&element_id=false&page=") + paramPlaceholder + PQString("&listing_type=false&isEditMode=false&addedPostCSS%5B%5D=1909");
-
-        URLparams.numParams = 1;
-        URLparams.param1Type = ptUint;
-        URLparams.UIparam1 = &flowParameters.currentPosition;
-
+        URLaddressTemplate  = URLbase + PQString("/necrologies/");
+        URLparams.numParams = 0;
         flowParameters.currentPosition = 1;
-        if (flowParameters.initialSetup == true)
-            flowParameters.endingPosition = 6;
-        else
-            flowParameters.endingPosition = 8;
+        flowParameters.endingPosition = 1;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
 
-        downloadRequest.instructions.verb = QString("POST");
-    }
+        www->download(downloadRequest);
+        while(www->processingDownload()){};
+        if(www->lastDownloadSuccessful())
+        {
+            sourceFile.setSourceFile(downloadRequest.outputs.downloadFileName);
+            if (sourceFile.consecutiveMovesTo(300, "JetEngineSettings", "ajaxlisting", ":"))
+            {
+                URLbase = sourceFile.readNextBetween(QUOTES);
+                URLbase.JSONsimplify();
+                URLaddressTemplate = URLbase;
+                URLaddressTemplate += PQString("&action=jet_engine_ajax&handler=get_listing&query%5Bpost_status%5D=publish&query%5Bfound_posts%5D=1281&query%5Bmax_num_pages%5D=129");
+                URLaddressTemplate += PQString("&query%5Bpost_type%5D=necrologies&query%5Borderby%5D=&query%5Border%5D=DESC&query%5Bpaged%5D=0&query%5Bposts_per_page%5D=10&page_settings%5Bpost_id%5D=1882");
+                URLaddressTemplate += PQString("&page_settings%5Bqueried_id%5D=5513%7CWP_Post&page_settings%5Belement_id%5D=3d3bc47&page_settings%5Bpage%5D=") + paramPlaceholder;
+                URLaddressTemplate += PQString("&listing_type=elementor&isEditMode=false");
+
+                downloadRequest.instructions.verb = QString("POST");
+
+                URLparams.numParams = 1;
+                URLparams.param1Type = ptUint;
+                URLparams.UIparam1 = &flowParameters.currentPosition;
+
+                flowParameters.currentPosition = 1;
+                flowParameters.endingPosition = 8;
+
+                determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
+                createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+            }
+        }
+     }
         break; // 1052 Citrus
 
     case 1054:  // TNours
@@ -5648,9 +5637,14 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         case 2:
         case 3:
         case 5:
+        case 6:
+            // https://manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=dc4dc470&page=2&per_page=10
             // https://manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=a804057b&page=2&q=&per_page=10&include_services=0&veterans_only=0
             URLbase = baseURL;
-            URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&q=&per_page=10&include_services=0&veterans_only=0");
+            if (providerKey == 6)
+                URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&per_page=10");
+            else
+                URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&q=&per_page=10&include_services=0&veterans_only=0");
 
             URLparams.numParams = 1;
             URLparams.param1Type = ptUint;
@@ -8101,7 +8095,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.flowType = startToEnd;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/fr/avis-de-deces/pages/") + paramPlaceholder + PQString("#page");
+        URLaddressTemplate  = URLbase + PQString("/avis-de-deces/pages/") + paramPlaceholder + PQString("#page");
         //http://poissantetfils.ca/fr/avis-de-deces/pages/2#page
 
         URLparams.numParams = 1;
@@ -8708,8 +8702,9 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         daysOfOverlap = 61;
         flowParameters.flowType = startToEnd;
 
-        URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/deces/page/") + paramPlaceholder + PQString("/");
+        URLbase = baseURL + PQString("/fr/avis-de-deces");
+        //URLaddressTemplate  = URLbase + PQString("/deces/page/") + paramPlaceholder + PQString("/");
+        URLaddressTemplate  = URLbase + PQString("/?page=") + paramPlaceholder;
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -8719,7 +8714,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         if (flowParameters.initialSetup)
             flowParameters.endingPosition = 27;
         else
-            flowParameters.endingPosition = 3;
+            flowParameters.endingPosition = 2;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -9314,6 +9309,63 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     }
         break; // 2151 Driftwood
 
+    case 2152:  // MLBW  (see also 1052 Citrus)
+    {
+        daysOfOverlap = 61;
+        flowParameters.initialSetup = false;
+        flowParameters.flowType = startToEnd;
+
+        URLbase = baseURL;
+        URLaddressTemplate  = URLbase + PQString("/avis-de-deces/");
+        URLparams.numParams = 0;
+        flowParameters.currentPosition = 1;
+        flowParameters.endingPosition = 1;
+
+        determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
+        createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+
+        www->download(downloadRequest);
+        while(www->processingDownload()){};
+        if(www->lastDownloadSuccessful())
+        {
+            sourceFile.setSourceFile(downloadRequest.outputs.downloadFileName);
+
+            if (sourceFile.consecutiveMovesTo(300, "JetEngineSettings", "ajaxlisting", ":"))
+            {
+                URLbase = sourceFile.readNextBetween(QUOTES);
+                URLbase.JSONsimplify();
+                URLaddressTemplate = URLbase;
+            }
+
+            URLaddressTemplate = URLbase;
+            URLaddressTemplate += PQString("&action=jet_engine_ajax&handler=listing_load_more&query%5Bpost_status%5D%5B%5D=publish&query%5Bpost_type%5D=avis-de-deces&query%5Bposts_per_page%5D=15&query%5Bpaged%5D=1");
+            URLaddressTemplate += PQString("&query%5Bignore_sticky_posts%5D=1&query%5Bsuppress_filters%5D=false&query%5Bjet_smart_filters%5D=jet-engine%2Flisting&widget_settings%5Blisitng_id%5D=560");
+            URLaddressTemplate += PQString("&widget_settings%5Bposts_num%5D=15&widget_settings%5Bcolumns%5D=3&widget_settings%5Bcolumns_tablet%5D=2&widget_settings%5Bcolumns_mobile%5D=1&widget_settings%5Bis_archive_template%5D=");
+            URLaddressTemplate += PQString("&widget_settings%5Bpost_status%5D%5B%5D=publish&widget_settings%5Buse_random_posts_num%5D=&widget_settings%5Bmax_posts_num%5D=9");
+            URLaddressTemplate += PQString("&widget_settings%5Bnot_found_message%5D=Aucun+avis+de+d%C3%A9c%C3%A8s+trouv%C3%A9.&widget_settings%5Bis_masonry%5D=false&widget_settings%5Bequal_columns_height%5D=");
+            URLaddressTemplate += PQString("&widget_settings%5Buse_load_more%5D=yes&widget_settings%5Bload_more_id%5D=load-more&widget_settings%5Bload_more_type%5D=click&widget_settings%5Buse_custom_post_types%5D=");
+            URLaddressTemplate += PQString("&widget_settings%5Bhide_widget_if%5D=&widget_settings%5Bcarousel_enabled%5D=&widget_settings%5Bslides_to_scroll%5D=1&widget_settings%5Barrows%5D=true");
+            URLaddressTemplate += PQString("&widget_settings%5Barrow_icon%5D=fa+fa-angle-left&widget_settings%5Bdots%5D=&widget_settings%5Bautoplay%5D=true&widget_settings%5Bautoplay_speed%5D=5000");
+            URLaddressTemplate += PQString("&widget_settings%5Binfinite%5D=true&widget_settings%5Bcenter_mode%5D=&widget_settings%5Beffect%5D=slide&widget_settings%5Bspeed%5D=500");
+            URLaddressTemplate += PQString("&widget_settings%5Binject_alternative_items%5D=&widget_settings%5Bscroll_slider_enabled%5D=&widget_settings%5Bscroll_slider_on%5D%5B%5D=desktop");
+            URLaddressTemplate += PQString("&widget_settings%5Bscroll_slider_on%5D%5B%5D=tablet&widget_settings%5Bscroll_slider_on%5D%5B%5D=mobile&widget_settings%5Bcustom_query%5D=false");
+            URLaddressTemplate += PQString("&widget_settings%5Bcustom_query_id%5D=&widget_settings%5B_element_id%5D=listing&page_settings%5Bpost_id%5D=false&page_settings%5Bqueried_id%5D=false");
+            URLaddressTemplate += PQString("&page_settings%5Belement_id%5D=false&page_settings%5Bpage%5D=") + paramPlaceholder + PQString("&listing_type=false&isEditMode=false");
+            URLaddressTemplate += PQString("");
+
+            downloadRequest.instructions.verb = QString("POST");
+
+            URLparams.numParams = 1;
+            URLparams.param1Type = ptUint;
+            URLparams.UIparam1 = &flowParameters.currentPosition;
+
+            flowParameters.currentPosition = 1;
+            flowParameters.endingPosition = 4;
+
+            createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+        }
+    }
+        break; // 2152 MLBW
 
     default:
         qDebug() << "Attempt to retrieve URLs for unknown/uncoded provider";
@@ -12247,7 +12299,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             }   // end case 1051 WebSolutions
                 break;
 
-            case 1052:  // Citrus
+            case 1052:  // Citrus (see also 2152 MLBW)
             {
                 //sourceFile.JSONsimplify();
                 //sourceFile.unQuoteHTML();
@@ -12297,6 +12349,22 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                     if ((pageVariables.includeRecord) || flowParameters.initialSetup)
                         records.append(record);
                 }
+
+                URLaddressTemplate = URLbase;
+                URLaddressTemplate += PQString("&action=jet_engine_ajax&handler=listing_load_more&query%5Bpost_status%5D=publish&query%5Bfound_posts%5D=1281&query%5Bmax_num_pages%5D=129&query%5Bpost_type%5D=necrologies");
+                URLaddressTemplate += PQString("&query%5Borderby%5D=&query%5Border%5D=DESC&query%5Bpaged%5D=0&query%5Bposts_per_page%5D=10&widget_settings%5Blisitng_id%5D=1909&widget_settings%5Bposts_num%5D=10");
+                URLaddressTemplate += PQString("&widget_settings%5Bcolumns%5D=1&widget_settings%5Bcolumns_tablet%5D=1&widget_settings%5Bcolumns_mobile%5D=1&widget_settings%5Bis_archive_template%5D=yes");
+                URLaddressTemplate += PQString("&widget_settings%5Bpost_status%5D%5B%5D=publish&widget_settings%5Buse_random_posts_num%5D=&widget_settings%5Bmax_posts_num%5D=9&widget_settings%5Bnot_found_message%5D=No+data+was+found");
+                URLaddressTemplate += PQString("&widget_settings%5Bis_masonry%5D=false&widget_settings%5Bequal_columns_height%5D=&widget_settings%5Buse_load_more%5D=yes&widget_settings%5Bload_more_id%5D=");
+                URLaddressTemplate += PQString("&widget_settings%5Bload_more_type%5D=scroll&widget_settings%5Buse_custom_post_types%5D=yes&widget_settings%5Bcustom_post_types%5D%5B%5D=necrologies");
+                URLaddressTemplate += PQString("&widget_settings%5Bhide_widget_if%5D=empty_query&widget_settings%5Bcarousel_enabled%5D=&widget_settings%5Bslides_to_scroll%5D=1&widget_settings%5Barrows%5D=true");
+                URLaddressTemplate += PQString("&widget_settings%5Barrow_icon%5D=fa+fa-angle-left&widget_settings%5Bdots%5D=&widget_settings%5Bautoplay%5D=true&widget_settings%5Bautoplay_speed%5D=5000&widget_settings%5Binfinite%5D=true");
+                URLaddressTemplate += PQString("&widget_settings%5Bcenter_mode%5D=&widget_settings%5Beffect%5D=slide&widget_settings%5Bspeed%5D=500&widget_settings%5Binject_alternative_items%5D=&widget_settings%5Bscroll_slider_enabled%5D=");
+                URLaddressTemplate += PQString("&widget_settings%5Bscroll_slider_on%5D%5B%5D=desktop&widget_settings%5Bscroll_slider_on%5D%5B%5D=tablet&widget_settings%5Bscroll_slider_on%5D%5B%5D=mobile&widget_settings%5Bcustom_query%5D=false");
+                URLaddressTemplate += PQString("&widget_settings%5Bcustom_query_id%5D=&widget_settings%5B_element_id%5D=&page_settings%5Bpost_id%5D=false&page_settings%5Bqueried_id%5D=false&page_settings%5Belement_id%5D=false");
+                URLaddressTemplate += PQString("&page_settings%5Bpage%5D=") + paramPlaceholder + PQString("&listing_type=false&isEditMode=false");
+
+                createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
 
                 updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
 
@@ -18788,18 +18856,23 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2122:  // Laurent
             {
-                while (sourceFile.consecutiveMovesTo(200, "<!-- Affichage des avis -->", "href="))
+                while (sourceFile.moveTo("class=\"avis\""))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read URL
-                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
-                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+                    if (sourceFile.moveBackwardTo("href=", 50))
+                    {
+                        pageVariables.webAddress = URLbase + PQString("/") + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                        pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
-                    // DOD
-                    if (sourceFile.conditionalMoveTo("Décédé(e) le ", "<!-- Affichage des avis -->", 0))
-                        pageVariables.ucDOD = sourceFile.getUntil("<");
+                        // DOD
+                        if (sourceFile.conditionalMoveTo("Décédé(e) le ", "class=\"avis\"", 0))
+                            pageVariables.ucDOD = sourceFile.getUntil("<");
+                        else
+                            sourceFile.moveTo("</a>");
+                    }
 
                     // Process
                     process(record, pageVariables, lang);
@@ -19529,6 +19602,43 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             }
                 break; // 2151 Driftwood
 
+            case 2152:  // MLBW (see also 1052 Citrus)
+            {
+                sourceFile.JSONsimplify();
+                sourceFile.unQuoteHTML();
+
+                while (sourceFile.consecutiveMovesTo(1000, "jet-listing-grid__item", "data-raven-link="))
+                {
+                    record.clear();
+                    pageVariables.reset();
+
+                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();;
+                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    if (sourceFile.conditionalMoveTo("1309f6a", "jet-listing-grid__item", 0))
+                    {
+                        sourceFile.consecutiveMovesTo(200, "<span", ">");
+                        sourceFile.backward(1);
+                        pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
+                    }
+
+                    if (sourceFile.conditionalMoveTo("d0d63de", "jet-listing-grid__item", 0))
+                    {
+                        sourceFile.consecutiveMovesTo(200, "<span", ">");
+                        sourceFile.backward(1);
+                        pageVariables.pcKey = sourceFile.readNextBetween(BRACKETS).getString();
+                    }
+
+                    // Process
+                    process(record, pageVariables, lang);
+                    if ((pageVariables.includeRecord) || flowParameters.initialSetup)
+                        records.append(record);
+                }
+
+                updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
+
+            }   // end case 2152 MLBW
+                break;
 
             default:
                 qDebug() << "Attempt to retrieve URLs for unknown/uncoded provider";
@@ -19857,7 +19967,7 @@ void MINER::process(RECORD &record, PAGEVARIABLES &pageVariables, LANGUAGE &lang
         pageVariables.yob = record.yob;
     }
 
-    if (pageVariables.currentDOD.isValid())
+    if (pageVariables.currentDOD.isValid() && (pageVariables.currentDOD <= globals->today))
     {
         record.dod = pageVariables.currentDOD;
         if (pageVariables.currentDOD != QDate(1900,1,1))
@@ -19879,7 +19989,7 @@ void MINER::process(RECORD &record, PAGEVARIABLES &pageVariables, LANGUAGE &lang
         }
     }
 
-    if ((record.ageAtDeath == 0) && pageVariables.currentDOB.isValid() && pageVariables.currentDOD.isValid() && (pageVariables.currentDOB > QDate(1900,1,1)))
+    if ((record.ageAtDeath == 0) && pageVariables.currentDOB.isValid() && pageVariables.currentDOD.isValid() && (pageVariables.currentDOB > QDate(1900,1,1)) && (pageVariables.currentDOD <= globals->today))
     {
         record.ageAtDeath = static_cast<unsigned int>(elapse(pageVariables.currentDOB, pageVariables.currentDOD));
         if ((record.ageAtDeath < 0) || (record.ageAtDeath > 125))

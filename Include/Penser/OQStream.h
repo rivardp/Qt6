@@ -49,7 +49,7 @@ public:
     OQString getNext(unsigned int numChars);
     OQString getUntil(QString qchar, unsigned int maxNumChars = 10000, bool dropLast = true);
     OQString getUntilEarliestOf(QString stop1, QString stop2, unsigned int maxNumChars = 10000, bool dropLast = true);
-    OQString peekAtWord(const bool considerParentheses = false, const unsigned int howFar = 1);
+    OQString peekAtWord(const bool considerParentheses = false, const unsigned int howFar = 1, const bool cleanWord = false);
     OQString peekAtNext(const unsigned int numChars);
     OQString peekAtNextRealChar();
     OQString readHTMLContent(unsigned int maxChar = 200);

@@ -77,6 +77,42 @@ bool databaseSearches::areAllNames(QList<OQString> &listOfNames, GLOBALVARS *gv)
     return valid;
 }
 
+bool databaseSearches::areAllLocations(QList<QString> &listOfNames, GLOBALVARS *gv)
+{
+    if (listOfNames.size() == 0)
+        return false;
+
+    bool valid = true;
+    QString word;
+    QSqlQuery query;
+    QSqlError error;
+
+    while (valid && !listOfNames.isEmpty())
+    {
+        word = OQString(listOfNames.takeFirst()).getUnaccentedString().toLower();
+
+        if(!OQString(word).isProvince())
+        {
+            bool success;
+            valid = false;
+
+            success = query.prepare("SELECT LOWER(location) FROM death_audits.postalcodes WHERE location = :location");
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation in areAllLocations()";
+            query.bindValue(":location", QVariant(word));
+
+            success = query.exec();
+            if (success)
+            {
+                if (query.size() > 0)
+                    valid = true;
+            }
+        }
+    }
+
+    return valid;
+}
+
 bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, GENDER gender)
 {
     int maleCount = 0;
@@ -766,7 +802,10 @@ POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID
                 {
                     tempDistance = pcInfoFH.distanceTo(pcInfoLookup);
                     if (tempDistance < distance)
+                    {
                         pcResult = pcInfoLookup;
+                        distance = tempDistance;
+                    }
                 }
             }
         }
