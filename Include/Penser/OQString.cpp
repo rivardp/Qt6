@@ -642,6 +642,7 @@ void OQString::removeAllSuffixPrefix()
 void OQString::removeSuffixPrefix(const QList<QString> &list)
 {
     QRegularExpression target;
+    target.setPatternOptions(QRegularExpression::UseUnicodePropertiesOption);
     QString tgt, pattern, upperLowerChar, singleChar;
     QList<QString> targets = list;
     sort(targets, false, false, false, true);  // sort by decreasing length
@@ -684,6 +685,7 @@ void OQString::removeSuffixPrefix(const QList<QString> &list)
 void OQString::removeStrings(const QList<QString> &list)
 {
     QRegularExpression target;
+    target.setPatternOptions(QRegularExpression::UseUnicodePropertiesOption);
     QString tgt, pattern;
     QList<QString> targets = list;
 
@@ -832,7 +834,8 @@ void OQString::compressCompoundNames(const LANGUAGE lang)
                 cancel = nextWord.removeBookEnds(PARENTHESES | QUOTES, true);
                 cancel = cancel || nextWord.removeLeading(PARENTHESES | QUOTES);
                 cancel = cancel || (nextWord.lower() == PQString("obituary"));
-                cancel = cancel || ((word.lower() == PQString("van")) && (nextWord.getLength() < 5));
+                cancel = cancel || (isCompound && word.isCapitalized() && !nextWord.isCapitalized());
+                cancel = cancel || word.isSingleVan();
 
                 if (cancel || !(isCompound || cleanWord.isAboriginalName(nextWord)))
                     result += space;
@@ -979,7 +982,8 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
 {
     // Need to be careful in types of fixes as this can easily break prior working code
     QRegularExpression targetS, targetI;
-    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+    targetS.setPatternOptions(QRegularExpression::UseUnicodePropertiesOption);
     QRegularExpressionMatch match;
     int index;
 
@@ -1065,10 +1069,23 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     // Ensure all french dates are lower case
     targetS.setPattern(QString("\\b(Janvier|Fevrier|Février|Mars|Avril|Mai|Juin|Juillet|Aout|Août|Septembre|Octobre|Novembre|Decembre|Décembre)\\b"));
     match = targetS.match(itsString);
-    if (match.hasMatch())
+    while (match.hasMatch())
     {
-        QString captured = match.captured(1);
-        itsString.replace(captured, captured.toLower());
+        QString capturedWord = match.captured(1);
+        QString replacementWord = capturedWord.toLower();
+        itsString.replace(capturedWord, replacementWord);
+        match = targetS.match(itsString);
+    }
+
+    // Eliminate all cap English months
+    targetS.setPattern(QString("\\b(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\\b"));
+    match = targetS.match(itsString);
+    while (match.hasMatch())
+    {
+        QString capturedWord = match.captured(1);
+        QString replacementWord = capturedWord.left(1).toUpper() + capturedWord.mid(1).toLower();
+        itsString.replace(capturedWord, replacementWord);
+        match = targetS.match(itsString);
     }
 
     // Standardize abbreviated dates
@@ -1120,7 +1137,8 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
 
     // English dates in French format
     // Must avoid converting French dates written with capitals
-    targetI.setPattern("\\b(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre|janv|fév|févr|mar|avr|juil|sep|déc)\\b");
+    //targetI.setPattern("\\b(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre|janv|fév|févr|mar|avr|juil|sep|déc)\\b");
+    targetI.setPattern("(\\d\\d?)(\\s|-)?(janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre|janv|fév|févr|avr|juil|déc)(\\s|-)?([1-2][0|9][0-9][0-9])");
     match = targetI.match(itsString);
     if (!match.hasMatch())
     {
@@ -1176,10 +1194,10 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     itsString.replace(targetS, "(\\1 \\2 - \\4 \\5)");
     targetS.setPattern("(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d+, \\d{4})( - | )(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d+, \\d{4})");
     itsString.replace(targetS, "(\\1 \\2 - \\4 \\5)");
-    targetS.setPattern("(\\d+ janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})( - | )(\\d+ janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})");
-    itsString.replace(targetS, "(\\1 \\2 - \\4 \\5)");
-    targetS.setPattern("(\\d+ jan|janv|fév|févr|mars|avr|mai|juin|juil|août|sep|sept|oct|nov|déc) (\\d{4})( - | )(\\d+ jan|janv|fév|févr|mars|avr|mai|juin|juil|août|sep|sept|oct|nov|déc) (\\d{4})");
-    itsString.replace(targetS, "(\\1 \\2 - \\4 \\5)");
+    targetS.setPattern("(\\d+) (janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})( - | )(\\d+) (janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})");
+    itsString.replace(targetS, "(\\1 \\2 \\3 - \\5 \\6 \\7)");
+    targetS.setPattern("(\\d+) (jan|janv|fév|févr|mars|avr|mai|juin|juil|août|sep|sept|oct|nov|déc) (\\d{4})( - | )(\\d+) (jan|janv|fév|févr|mars|avr|mai|juin|juil|août|sep|sept|oct|nov|déc) (\\d{4})");
+    itsString.replace(targetS, "(\\1 \\2 \\3 - \\5 \\6 \\7)");
     itsString.replace("( ", "(");
     itsString.replace(" )", ")");
     itsString.replace("((", "(");
@@ -1202,8 +1220,8 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     itsString.replace(targetS, "(\\1 \\2 - \\3 \\4)");
     targetS.setPattern("(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d+, \\d{4}) - (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d+, \\d{4})");
     itsString.replace(targetS, "(\\1 \\2 - \\3 \\4)");
-    targetS.setPattern("(\\d+ janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4}) - (\\d+ janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})");
-    itsString.replace(targetS, "(\\1 \\2 - \\3 \\4)");
+    targetS.setPattern("(\\d+) (janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4}) - (\\d+) (janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})");
+    itsString.replace(targetS, "(\\1 \\2 \\3 - \\4 \\5 \\6)");
     itsString.replace("( ", "(");
     itsString.replace(" )", ")");
     itsString.replace("((", "(");
@@ -2185,6 +2203,11 @@ bool OQString::isUncapitalizedName() const
     return isFoundIn(uncapitalizedNames, 1);
 }
 
+bool OQString::isSingleVan() const
+{
+    return isFoundIn(singleVans, 1);
+}
+
 bool OQString::isNoVowelName() const
 {
     return isFoundIn(noVowelNames, 1);
@@ -2291,6 +2314,9 @@ bool OQString::isAboriginalName(OQString nextWord, bool firstCall) const
     // For the problematic names that are also non-aboriginal last names (e.g. Young), a secondary check is performed
 
     if (firstCall && ((nextWord.getLength() == 0) || (nextWord.left(1) == OQString("("))))
+        return false;
+
+    if (PQString(itsString).isCapitalized() && !nextWord.isCapitalized())
         return false;
 
     bool potential = false;
@@ -4041,7 +4067,7 @@ QList<QString> OQString::prefixesAbbreviatedEnglish = QList<QString> () << "aalu
                                                                         << "capt" << "cdr" << "cdt" << "cfp" << "clu" << "cmdr" << "cnd" << "col" << "cpl" << "cpo" << "cpsm" << "cpt" << "cst" << "csv" << "cwo"
                                                                         << "dc" << "dr" << "facog" << "fcsse" << "feic" << "flmi" << "flt" << "fr" << "frcs" << "gen" << "gov"
                                                                         << "hon" << "lcdr" << "lcol" << "llb" << "lt"
-                                                                        << "maj" << "mcpl" << "mdiv" << "msgr" << "mwa" << "mwo" << "ofm" << "omm" << "prof" << "pssf" << "pvt"
+                                                                        << "maj" << "mcpl" << "mdiv" << "mgr" << "msgr" << "mwa" << "mwo" << "ofm" << "omm" << "prof" << "pssf" << "pvt"
                                                                         << "raf" << "rcaf" << "rcmp" << "rcn" << "rep"  << "rev" << "rjm" << "rn" << "rsm" << "rsr" << "rt" << "rtd"
                                                                         << "sasv" << "scsl" << "sen" << "sgt" << "sj" << "ssccjm" << "wo";
 QList<QString> OQString::prefixesAbbreviatedFrench  = QList<QString> () << "dre" << "osu" << "rsr";
@@ -4068,12 +4094,12 @@ QList<QString> OQString::suffixesDegree  = QList<QString> () << "a" << "comm" <<
 
 QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "acii" << "ba" << "bcomm" << "bed" << "bmsc" << "bpe"
                                                                     << "bs" << "bsc" << "bscn" << "bve" << "bvoced"
-                                                                    << "ca" << "cd" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmm" << "cpa" << "crcs" << "crm" << "csb" << "csc" << "csj" << "cssr"
+                                                                    << "ca" << "cd" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmm" << "cpa" << "crcs" << "crm" << "csb" << "csc" << "csj" << "cssr" << "cvo"
                                                                     << "dds" << "dip" << "doctor" << "dsm" << "dvm" << "eng" << "esq"
                                                                     << "facs" << "fca" << "fcahs" <<  "fcia" << "fcscj" << "fiic" << "fj" << "fma" << "fr" << "frcp" << "frcpc" << "frcsc" << "fsa" << "gclj" << "gm"
                                                                     << "honors" << "honours" << "ing" << "juris" << "kstj"
-                                                                    << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "med" << "meng" << "msc" << "ndsc"
-                                                                    << "obgyn" << "ocad" << "offm" << "ohc" << "olm" << "omi" << "omri" << "osb" << "osbm"<< "pc" << "peng" << "pgeo" << "phd"
+                                                                    << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "med" << "meng" << "mgr" << "msc" << "ndsc"
+                                                                    << "obgyn" << "ocad" << "offm" << "ohc" << "olm" << "omi" << "omri" << "onl" << "osb" << "osbm"<< "pc" << "peng" << "pgeo" << "ph" << "phd"
                                                                     << "qc" << "qffq" << "rcmp" << "ret" << "ret'd" << "retd" << "rev" << "rn" << "rndm" << "sdb" << "sgm" << "ssm" << "ssmi"
                                                                     << "ue" << "wwi" << "wwii";
 QList<QString> OQString::suffixesDropFrench     = suffixesDropEnglish;
@@ -4088,6 +4114,7 @@ QList<QString> OQString::uncapitalizedNames  = QList<QString> () << "cinq" << "d
                                                                  << "di" << "do" << "dos" << "du" << "dè" << "e" << "el"
                                                                  << "la" << "le" << "lo" << "los" << "san" << "st" << "st." << "te" << "ten" << "ter"
                                                                  << "van" << "van't" << "vande" << "vanden" << "vander" << "von" ;
+QList<QString> OQString::singleVans          = QList<QString> () << "du" << "ho" << "hoan" << "le" << "luong" << "nguyen" << "pham" << "phan" << "tran" << "vo";
 QList<QString> OQString::hyphenatedNameBeginnings = QList<QString> () << "abu" << "ad" << "al" << "el" << "ud";
 
 QList<QString> OQString::ignoreWordsEnglish1 = QList<QString> () << "aa";

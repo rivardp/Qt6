@@ -844,6 +844,707 @@ struct URLPARAMS
     }
 };
 
+struct PAYLOADPARAMS
+{
+    QByteArray param1;
+    QByteArray param2;
+    QByteArray param3;
+    QByteArray param4;
+    QByteArray param5;
+    QByteArray param6;
+
+    PARAMTYPE param1Type;
+    PARAMTYPE param2Type;
+    PARAMTYPE param3Type;
+    PARAMTYPE param4Type;
+    PARAMTYPE param5Type;
+    PARAMTYPE param6Type;
+
+    unsigned int *UIparam1;
+    unsigned int *UIparam2;
+    unsigned int *UIparam3;
+    unsigned int *UIparam4;
+    unsigned int *UIparam5;
+    unsigned int *UIparam6;
+
+    int *IntParam1;
+    int *IntParam2;
+    int *IntParam3;
+    int *IntParam4;
+    int *IntParam5;
+    int *IntParam6;
+
+    QString *QSparam1;
+    QString *QSparam2;
+    QString *QSparam3;
+    QString *QSparam4;
+    QString *QSparam5;
+    QString *QSparam6;
+
+    QByteArray *QBAparam1;
+    QByteArray *QBAparam2;
+    QByteArray *QBAparam3;
+    QByteArray *QBAparam4;
+    QByteArray *QBAparam5;
+    QByteArray *QBAparam6;
+
+    QDate *QTDdate1;
+    QDate *QTDdate2;
+    QDate *QTDdate3;
+    QDate *QTDdate4;
+    QDate *QTDdate5;
+    QDate *QTDdate6;
+
+    unsigned int *Julian1;
+    unsigned int *Julian2;
+    unsigned int *Julian3;
+    unsigned int *Julian4;
+    unsigned int *Julian5;
+    unsigned int *Julian6;
+
+    MASKTYPE maskType1;
+    MASKTYPE maskType2;
+    MASKTYPE maskType3;
+    MASKTYPE maskType4;
+    MASKTYPE maskType5;
+    MASKTYPE maskType6;
+
+    unsigned int numParams;
+
+    PAYLOADPARAMS() : UIparam1(nullptr), UIparam2(nullptr), UIparam3(nullptr), UIparam4(nullptr), UIparam5(nullptr), UIparam6(nullptr),
+                      IntParam1(nullptr), IntParam2(nullptr), IntParam3(nullptr), IntParam4(nullptr), IntParam5(nullptr), IntParam6(nullptr),
+                      QSparam1(nullptr), QSparam2(nullptr), QSparam3(nullptr), QSparam4(nullptr), QSparam5(nullptr),  QSparam6(nullptr),
+                      QBAparam1(nullptr), QBAparam2(nullptr), QBAparam3(nullptr), QBAparam4(nullptr), QBAparam5(nullptr), QBAparam6(nullptr),
+                      QTDdate1(nullptr), QTDdate2(nullptr), QTDdate3(nullptr), QTDdate4(nullptr), QTDdate5(nullptr),  QTDdate6(nullptr) {}
+
+    void clear(){
+        param1.clear();
+        param2.clear();
+        param3.clear();
+        param4.clear();
+        param5.clear();
+        param6.clear();
+
+        param1Type = ptNotSet;
+        param2Type = ptNotSet;
+        param3Type = ptNotSet;
+        param4Type = ptNotSet;
+        param5Type = ptNotSet;
+        param6Type = ptNotSet;
+    }
+
+    void updateParams(){
+
+        QDate tempDate;
+
+        if (numParams >= 1)
+        {
+            switch (param1Type)
+            {
+            case ptUint:
+                param1 = QByteArray::number(*UIparam1);
+                break;
+
+            case ptInt:
+                param1 = QByteArray::number(*IntParam1);
+                break;
+
+            case ptQS:
+                param1 = (*QSparam1).toUtf8();
+                break;
+
+            case ptPQS:
+                param1 = *QBAparam1;
+                break;
+
+            case ptQTDyear:
+                tempDate = *QTDdate1;
+                param1 = QByteArray::number(tempDate.year());
+                break;
+
+            case ptQTDmonth:
+                tempDate = *QTDdate1;
+                param1 = QByteArray::number(tempDate.month());
+                break;
+
+            case ptQTDday:
+                tempDate = *QTDdate1;
+                param1 = QByteArray::number(tempDate.day());
+                break;
+
+            case ptQTDmask:
+                tempDate = *QTDdate1;
+                switch(maskType1)
+                {
+                case mtYYYYMM:
+                    param1 = (tempDate.toString("yyyyMM")).toUtf8();
+                    break;
+
+                case mtMMhYYYY:
+                    param1 = (tempDate.toString("MM-yyyy")).toUtf8();
+                    break;
+
+                case mtDDsMMsYYYY:
+                    param1 = (tempDate.toString("dd/MM/yyyy")).toUtf8();
+                    break;
+
+                case mtMMsDDsYYYY:
+                    param1 = (tempDate.toString("MM/dd/yyyy")).toUtf8();
+                    break;
+
+                case mtYYYYhMMhDD:
+                    param1 = (tempDate.toString("yyyy-MM-dd")).toUtf8();
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ptJulian:
+                tempDate = QDate::fromJulianDay(*Julian1);
+                switch(maskType1)
+                {
+                case mtYYYY:
+                    param1 = (tempDate.toString("yyyy")).toUtf8();
+                    break;
+
+                case mtMM:
+                    param1 = (tempDate.toString("MM")).toUtf8();
+                    break;
+
+                case mtDD:
+                    param1 = (tempDate.toString("dd")).toUtf8();
+                    break;
+
+                case mtM:
+                    param1 = (tempDate.toString("M")).toUtf8();
+                    break;
+
+                case mtD:
+                    param1 = (tempDate.toString("d")).toUtf8();
+                    break;
+
+                case mtMMMM:
+                    param1 = (tempDate.toString("MMMM")).toUtf8();
+                    break;
+
+                default:
+                break;
+                }
+
+            default:
+            break;
+            }
+        }
+
+        if (numParams >= 2)
+        {
+            switch (param2Type)
+            {
+            case ptUint:
+                param2 = QByteArray::number(*UIparam2);
+                break;
+
+            case ptInt:
+                param2 = QByteArray::number(*IntParam2);
+                break;
+
+            case ptQS:
+                param2 = (*QSparam2).toUtf8();
+                break;
+
+            case ptPQS:
+                param2 = *QBAparam2;
+                break;
+
+            case ptQTDyear:
+                tempDate = *QTDdate2;
+                param2 = QByteArray::number(tempDate.year());
+                break;
+
+            case ptQTDmonth:
+                tempDate = *QTDdate2;
+                param2 = QByteArray::number(tempDate.month());
+                break;
+
+            case ptQTDday:
+                tempDate = *QTDdate2;
+                param2 = QByteArray::number(tempDate.day());
+                break;
+
+            case ptQTDmask:
+                tempDate = *QTDdate2;
+                switch(maskType2)
+                {
+                case mtYYYYMM:
+                    param2 = (tempDate.toString("yyyyMM")).toUtf8();
+                    break;
+
+                case mtMMhYYYY:
+                    param2 = (tempDate.toString("MM-yyyy")).toUtf8();
+                    break;
+
+                case mtDDsMMsYYYY:
+                    param2 = (tempDate.toString("dd/MM/yyyy")).toUtf8();
+                    break;
+
+                case mtMMsDDsYYYY:
+                    param2 = (tempDate.toString("MM/dd/yyyy")).toUtf8();
+                    break;
+
+                case mtYYYYhMMhDD:
+                    param2 = (tempDate.toString("yyyy-MM-dd")).toUtf8();
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ptJulian:
+                tempDate = QDate::fromJulianDay(*Julian2);
+                switch(maskType2)
+                {
+                case mtYYYY:
+                    param2 = (tempDate.toString("yyyy")).toUtf8();
+                    break;
+
+                case mtMM:
+                    param2 = (tempDate.toString("MM")).toUtf8();
+                    break;
+
+                case mtDD:
+                    param2 = (tempDate.toString("dd")).toUtf8();
+                    break;
+
+                case mtM:
+                    param2 = (tempDate.toString("M")).toUtf8();
+                    break;
+
+                case mtD:
+                    param2 = (tempDate.toString("d")).toUtf8();
+                    break;
+
+                case mtMMMM:
+                    param2 = (tempDate.toString("MMMM")).toUtf8();
+                    break;
+
+                default:
+                break;
+                }
+
+            default:
+                break;
+            }
+        }
+
+        if (numParams >= 3)
+        {
+            switch (param3Type)
+            {
+            case ptUint:
+                param3 = QByteArray::number(*UIparam3);
+                break;
+
+            case ptInt:
+                param3 = QByteArray::number(*IntParam3);
+                break;
+
+            case ptQS:
+                param3 = (*QSparam3).toUtf8();
+                break;
+
+            case ptPQS:
+                param3 = *QBAparam3;
+                break;
+
+            case ptQTDyear:
+                tempDate = *QTDdate3;
+                param3 = QByteArray::number(tempDate.year());
+                break;
+
+            case ptQTDmonth:
+                tempDate = *QTDdate3;
+                param3 = QByteArray::number(tempDate.month());
+                break;
+
+            case ptQTDday:
+                tempDate = *QTDdate3;
+                param3 = QByteArray::number(tempDate.day());
+                break;
+
+            case ptQTDmask:
+                tempDate = *QTDdate3;
+                switch(maskType3)
+                {
+                case mtYYYYMM:
+                    param3 = (tempDate.toString("yyyyMM")).toUtf8();
+                    break;
+
+                case mtMMhYYYY:
+                    param3 = (tempDate.toString("MM-yyyy")).toUtf8();
+                    break;
+
+                case mtDDsMMsYYYY:
+                    param3 = (tempDate.toString("dd/MM/yyyy")).toUtf8();
+                    break;
+
+                case mtMMsDDsYYYY:
+                    param3 = (tempDate.toString("MM/dd/yyyy")).toUtf8();
+                    break;
+
+                case mtYYYYhMMhDD:
+                    param3 = (tempDate.toString("yyyy-MM-dd")).toUtf8();
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ptJulian:
+                tempDate = QDate::fromJulianDay(*Julian3);
+                switch(maskType3)
+                {
+                case mtYYYY:
+                    param3 = (tempDate.toString("yyyy")).toUtf8();
+                    break;
+
+                case mtMM:
+                    param3 = (tempDate.toString("MM")).toUtf8();
+                    break;
+
+                case mtDD:
+                    param3 = (tempDate.toString("dd")).toUtf8();
+                    break;
+
+                case mtM:
+                    param3 = (tempDate.toString("M")).toUtf8();
+                    break;
+
+                case mtD:
+                    param3 = (tempDate.toString("d")).toUtf8();
+                    break;
+
+                case mtMMMM:
+                    param3 = (tempDate.toString("MMMM")).toUtf8();
+                    break;
+
+                default:
+                break;
+                }
+
+            default:
+                break;
+            }
+        }
+
+        if (numParams >= 4)
+        {
+            switch (param4Type)
+            {
+            case ptUint:
+                param4 = QByteArray::number(*UIparam4);
+                break;
+
+            case ptInt:
+                param4 = QByteArray::number(*IntParam4);
+                break;
+
+            case ptQS:
+                param4 = (*QSparam4).toUtf8();
+                break;
+
+            case ptPQS:
+                param4 = *QBAparam4;
+                break;
+
+            case ptQTDyear:
+                tempDate = *QTDdate4;
+                param4 = QByteArray::number(tempDate.year());
+                break;
+
+            case ptQTDmonth:
+                tempDate = *QTDdate4;
+                param4 = QByteArray::number(tempDate.month());
+                break;
+
+            case ptQTDday:
+                tempDate = *QTDdate4;
+                param4 = QByteArray::number(tempDate.day());
+                break;
+
+            case ptQTDmask:
+                tempDate = *QTDdate4;
+                switch(maskType4)
+                {
+                case mtYYYYMM:
+                    param4 = (tempDate.toString("yyyyMM")).toUtf8();
+                    break;
+
+                case mtMMhYYYY:
+                    param4 = (tempDate.toString("MM-yyyy")).toUtf8();
+                    break;
+
+                case mtDDsMMsYYYY:
+                    param4 = (tempDate.toString("dd/MM/yyyy")).toUtf8();
+                    break;
+
+                case mtMMsDDsYYYY:
+                    param4 = (tempDate.toString("MM/dd/yyyy")).toUtf8();
+                    break;
+
+                case mtYYYYhMMhDD:
+                    param4 = (tempDate.toString("yyyy-MM-dd")).toUtf8();
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ptJulian:
+                tempDate = QDate::fromJulianDay(*Julian4);
+                switch(maskType4)
+                {
+                case mtYYYY:
+                    param4 = (tempDate.toString("yyyy")).toUtf8();
+                    break;
+
+                case mtMM:
+                    param4 = (tempDate.toString("MM")).toUtf8();
+                    break;
+
+                case mtDD:
+                    param4 = (tempDate.toString("dd")).toUtf8();
+                    break;
+
+                case mtM:
+                    param4 = (tempDate.toString("M")).toUtf8();
+                    break;
+
+                case mtD:
+                    param4 = (tempDate.toString("d")).toUtf8();
+                    break;
+
+                case mtMMMM:
+                    param4 = (tempDate.toString("MMMM")).toUtf8();
+                    break;
+
+                default:
+                break;
+                }
+
+            default:
+                break;
+            }
+        }
+
+        if (numParams >= 5)
+        {
+            switch (param5Type)
+            {
+            case ptUint:
+                param5 = QByteArray::number(*UIparam5);
+                break;
+
+            case ptInt:
+                param5 = QByteArray::number(*IntParam5);
+                break;
+
+            case ptQS:
+                param5 = (*QSparam5).toUtf8();
+                break;
+
+            case ptPQS:
+                param5 = *QBAparam5;
+                break;
+
+            case ptQTDyear:
+                tempDate = *QTDdate5;
+                param5 = QByteArray::number(tempDate.year());
+                break;
+
+            case ptQTDmonth:
+                tempDate = *QTDdate5;
+                param5 = QByteArray::number(tempDate.month());
+                break;
+
+            case ptQTDday:
+                tempDate = *QTDdate5;
+                param5 = QByteArray::number(tempDate.day());
+                break;
+
+            case ptQTDmask:
+                tempDate = *QTDdate5;
+                switch(maskType5)
+                {
+                case mtYYYYMM:
+                    param5 = (tempDate.toString("yyyyMM")).toUtf8();
+                    break;
+
+                case mtMMhYYYY:
+                    param5 = (tempDate.toString("MM-yyyy")).toUtf8();
+                    break;
+
+                case mtDDsMMsYYYY:
+                    param5 = (tempDate.toString("dd/MM/yyyy")).toUtf8();
+                    break;
+
+                case mtMMsDDsYYYY:
+                    param5 = (tempDate.toString("MM/dd/yyyy")).toUtf8();
+                    break;
+
+                case mtYYYYhMMhDD:
+                    param5 = (tempDate.toString("yyyy-MM-dd")).toUtf8();
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ptJulian:
+                tempDate = QDate::fromJulianDay(*Julian5);
+                switch(maskType5)
+                {
+                case mtYYYY:
+                    param5 = (tempDate.toString("yyyy")).toUtf8();
+                    break;
+
+                case mtMM:
+                    param5 = (tempDate.toString("MM")).toUtf8();
+                    break;
+
+                case mtDD:
+                    param5 = (tempDate.toString("dd")).toUtf8();
+                    break;
+
+                case mtM:
+                    param5 = (tempDate.toString("M")).toUtf8();
+                    break;
+
+                case mtD:
+                    param5 = (tempDate.toString("d")).toUtf8();
+                    break;
+
+                case mtMMMM:
+                    param5 = (tempDate.toString("MMMM")).toUtf8();
+                    break;
+
+                default:
+                break;
+                }
+
+            default:
+                break;
+            }
+        }
+
+        if (numParams >= 6)
+        {
+            switch (param6Type)
+            {
+            case ptUint:
+                param6 = QByteArray::number(*UIparam6);
+                break;
+
+            case ptInt:
+                param6 = QByteArray::number(*IntParam6);
+                break;
+
+            case ptQS:
+                param6 = (*QSparam6).toUtf8();
+                break;
+
+            case ptPQS:
+                param6 = *QBAparam6;
+                break;
+
+            case ptQTDyear:
+                tempDate = *QTDdate6;
+                param6 = QByteArray::number(tempDate.year());
+                break;
+
+            case ptQTDmonth:
+                tempDate = *QTDdate6;
+                param6 = QByteArray::number(tempDate.month());
+                break;
+
+            case ptQTDday:
+                tempDate = *QTDdate6;
+                param6 = QByteArray::number(tempDate.day());
+                break;
+
+            case ptQTDmask:
+                tempDate = *QTDdate6;
+                switch(maskType6)
+                {
+                case mtYYYYMM:
+                    param6 = (tempDate.toString("yyyyMM")).toUtf8();
+                    break;
+
+                case mtMMhYYYY:
+                    param6 = (tempDate.toString("MM-yyyy")).toUtf8();
+                    break;
+
+                case mtDDsMMsYYYY:
+                    param6 = (tempDate.toString("dd/MM/yyyy")).toUtf8();
+                    break;
+
+                case mtMMsDDsYYYY:
+                    param6 = (tempDate.toString("MM/dd/yyyy")).toUtf8();
+                    break;
+
+                case mtYYYYhMMhDD:
+                    param6 = (tempDate.toString("yyyy-MM-dd")).toUtf8();
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ptJulian:
+                tempDate = QDate::fromJulianDay(*Julian6);
+                switch(maskType6)
+                {
+                case mtYYYY:
+                    param6 = (tempDate.toString("yyyy")).toUtf8();
+                    break;
+
+                case mtMM:
+                    param6 = (tempDate.toString("MM")).toUtf8();
+                    break;
+
+                case mtDD:
+                    param6 = (tempDate.toString("dd")).toUtf8();
+                    break;
+
+                case mtM:
+                    param6 = (tempDate.toString("M")).toUtf8();
+                    break;
+
+                case mtD:
+                    param6 = (tempDate.toString("d")).toUtf8();
+                    break;
+
+                case mtMMMM:
+                    param6 = (tempDate.toString("MMMM")).toUtf8();
+                    break;
+
+                default:
+                break;
+                }
+
+            default:
+                break;
+            }
+        }
+    }
+};
+
 enum FLOWTYPE {startToEnd, sequential, singleListing, dateRange, lastValue, alphabetical, monthly};
 
 struct FLOWPARAMETERS

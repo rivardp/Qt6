@@ -117,7 +117,17 @@ MAKEDATE::MAKEDATE(int num1, int num2, int num3, int num4, int num5, int num6, Q
 
     // Logic could be enhanced later to use DOD or ageAtDeath to further refine
     if (!definitive)
-        return;
+    {
+        // Default to MDY is all values are valid
+        if ((yearPosition == 3) && (num1 <= 12) && (num2 <= 31) && (num4 <= 12) && (num5 <= 31))
+        {
+            dateOrder = doMDY;
+            finalDate = QDate(yyyy1, num1, num2);
+            finalDate2 = QDate(yyyy2, num4, num5);
+        }
+        else
+            return;
+    }
     else
     {
         switch (dateOrder)

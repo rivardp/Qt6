@@ -6,6 +6,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QNetworkReply>
+#include <QHttpMultiPart>
 #include <QSslConfiguration>
 #include <QUrl>
 #include <QDateTime>

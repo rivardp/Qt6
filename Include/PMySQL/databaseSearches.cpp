@@ -746,11 +746,17 @@ POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID
     bool errorEncounteredA = false;
     bool errorEncounteredB = false;
 
-    QString providerPC;
+    QString providerPC, finalLocation;
     double distance, tempDistance;
     POSTALCODE_INFO pcInfoFH, pcResult, pcInfoLookup;
 
-    providerPC = pcLookup(gv, provID, provKey, location);
+    // Fix location names to align with Postal Code database norms
+    QRegularExpression target;
+    target.setPattern("\\bSt-([A-Z])");
+    finalLocation = location;
+    finalLocation.replace(target, "Saint-\\1");
+
+    providerPC = pcLookup(gv, provID, provKey, finalLocation);
     if (providerPC.length() > 0)
     {
         fillInPostalCodeInfo(gv, pcInfoLookup, providerPC);
@@ -787,7 +793,7 @@ POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID
     success = queryB.prepare("SELECT postalCode, location, provLong, provShort, provEnum, timeZone, latitude, longitude FROM death_audits.postalcodes WHERE location = :location");
     if (!success)
         qDebug() << "Problem with SQL statement formulation";
-    queryB.bindValue(":location", QVariant(location));
+    queryB.bindValue(":location", QVariant(finalLocation));
 
     success = queryB.exec();
     if (success)
@@ -1279,14 +1285,14 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
     QSqlError error;
     PQString errorMessage, dateSQL;
     bool success;
-    QDate firstObit, lastObit, recDOD;
+    QDate firstObit, lastObit, recDOD, lastChecked;
 
     bool updated = false;
     recDOD = dr.getDOD();
     if (!recDOD.isValid() || (recDOD > gv->today))
         return updated;
 
-    success = query.prepare("SELECT fhFirstObit, fhLastObit FROM death_audits.funeralhomedata "
+    success = query.prepare("SELECT fhFirstObit, fhLastObit, fhLastChecked FROM death_audits.funeralhomedata "
                             "WHERE providerID = :providerID AND providerKey = :providerKey AND ((fhRunStatus = 1) OR (fhRunStatus = 2))");
     if (!success)
         qDebug() << "Problem with SQL statement formulation";
@@ -1306,6 +1312,7 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
         query.next();
         firstObit = query.value(0).toDate();
         lastObit = query.value(1).toDate();
+        lastChecked = query.value(2).toDate();
 
         if (recDOD > lastObit)
         {
@@ -1334,6 +1341,21 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
             if (!success)
                 qDebug() << "Problem with SQL statement formulation";
             query.bindValue(":fhFirstObit", QVariant(dateSQL.getString()));
+            query.bindValue(":providerID", QVariant(dr.getProvider()));
+            query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
+
+            success = query.exec();
+            updated = success;
+        }
+
+        if (lastChecked.isValid() && (recDOD > lastChecked))
+        {
+            query.clear();
+
+            success = query.prepare("UPDATE death_audits.funeralhomedata SET fhLastChecked = NULL "
+                                    "WHERE providerID = :providerID AND providerKey = :providerKey AND ((fhRunStatus = 1) OR (fhRunStatus = 2))");
+            if (!success)
+                qDebug() << "Problem with SQL statement formulation";
             query.bindValue(":providerID", QVariant(dr.getProvider()));
             query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
 

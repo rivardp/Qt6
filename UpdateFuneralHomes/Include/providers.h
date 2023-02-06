@@ -7,7 +7,7 @@
 #include "tchar.h"
 
 enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, CooperativeFuneraire, Phaonix, DomainFuneraire, SalonsFuneraire,
-               AvisDeDeces, GreatWest, ObitTree, EchoVita, SaltWire, BlackPress, Aberdeen,
+               AvisDeDeces, GreatWest, ObitTree, EchoVita, SaltWire, BlackPress, Aberdeen, Village,
                Batesville = 1000, SIDS, BrowseAll, DignityMemorial, FosterMcGarvey, CFS, Frazer, Alternatives, FuneralTech, WordPress,
                FrontRunner, FuneralOne, WebStorm, GasLamp, ClickTributes, ConnellyMcKinley, Arbor, SiteWyze, ThinkingThru, Codesign,
                Shape5, TributeArchive, YAS, WFFH, FHW, Crew, Jelly, Nirvana, Bergetti, PacificByte,
@@ -24,7 +24,7 @@ enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, Coopera
                InoVision, FRM, PassageCoop, Ah, JBCote, BlackCreek, CityMax, SYGIF, PortNeuf, Burke,
                Canadian, BallaMedia, Jac, Ministry, Multinet, PropulC, Nexion, LCProduction, Absolu, SuiteB,
                Map, iClic, Bouille, Pub30, Theories14, Techlogical, GyOrgy, GemWebb, RedChair, ExtremeSurf,
-               Cahoots, Tride, Jensii, InterWeb, Brown, Tukio, WebCemeteries, Etincelle,
+               Cahoots, Tride, Jensii, InterWeb, Brown, Tukio, WebCemeteries, Etincelle, ObitAssistant,
                MikePurdy = 2000, BowRiver, Serenity, McInnis, Sturgeon, CornerStone, Pierson, Trinity, CelebrateLife, Funks,
                WowFactor, Dalmeny, Hansons, IDOmedia, Martens, Shine, Simply, McCall, Care, Ancient,
                Amherst, Bowers, Heritage, Koru, Kowalchuk, Loehmer, Doyle, Ethical, Integrity, Direct,
@@ -40,7 +40,7 @@ enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, Coopera
                Montcalm, Trahan, Laurent, Eternel, Ruel, Hamel, CremAlt, London, Dryden, Forest,
                JasonSmith, Lampman, ecoPassages, Peaceful, Ranger, People, Whitcroft, TriCity, LegacyCardstrom, Wiebe,
                Arimathea, GFournier, CharleVoix2, Harmonia, Omega, HeritageWP, Ouellet, HommageNB, Drake, CityLine,
-               Komitas, Driftwood, MLBW};
+               Komitas, Driftwood, MLBW, Sproing};
 
 // Search parameters
 

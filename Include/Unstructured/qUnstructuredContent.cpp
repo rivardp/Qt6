@@ -8556,6 +8556,9 @@ unsigned int unstructuredContent::contentReadAgeAtDeath(unsigned int maxSentence
         }
     }
 
+    if ((result > 0) && (result != 999))
+        globals->globalDr->setAgeAtDeath(result);
+
     return result;
 }
 
@@ -8577,6 +8580,9 @@ unsigned int unstructuredContent::contentReadAgeAtDeath(QList<QString> firstName
             i++;
         }
     }
+
+    if ((result > 0) && (result != 999))
+        globals->globalDr->setAgeAtDeath(result);
 
     return result;
 }
@@ -8608,6 +8614,7 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
 
     bool wordMatched = false;
     bool precedingFlag = false;
+    bool bornFlag = false;
     OQString space(" ");
     LANGUAGE lang;
 
@@ -8774,29 +8781,34 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                     }
                     else
                     {
-                        if (word.isFoundIn(changedContextIndicators, 1))
-                        {
-                            contextChanged = true;
-                            if (word == QString("came"))
-                            {
-                                if (nextWord == OQString("to"))
-                                {
-                                    if (peekTwoAhead == OQString("rest"))
-                                        contextChanged = false;
-                                }
-                            }
-                        }
+                        // Look for "Born [in Winnipeg] 60 years ago
+                        if (word == PQString("born"))
+                            bornFlag = true;
                         else
                         {
-                            if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))) || (word == OQString(QString("depuis"))))
-                                eventCheck = true;
+                            if (word.isFoundIn(changedContextIndicators, 1))
+                            {
+                                contextChanged = true;
+                                if (word == QString("came"))
+                                {
+                                    if (nextWord == OQString("to"))
+                                    {
+                                        if (peekTwoAhead == OQString("rest"))
+                                            contextChanged = false;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))) || (word == OQString(QString("depuis"))))
+                                    eventCheck = true;
+                            }
                         }
                     }
                 }
 			}
 			else
 			{
-
                 if (hadOrdinal)
                 {
                     if ((nextWord.lower() == PQString("year")) || (nextWord.lower() == PQString("annee")) || (nextWord.lower() == PQString(QString("année"))))
@@ -8811,19 +8823,38 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                     num = static_cast<unsigned int>(word.asNumber());
                     if (num < 125)
                     {
-                        numFound = true;
-                        contextError = false;
-                        fullyCredible = false;
+                        if (bornFlag)
+                        {
+                            if (contextChanged)
+                                bornFlag = false;
+                            else
+                            {
+                                if ((nextWord == "years") && (peekTwoAhead == "ago"))
+                                {
+                                    numFound = true;
+                                    contextError = false;
+                                    fullyCredible = false;
+                                    ageAtDeath = num;
+                                }
+                            }
+                        }
 
-                        // Run error checking to catch errors such as "..at the age of 3 months"
-                        bool endOfSentence = word.removeEnding(QString(".")) || cleanContent.isEOS();
-                        if (!endOfSentence)
-                            readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
-                        ageAtDeath = num;
+                        if (!bornFlag)
+                        {
+                            numFound = true;
+                            contextError = false;
+                            fullyCredible = false;
 
-                        // Check for special instances of "John Smith, 68, left us...."
-                        if (lastHadComma && currentHasComma)
-                            wordMatched = true;
+                            // Run error checking to catch errors such as "..at the age of 3 months"
+                            bool endOfSentence = word.removeEnding(QString(".")) || cleanContent.isEOS();
+                            if (!endOfSentence)
+                                readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
+                            ageAtDeath = num;
+
+                            // Check for special instances of "John Smith, 68, left us...."
+                            if (lastHadComma && currentHasComma)
+                                wordMatched = true;
+                        }
                     }
 				}
 			}
@@ -8867,7 +8898,10 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
             }
 		}
         else
-            ageAtDeath = 999;
+        {
+            if (!(numFound && bornFlag))
+                ageAtDeath = 999;
+        }
 
 	} // end if a single DOD existed
 
@@ -9066,6 +9100,12 @@ void unstructuredContent::readAgeAtDeathPostNumChecks(bool &numFound, bool &cont
     {
         contextError = true;
         altNum = num / 365;
+    }
+
+    if (numFound && !contextError && ((peek1 == QString("weeks")) || (peek1 == QString("semaines")) || (peek1 == QString("semanas"))))
+    {
+        contextError = true;
+        altNum = num / 52;
     }
 
     if (numFound && !contextError &&  ((peek1 == QString("months")) || (peek1 == QString("month")) || (peek1 == QString("mois")) || (peek1 == QString("meses")) || (peek1 == QString("mes"))))

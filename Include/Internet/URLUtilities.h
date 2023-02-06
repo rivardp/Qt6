@@ -11,6 +11,7 @@ void createURLaddress(PQString &result, const PQString &URLtemplate, const PQStr
 
 void createURLaddress(PQString &result, const PQString &URLtemplate, URLPARAMS &urlParams);
 void createURLaddress(DOWNLOADREQUEST &downloadRequest, const PQString &URLtemplate, URLPARAMS &urlParams);
+void createURLaddress(DOWNLOADREQUEST &downloadRequest, const PQString &URLtemplate, URLPARAMS &urlParams, PAYLOADPARAMS &payloadParams);
 
 PQString URLparam(const PQString &param);
 PQString URLparam(const unsigned int &param);

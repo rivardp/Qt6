@@ -4,6 +4,7 @@
 #include <QString>
 #include <QFile>
 #include <QUrl>
+#include <QHttpMultiPart>
 
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 
@@ -70,7 +71,8 @@ struct downloadInstructions
     QString POSTformRequest;
 
     QString verb;
-    QString payload;
+    QByteArray payload;
+    QList<QHttpMultiPart*> multiPartList;
 
     // Headers
     QString ContentTypeHeader;
@@ -115,6 +117,9 @@ struct downloadInstructions
 
         followRedirects = false;
         POSTformRequest.clear();
+
+        qDeleteAll(multiPartList);
+        multiPartList.clear();
 
         verb.clear();
         payload.clear();

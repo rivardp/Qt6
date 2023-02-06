@@ -284,6 +284,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     URLPARAMS URLparams;
     PAGEVARIABLES pageVariables;
     FLOWPARAMETERS flowParameters;
+    QHttpMultiPart *multiPart = nullptr;
 
     // Following structured only exist to avoid read errors on some unstructured content functions that refer to dataRecord
     dataRecord dr;
@@ -471,18 +472,28 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
 
-        URLbase = baseURL;
-        //URLaddressTemplate  = URLbase + PQString("/recherche/avis-de-deces/page-") + paramPlaceholder;
-        if (providerKey == 266)
-            URLaddressTemplate  = URLbase + PQString("/salon/") + paramPlaceholder + PQString("/recherche/avis-de-deces/page-") + paramPlaceholder;
+        if (fhSpecialCode == 1)
+        {
+            URLbase = baseURL;
+            URLaddressTemplate  = URLbase + PQString("/recherche/avis-de-deces/page-") + paramPlaceholder  + PQString("?companySlug=") + paramPlaceholder;
+
+            URLparams.numParams = 2;
+            URLparams.param1Type = ptUint;
+            URLparams.UIparam1 = &flowParameters.currentPosition;
+            URLparams.param2Type = ptQS;
+            URLparams.QSparam2 = &fhParam1;
+        }
         else
+        {
+            URLbase = baseURL;
             URLaddressTemplate  = URLbase + PQString("/recherche/avis-de-deces/") + paramPlaceholder + PQString("/page-") + paramPlaceholder;
 
-        URLparams.numParams = 2;
-        URLparams.param1Type = ptQS;
-        URLparams.QSparam1 = &fhParam1;
-        URLparams.param2Type = ptUint;
-        URLparams.UIparam2 = &flowParameters.currentPosition;
+            URLparams.numParams = 2;
+            URLparams.param1Type = ptQS;
+            URLparams.QSparam1 = &fhParam1;
+            URLparams.param2Type = ptUint;
+            URLparams.UIparam2 = &flowParameters.currentPosition;
+        }
 
         flowParameters.currentPosition = 1;
         if (flowParameters.initialSetup == true)
@@ -493,7 +504,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
 
-        downloadRequest.instructions.Accept_Encoding = QString("br");
+        //downloadRequest.instructions.Accept_Encoding = QString("br");
     }
         break;
 
@@ -502,6 +513,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
+        if (providerKey == 18)
+            pageVariables.usePubDateForCutOff = true;
 
         // https://kitchener.citynews.ca/obituaries?page=2
         URLbase = baseURL;
@@ -515,7 +528,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         if (flowParameters.initialSetup)
             flowParameters.endingPosition = fhParam1.toUInt();
         else
-            flowParameters.endingPosition = 10;
+            flowParameters.endingPosition = 15;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -560,6 +573,30 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
     }
         break; // ObitTree
+
+    case 13:  // Echovita
+    {
+        daysOfOverlap = 61;
+        flowParameters.initialSetup = false;
+        flowParameters.flowType = startToEnd;
+
+        URLbase = baseURL;
+        URLaddressTemplate = URLbase + PQString("/ca/obituaries") + fhParam1 + PQString("?page=") + paramPlaceholder;
+
+        URLparams.numParams = 1;
+        URLparams.param1Type = ptUint;
+        URLparams.UIparam1 = &flowParameters.currentPosition;
+
+        flowParameters.currentPosition = 1;
+        if (flowParameters.initialSetup)
+            flowParameters.endingPosition = fhParam2.toUInt();
+        else
+            flowParameters.endingPosition = 1;
+
+        determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
+        createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+    }
+        break;
 
     case 14:  // Saltwire
     {
@@ -695,6 +732,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
     }
         break;
+
+    case 17:  // Village
 
 
     case 1000:  // Batesville
@@ -1034,10 +1073,19 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
 
-        URLbase = baseURL + QString("/obituaries/obituary-listings");
-        URLaddressTemplate  = URLbase;
-        URLaddressTemplate += PQString("?CurrentPage=") + paramPlaceholder;
-        URLaddressTemplate += PQString("&PageSize=10");
+        if (providerKey == 15)
+        {
+            URLbase = baseURL + QString("/obituaries/obituary-listings");
+            URLaddressTemplate  = URLbase;
+            URLaddressTemplate += PQString("?page=") + paramPlaceholder;
+        }
+        else
+        {
+            URLbase = baseURL + QString("/obituaries/obituary-listings");
+            URLaddressTemplate  = URLbase;
+            URLaddressTemplate += PQString("?CurrentPage=") + paramPlaceholder;
+            URLaddressTemplate += PQString("&PageSize=10");
+        }
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -1130,7 +1178,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         {
             // This is old approach applicable to 99% of sites
             // https://ogden.funeraltechweb.com/tribute/current-services/index.html?page=0
-            daysOfOverlap = 361;
+            daysOfOverlap = 61;
             flowParameters.initialSetup = false;
             flowParameters.flowType = startToEnd;
             flowParameters.indexOffset = 1;
@@ -2181,12 +2229,12 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
 
-        //  https://voyagefuneralhomes.com/wp-admin/admin-ajax.php?pid=5314+elementor&wid=3fab224&cpid=&page_num=2&curr_url=aHR0cHM6Ly92b3lhZ2VmdW5lcmFsaG9tZXMuY29tL2NhdGVnb3J5L29iaXR1YXJpZXMv&action=ae_post_data&fetch_mode=paged
-        //                                                         pid=5314+elementor&wid=3fab224&cpid=&page_num=2&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=96e389a81f
-        // pid=5314+elementor&wid=3fab224&cpid=&page_num=2&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=629f288a36
+        // https://voyagefuneralhomes.com/wp-admin/admin-ajax.php
+        // pid=5314+elementor&wid=3fab224&cpid=&page_num=2&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=075f69e0a3
+
         URLbase = baseURL;
         URLaddressTemplate  = URLbase + PQString("/wp-admin/admin-ajax.php?pid=5314+elementor&wid=3fab224&cpid=&page_num=") + paramPlaceholder;
-        URLaddressTemplate += PQString("&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=629f288a36");
+        URLaddressTemplate += PQString("&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=075f69e0a3");
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -2196,7 +2244,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         if (flowParameters.initialSetup == true)
             flowParameters.endingPosition = fhParam1.toUInt();
         else
-            flowParameters.endingPosition = 10; // 10
+            flowParameters.endingPosition = 7; // 10
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -3000,7 +3048,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             break;
 
         case 2:
-            daysOfOverlap = 661;
+            daysOfOverlap = 61;
             flowParameters.initialSetup = false;
             flowParameters.flowType = startToEnd;
             flowParameters.flowIncrement = 1;
@@ -3385,6 +3433,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             flowParameters.flowType = startToEnd;
             flowParameters.flowIncrement = 14;
 
+            //http://www.complexegendron.ca/php/index.php?start=14
             URLbase = baseURL;
             URLaddressTemplate  = URLbase + PQString("/php/index.php?start=") + paramPlaceholder;
 
@@ -3494,8 +3543,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         if (flowParameters.initialSetup == true)
             flowParameters.endingPosition = fhParam1.toUInt();
         else
-            flowParameters.endingPosition = 5;
-
+            flowParameters.endingPosition = 10;
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
     }
@@ -3804,70 +3852,63 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         }
         else
         {
-            // Cannot get history to work properly, so temporarily set as a single unsorted listing
-
-            daysOfOverlap = 61;
+            daysOfOverlap = 261;
             pageVariables.firstAvailableDate.setDate(fhFirstObit.year(), fhFirstObit.month(), 1);
             flowParameters.initialSetup = false;
-            flowParameters.flowType = singleListing;
-            //flowParameters.flowType = startToEnd;
-            //flowParameters.flowIncrement = 20;
+            flowParameters.flowType = startToEnd;
 
-            URLbase = baseURL;
-
-            // Initial download sets stage
-            URLparams.numParams = 0;
-            URLaddressTemplate  = URLbase + PQString("/necrologie-avis-de-deces");
             flowParameters.currentPosition = 1;
             flowParameters.endingPosition = 1;
 
-            /*createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
-            www->download(downloadRequest);
-            while(www->processingDownload()){};
+            URLbase = baseURL;
+            URLaddressTemplate  = URLbase + PQString("/fetch_front_end_obituaries");
 
-            // The second POST establishes the start and end dates, which are then retrieved by a GET
             URLparams.numParams = 0;
-            URLaddressTemplate  = URLbase + PQString("/necrologie-avis-de-deces/recherche?");
-            URLaddressTemplate += PQString("search_from%5B%5D=reg-2&searchword=");
-            URLaddressTemplate += PQString("&from_day=0&from_month=0&from_year=0&to_day=0&to_month=0&to_year=0&sort_by=desc&submitted=1");
 
-            requestByPOST = false;
-            createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
-            www->download(downloadRequest);
-            while(www->processingDownload()){};
+            QByteArray ba;
+            QHttpPart part1, part2, part3, part4, part5, part6;
+            part1.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"reference_id\""));
+            part1.setBody("17b948bb-9f11-11ec-8ba8-02f387f5c980");
+            part2.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"type\""));
+            part2.setBody("list");
+            part3.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"filters[sort]\""));
+            part3.setBody("d_dod/desc");
+            part4.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"number_items_per_page\""));
+            part4.setBody("24");
+            part5.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"action\""));
+            part5.setBody("null");
+            part6.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"current_page\""));
 
-            //https://www.lepinecloutier.com/necrologie-avis-de-deces/recherche?search_from%5B%5D=reg-2&searchword=&from_day=0&from_month=0&from_year=0&to_day=0&to_month=0&to_year=0&sort_by=desc&submitted=1"
-            //https://www.lepinecloutier.com/necrologie-avis-de-deces
-            //https://www.lepinecloutier.com/necrologie-avis-de-deces/recherche?search_from%5B%5D=reg-2&searchword=&from_day=0&from_month=0&from_year=0&to_day=0&to_month=0&to_year=0&sort_by=desc&submitted=1
+            for (unsigned int i = flowParameters.currentPosition; i <= flowParameters.endingPosition; i++)
+            {
+                multiPart = new QHttpMultiPart;
+                multiPart->append(part1);
+                multiPart->append(part2);
+                multiPart->append(part3);
+                multiPart->append(part4);
+                multiPart->append(part5);
+                ba.setNum(i);
+                part6.setBody(ba);
+                multiPart->append(part6);
 
-            requestByPOST = true;
-            URLaddressTemplate  = URLbase + PQString("/necrologie-avis-de-deces/recherche?sort_by=desc&submitted=1");
-            createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
-            www->download(downloadRequest);
-            //while(www->processingDownload()){};
+                downloadRequest.instructions.multiPartList.append(multiPart);
+                multiPart = nullptr;  // List will be deleted individually after reply received
+            }
 
-            // Real download
-            requestByPOST = false;
-            URLaddressTemplate  = URLbase + PQString("/necrologie-avis-de-deces/recherche?start=") + paramPlaceholder;
-            //URLaddressTemplate  = URLbase + PQString("/necrologie-avis-de-deces/recherche?sort_by=asc&submitted=1&start=") + paramPlaceholder;
-            //URLaddressTemplate  = URLbase + PQString("/necrologie-avis-de-deces/recherche?submitted=1&start=") + paramPlaceholder;
-
-            if (flowParameters.initialSetup)
-                pageVariables.cutoffDate = pageVariables.firstAvailableDate;
-            else
-                pageVariables.cutoffDate = pageVariables.latestDODdate.addDays(-daysOfOverlap);
-
-            URLparams.numParams = 1;
-            URLparams.param1Type = ptUint;
-            URLparams.UIparam1 = &flowParameters.currentPosition;
-
-            flowParameters.currentPosition = 0;
-            if (flowParameters.initialSetup)
-                flowParameters.endingPosition = 2100;
-            else
-                flowParameters.endingPosition = 140;*/
+            downloadRequest.instructions.verb = QString("MULTIPART");
+            downloadRequest.instructions.Accept = QString("application/json, text/javascript, */*; q=0.01");
+            downloadRequest.instructions.ContentTypeHeader = QString("multipart/form-data");
+            downloadRequest.instructions.X_Requested_With = QString("XMLHttpRequest");
+            downloadRequest.instructions.Origin = baseURL.getString();
+            downloadRequest.instructions.Sec_Fetch_Mode = QString("cors");
+            downloadRequest.instructions.Sec_Fetch_Site = QString("same-origin");
+            downloadRequest.instructions.Sec_Fetch_Dest = QString("empty");
+            //downloadRequest.instructions.Accept_Encoding = QString("br");
+            downloadRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
+            downloadRequest.instructions.Referer = URLbase.getString() + QString("/fr/necrologie-avis-de-deces?page=") + QString::number(flowParameters.currentPosition) + QString("&number_items=24&sort=d_dod/desc");
         }
 
+        determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
     }
         break; // 1097 Scrypta
@@ -4214,52 +4255,45 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     {
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
-        flowParameters.flowType = singleListing;
-        flowParameters.flowIncrement = 10;
-        QString payload;
+        flowParameters.flowType = startToEnd;
+        flowParameters.flowIncrement = 100;
+        QByteArray payload;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/Service/InventoryService.asmx/GetProductsByFacets?_Facets&Search=&OrderBy_PropertyName0&IdentifierGuid=17d538cf-a248-d961-d652-4a1db6d995a4&IsDescOrdertrue&Index") + paramPlaceholder;
-        URLaddressTemplate += PQString("&Count10fr-CAc00cfbe6-2a56-4d03-bdab-d7e0746b1968");
+        URLaddressTemplate  = URLbase + PQString("/Service/InventoryService.asmx/GetProductsByFacets?fr-CAc00cfbe6-2a56-4d03-bdab-d7e0746b1968");
 
-        payload  = QString("{\"args\":{\"FacetsConfiguration\":{\"Facets\":[{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,");
-        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,");
-        payload += QString("\"DropDownWaterMark\":\"Tous les complexes\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,");
-        payload += QString("\"OrderedCustomFieldValueGuids\":[\"c6fcf35d-54f6-2ca5-842e-fa5e97afad11\",\"39a7b55c-2463-1b60-90d0-77651b90cd99\",\"d4e34184-98cb-1384-0e90-9ce36ff8bba0\",\"fa1dff5e-16c0-24f1-646f-f61d9be797f6\"],");
-        payload += QString("\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,");
-        payload += QString("\"IdentifierGuid\":\"3a04e611-8d55-a133-2737-a71c3a3b83dc\"},{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,");
-        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,");
-        payload += QString("\"DropDownWaterMark\":\"Année\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,");
-        payload += QString("\"OrderedCustomFieldValueGuids\":[\"31437352-d792-eacd-9912-924856406ec0\",\"f0a83c9b-729a-09c5-4d16-030d62440de6\",\"c2f91fdf-e176-2d78-9797-7964aaac7f4d\",\"c7cf8744-ee30-9dd6-977b-e44663c09b4d\",");
-        payload += QString("\"e48746bb-c539-67f3-52ac-aa81a02c09d0\",\"4371e341-7e7b-395f-c39e-51ac55b981f6\",\"3349231f-9f6e-9eed-43b2-ee35eb6504ee\",\"0deb842b-ca78-5c83-3769-34e4df052660\",\"30f1f192-3850-2d31-45d1-4feebf975635\"],");
-        payload += QString("\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,");
-        payload += QString("\"IdentifierGuid\":\"fa298514-fc42-ea42-8789-637d27dc7497\"},{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,");
-        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,");
-        payload += QString("\"DropDownWaterMark\":\"Mois\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,");
-        payload += QString("\"OrderedCustomFieldValueGuids\":[\"fb511438-8d6b-f213-b5b2-9145e11bdebb\",\"ac45173c-0771-c015-0422-a1e80749f19e\",\"fb2c0d9f-5524-268c-8e3f-ce0998512ad3\",\"03dc9ae0-ec02-f1b4-5d8e-8d8f2a4ef15d\",");
-        payload += QString("\"d32918e4-651a-95c5-4582-473163c97638\",\"fabab403-8642-9635-8ddb-2dc112a72439\",\"cdc91ac9-3173-0171-0d40-fe7d51b6e3ed\",\"3ebc7d1a-1a52-781a-af8f-bee95eb68a4b\",\"8dc1c5bd-29b6-d751-8488-01d0d585415b\",");
-        payload += QString("\"a36e3575-53fd-ccb7-7470-812b3e9cf61d\",\"9daf4406-01f8-aa92-ab7f-56807c956728\",\"e3b6dddc-d45f-7253-1896-4700983ac8ca\"],\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,");
-        payload += QString("\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,\"IdentifierGuid\":\"0929ca2f-f855-3d41-77f4-754975621ace\"}],");
-        payload += QString("\"Tags\":[\"2a61180d-37c8-2cf9-4505-4f4596ae6de2\"],\"CatalogGuid\":\"00000000-0000-0000-0000-000000000000\",\"RedirectionZoneHierarchyId\":0,\"GroupByFamily\":false,\"GroupingCustomFieldGuids\":[],");
-        payload += QString("\"GetOnlyProductsWithUrl\":false,\"IsRedirectOnSelect\":true,\"HasGroupedQueryZone\":false,\"DateFilter\":0},\"CustomFieldGuids\":[\"92e07d8c-a292-4f21-1c9d-215bec4dbcb8\",\"d967506e-7ba5-26e4-6c40-1dd6b2c466b3\",");
-        payload += QString("\"4414d72d-0b7a-a13e-d92a-166cec1040b5\",\"17d538cf-a248-d961-d652-4a1db6d995a4\",\"407b7048-899b-2a2e-e230-7ae2d781f3f9\",\"e165c184-157a-1bae-454b-208ff2d84047\",\"e1e5eebc-a3dc-9c0f-845f-6dadc41c353e\",");
-        payload += QString("\"f2fec77b-53a8-484f-1526-0b7638c241a8\",\"a291054d-d746-7fcd-9d5f-99b7ea74304b\"],\"CultureId\":\"fr-CA\",\"CurrencyId\":1,\"CurrencyIsoCode\":\"CAD\",\"Facets\":[],\"Search\":\"\",\"OrderBy\":{\"PropertyName\":0,");
-        payload += QString("\"IdentifierGuid\":\"17d538cf-a248-d961-d652-4a1db6d995a4\"},\"IsDescOrder\":true,\"Index\":10,\"Count\":10}}");
+        payload  = QString("{\"args\":{\"FacetsConfiguration\":{\"Facets\":[{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,").toUtf8();
+        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,").toUtf8();
+        payload += QString("\"DropDownWaterMark\":\"Tous les complexes\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,").toUtf8();
+        payload += QString("\"OrderedCustomFieldValueGuids\":[\"c6fcf35d-54f6-2ca5-842e-fa5e97afad11\",\"39a7b55c-2463-1b60-90d0-77651b90cd99\",\"d4e34184-98cb-1384-0e90-9ce36ff8bba0\",\"fa1dff5e-16c0-24f1-646f-f61d9be797f6\"],").toUtf8();
+        payload += QString("\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,").toUtf8();
+        payload += QString("\"IdentifierGuid\":\"3a04e611-8d55-a133-2737-a71c3a3b83dc\"},{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,").toUtf8();
+        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,").toUtf8();
+        payload += QString("\"DropDownWaterMark\":\"Année\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,").toUtf8();
+        payload += QString("\"OrderedCustomFieldValueGuids\":[\"31437352-d792-eacd-9912-924856406ec0\",\"f0a83c9b-729a-09c5-4d16-030d62440de6\",\"c2f91fdf-e176-2d78-9797-7964aaac7f4d\",\"c7cf8744-ee30-9dd6-977b-e44663c09b4d\",").toUtf8();
+        payload += QString("\"e48746bb-c539-67f3-52ac-aa81a02c09d0\",\"4371e341-7e7b-395f-c39e-51ac55b981f6\",\"3349231f-9f6e-9eed-43b2-ee35eb6504ee\",\"0deb842b-ca78-5c83-3769-34e4df052660\",\"30f1f192-3850-2d31-45d1-4feebf975635\"],").toUtf8();
+        payload += QString("\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,").toUtf8();
+        payload += QString("\"IdentifierGuid\":\"fa298514-fc42-ea42-8789-637d27dc7497\"},{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,").toUtf8();
+        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,").toUtf8();
+        payload += QString("\"DropDownWaterMark\":\"Mois\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,").toUtf8();
+        payload += QString("\"OrderedCustomFieldValueGuids\":[\"fb511438-8d6b-f213-b5b2-9145e11bdebb\",\"ac45173c-0771-c015-0422-a1e80749f19e\",\"fb2c0d9f-5524-268c-8e3f-ce0998512ad3\",\"03dc9ae0-ec02-f1b4-5d8e-8d8f2a4ef15d\",").toUtf8();
+        payload += QString("\"d32918e4-651a-95c5-4582-473163c97638\",\"fabab403-8642-9635-8ddb-2dc112a72439\",\"cdc91ac9-3173-0171-0d40-fe7d51b6e3ed\",\"3ebc7d1a-1a52-781a-af8f-bee95eb68a4b\",\"8dc1c5bd-29b6-d751-8488-01d0d585415b\",").toUtf8();
+        payload += QString("\"a36e3575-53fd-ccb7-7470-812b3e9cf61d\",\"9daf4406-01f8-aa92-ab7f-56807c956728\",\"e3b6dddc-d45f-7253-1896-4700983ac8ca\"],\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,").toUtf8();
+        payload += QString("\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,\"IdentifierGuid\":\"0929ca2f-f855-3d41-77f4-754975621ace\"}],").toUtf8();
+        payload += QString("\"Tags\":[\"2a61180d-37c8-2cf9-4505-4f4596ae6de2\"],\"CatalogGuid\":\"00000000-0000-0000-0000-000000000000\",\"RedirectionZoneHierarchyId\":0,\"GroupByFamily\":false,\"GroupingCustomFieldGuids\":[],").toUtf8();
+        payload += QString("\"GetOnlyProductsWithUrl\":false,\"IsRedirectOnSelect\":true,\"HasGroupedQueryZone\":false,\"DateFilter\":0},\"CustomFieldGuids\":[\"92e07d8c-a292-4f21-1c9d-215bec4dbcb8\",\"d967506e-7ba5-26e4-6c40-1dd6b2c466b3\",").toUtf8();
+        payload += QString("\"4414d72d-0b7a-a13e-d92a-166cec1040b5\",\"17d538cf-a248-d961-d652-4a1db6d995a4\",\"407b7048-899b-2a2e-e230-7ae2d781f3f9\",\"e165c184-157a-1bae-454b-208ff2d84047\",\"e1e5eebc-a3dc-9c0f-845f-6dadc41c353e\",").toUtf8();
+        payload += QString("\"f2fec77b-53a8-484f-1526-0b7638c241a8\",\"a291054d-d746-7fcd-9d5f-99b7ea74304b\"],\"CultureId\":\"fr-CA\",\"CurrencyId\":1,\"CurrencyIsoCode\":\"CAD\",\"Facets\":[],\"Search\":\"\",\"OrderBy\":{\"PropertyName\":0,").toUtf8();
+        payload += QString("\"IdentifierGuid\":\"17d538cf-a248-d961-d652-4a1db6d995a4\"},\"IsDescOrder\":true,\"Index\":100,\"Count\":100}}").toUtf8();
+        //payload += QString("\"IdentifierGuid\":\"17d538cf-a248-d961-d652-4a1db6d995a4\"},\"IsDescOrder\":true,\"Index\":").toUtf8() + paramPlaceholder + PQString(",\"Count\":100}}").toUtf8();
 
-        /*URLaddressTemplate  = URLbase + PQString("/avis-deces#_Facets@;&Search=&OrderBy_PropertyName:0&IdentifierGuid=17d538cf-a248-d961-d652-4a1db6d995a4;&IsDescOrder:true&Index:") + paramPlaceholder;
-        URLaddressTemplate += PQString("/Service/InventoryService.asmx/GetProductsByFacets?fr-CAc00cfbe6-2a56-4d03-bdab-d7e0746b1968");
-        URLaddressTemplate += PQString("&Count:10");
-        //https://www.jndonais.ca/Service/InventoryService.asmx/GetProductsByFacets?_Facets&Search=&OrderBy_PropertyName0&IdentifierGuid=17d538cf-a248-d961-d652-4a1db6d995a4&IsDescOrdertrue&Index10&Count10fr-CAc00cfbe6-2a56-4d03-bdab-d7e0746b1968*/
+        URLparams.numParams = 0;
 
-        URLparams.numParams = 1;
-        URLparams.param1Type = ptUint;
-        URLparams.UIparam1 = &flowParameters.currentPosition;
-
-        flowParameters.currentPosition = 10;
+        flowParameters.currentPosition = 0;
         if (flowParameters.initialSetup == true)
-            flowParameters.endingPosition = 100;
+            flowParameters.endingPosition = 2400;
         else
-            flowParameters.endingPosition = 10;
+            flowParameters.endingPosition = 1;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -4267,13 +4301,13 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         downloadRequest.instructions.verb = QString("POST");
         downloadRequest.instructions.payload = payload;
         downloadRequest.instructions.Accept = QString("application/json, text/javascript, */*; q=0.01");
-        downloadRequest.instructions.ContentTypeHeader = QString("application/x-www-form-urlencoded; charset=UTF-8");
+        downloadRequest.instructions.ContentTypeHeader = QString("application/json; charset=UTF-8");
         downloadRequest.instructions.X_Requested_With = QString("XMLHttpRequest");
         downloadRequest.instructions.Origin = baseURL.getString();
         downloadRequest.instructions.Sec_Fetch_Mode = QString("cors");
         downloadRequest.instructions.Sec_Fetch_Site = QString("same-origin");
         downloadRequest.instructions.Sec_Fetch_Dest = QString("empty");
-        downloadRequest.instructions.Accept_Encoding = QString("br");
+        //downloadRequest.instructions.Accept_Encoding = QString("br");
         downloadRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
         downloadRequest.instructions.Referer = URLbase.getString() + QString("/avis-deces");
     }
@@ -4597,7 +4631,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         flowParameters.currentPosition = 1;
         if (flowParameters.initialSetup == true)
-            flowParameters.endingPosition = 21;
+            flowParameters.endingPosition = 5;
         else
             flowParameters.endingPosition = 2;
 
@@ -5313,20 +5347,33 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     {
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
-        flowParameters.flowType = startToEnd;
+        flowParameters.flowType = singleListing;
+        pageVariables.usePubDateForCutOff = true;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/fr/avis-de-deces?p=") + paramPlaceholder;
+        //URLaddressTemplate  = URLbase + PQString("/fr/avis-de-deces?p=") + paramPlaceholder;
+        URLaddressTemplate  = URLbase + PQString("/_api/cloud-data/v1/wix-data/collections/query");
+        URLaddressTemplate += PQString("?{\"collectionName\":\"Blog/Posts\",\"dataQuery\":{\"filter\":{},\"sort\":[{\"fieldName\":\"publishedDate\",\"order\":\"DESC\"}],\"paging\":{\"offset\":0,\"limit\":200}},");
+        URLaddressTemplate += PQString("\"options\":{},\"includeReferencedItems\":[],\"segment\":\"LIVE\",\"appId\":\"5a3a8fca-371a-4c20-9ea0-16b976f5732d\"}");
 
-        URLparams.numParams = 1;
-        URLparams.param1Type = ptUint;
-        URLparams.UIparam1 = &flowParameters.currentPosition;
+        URLparams.numParams = 0;
 
         flowParameters.currentPosition = 1;
         if (flowParameters.initialSetup == true)
-            flowParameters.endingPosition = 33;
+            flowParameters.endingPosition = 1;
         else
-            flowParameters.endingPosition = 3;
+            flowParameters.endingPosition = 1;
+
+        downloadRequest.instructions.verb = QString("POST");
+        downloadRequest.instructions.Accept = QString("application/json, text/plain, */*");
+        downloadRequest.instructions.ContentTypeHeader = QString("application/json");
+        downloadRequest.instructions.Referer = QString("https://www.maisonfuneraireroussin.com/_partials/wix-thunderbolt/dist/clientWorker.709d549b.bundle.min.js");
+        downloadRequest.instructions.Authorization  = QString("wixcode-pub.b4caa853ce7efd748e53715837b639eda8052cca.eyJpbnN0YW5jZUlkIjoiM2JhOTU2YzQtMDk4My00NTdhLWJlOWYtZGQxMzNlOWQ4YjVlIiwiaHRtbFNpdGVJZCI6Ij");
+        downloadRequest.instructions.Authorization += QString("NmNDBmOTRjLTBjZWUtNGI5MC1iYTQ3LWZiNDQ0M2RlZTI1MiIsInVpZCI6bnVsbCwicGVybWlzc2lvbnMiOm51bGwsImlzVGVtcGxhdGUiOmZhbHNlLCJzaWduRGF0ZSI6MTY3NTMwODYyN");
+        downloadRequest.instructions.Authorization += QString("DQ1NiwiYWlkIjoiNWRlNmE5YWEtNDBjMS00YWY2LWE2M2EtNWQzZTA1ZTZiYzI5IiwiYXBwRGVmSWQiOiJDbG91ZFNpdGVFeHRlbnNpb24iLCJpc0FkbWluIjpmYWxzZSwibWV0YVNpdGVJ");
+        downloadRequest.instructions.Authorization += QString("ZCI6IjUzNjRhZGM5LWRjMTMtNDM5ZS1iZTAxLTBkZjFlMWE4NWU5YSIsImNhY2hlIjpudWxsLCJleHBpcmF0aW9uRGF0ZSI6bnVsbCwicHJlbWl1bUFzc2V0cyI6IlNob3dXaXhXaGlsZUx");
+        downloadRequest.instructions.Authorization += QString("vYWRpbmcsQWRzRnJlZSxIYXNEb21haW4iLCJ0ZW5hbnQiOm51bGwsInNpdGVPd25lcklkIjoiZDRkNzRhN2ItODY4Ny00NGI3LWI0MGMtZDJlNWVlMDg5ZTM0IiwiaW5zdGFuY2VUeXBlIj");
+        downloadRequest.instructions.Authorization += QString("oicHViIiwic2l0ZU1lbWJlcklkIjpudWxsLCJwZXJtaXNzaW9uU2NvcGUiOm51bGx9");
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -5636,12 +5683,14 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         case 2:
         case 3:
+        case 4:
         case 5:
         case 6:
+        case 7:
             // https://manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=dc4dc470&page=2&per_page=10
             // https://manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=a804057b&page=2&q=&per_page=10&include_services=0&veterans_only=0
             URLbase = baseURL;
-            if (providerKey == 6)
+            if ((providerKey == 6) || (providerKey == 7))
                 URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&per_page=10");
             else
                 URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&q=&per_page=10&include_services=0&veterans_only=0");
@@ -5679,44 +5728,6 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             break;
 
-        case 4:
-            // https://manage2.tukioswebsites.com/api/legacy/obituaries?fhid=662&page=2&q=&per_page=10&include_services=0&veterans_only=0
-
-            URLbase = baseURL;
-            URLaddressTemplate  = URLbase + PQString("/api/legacy/obituaries?fhid=") + fhParam1 + PQString("&page=") + paramPlaceholder + PQString("&q=&per_page=10&include_services=0&veterans_only=0");
-
-            URLparams.numParams = 1;
-            URLparams.param1Type = ptUint;
-            URLparams.UIparam1 = &flowParameters.currentPosition;
-
-            flowParameters.currentPosition = 1;
-            if (flowParameters.initialSetup == true)
-                flowParameters.endingPosition = 4;
-            else
-                flowParameters.endingPosition = 2;
-
-            // Unique situation where a very specific preflight OPTION request is required
-            preflightRequest.instructions.verb = QString("OPTIONS");
-            preflightRequest.instructions.Accept = QString("ALL");
-            preflightRequest.instructions.Access_Control_Request_Method = QString("GET");
-            preflightRequest.instructions.Access_Control_Request_Headers = QString("authorization");
-            preflightRequest.instructions.Origin = baseURL.getString();
-            preflightRequest.instructions.User_Agent = QString("STD");
-            preflightRequest.instructions.Sec_Fetch_Mode = QString("cors");
-            preflightRequest.instructions.Sec_Fetch_Site = QString("cross-site");
-            preflightRequest.instructions.Sec_Fetch_Dest = QString("empty");
-            preflightRequest.instructions.Referer = baseURL.getString() + QString("/");
-            preflightRequest.instructions.Accept_Encoding = QString("br");
-            preflightRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
-
-            // Preflight Request
-            downloadRequest.instructions.Authorization = QString("Bearer k9PMgGzdKda2PGocioyUBzAtVwFj7FsKZlpxORi6");
-            createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
-            preflightRequest.instructions.url = downloadRequest.instructions.url;
-            www->download(preflightRequest);
-            while(www->processingDownload()){};
-
-            break;
         }
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
@@ -5761,6 +5772,54 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
     }
         break; // 1166 Etincelle
+
+    case 1168:      // ObitAssistant
+    {
+        daysOfOverlap = 61;
+        flowParameters.initialSetup = false;
+        flowParameters.flowType = startToEnd;
+
+        //https://www.obituary-assistant.com/api/rest/obituaries?page=2&_=1674929206917
+
+        URLbase = baseURL;
+        URLaddressTemplate  = URLbase + PQString("/api/rest/obituaries?page=") + paramPlaceholder + PQString("&_=") + fhParam1;
+
+        URLparams.numParams = 1;
+        URLparams.param1Type = ptUint;
+        URLparams.UIparam1 = &flowParameters.currentPosition;
+
+        flowParameters.currentPosition = 1;
+        if (flowParameters.initialSetup == true)
+            flowParameters.endingPosition = fhParam2.toInt();
+        else
+            flowParameters.endingPosition = 2;
+
+        determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
+        createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+
+        // Unique situation where a very specific preflight OPTION request is required
+        preflightRequest.instructions.verb = QString("OPTIONS");
+        preflightRequest.instructions.Accept = QString("ALL");
+        preflightRequest.instructions.Access_Control_Request_Method = QString("GET");
+        preflightRequest.instructions.Access_Control_Request_Headers = QString("authorization");
+        preflightRequest.instructions.Origin = baseURL.getString();
+        preflightRequest.instructions.User_Agent = QString("STD");
+        preflightRequest.instructions.Sec_Fetch_Mode = QString("cors");
+        preflightRequest.instructions.Sec_Fetch_Site = QString("cross-site");
+        preflightRequest.instructions.Sec_Fetch_Dest = QString("empty");
+        preflightRequest.instructions.Referer = baseURL.getString() + QString("/");
+        //preflightRequest.instructions.Accept_Encoding = QString("br");
+        preflightRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
+
+        downloadRequest.instructions.Accept = QString("application/json;charset=utf-8");
+        downloadRequest.instructions.Authorization = QString("Basic d2lsbGlhbXM6SnZEb0lRcUNaWA==");
+
+        // Preflight Request
+        preflightRequest.instructions.url = downloadRequest.instructions.url;
+        www->download(preflightRequest);
+        while(www->processingDownload()){};
+    }
+        break; // 1168 ObitAssistant
 
     case 2000:  // Mike Purdy
     {
@@ -6384,12 +6443,46 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     {
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
-        flowParameters.flowType = singleListing;
+        flowParameters.flowType = startToEnd;
+
+        downloadRequest.instructions.verb = QString("POST");
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/obituaries/");
+        URLaddressTemplate  = URLbase + PQString("/wp-admin/admin-ajax.php") + PQString("?");
+        URLaddressTemplate += PQString("action=trx_addons_item_pagination&nonce=79600f2a3e&params=a%3A91%3A%7Bs%3A3%3A%22cat%22%3Bs%3A3%3A%22177%22%3Bs%3A7%3A%22columns%22%3Bi%3A3%3Bs%3A14%3A%22columns_tablet%22%3Bs%3A0%3A%22%22%3Bs%3A14%3A%22");
+        URLaddressTemplate += PQString("columns_mobile%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22count%22%3Bi%3A12%3Bs%3A6%3A%22offset%22%3Bi%3A0%3Bs%3A7%3A%22orderby%22%3Bs%3A9%3A%22post_date%22%3Bs%3A5%3A%22order%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("desc%22%3Bs%3A3%3A%22ids%22%3Bs%3A0%3A%22%22%3Bs%3A6%3A%22slider%22%3Bb%3A0%3Bs%3A13%3A%22slider_effect%22%3Bs%3A5%3A%22slide%22%3Bs%3A17%3A%22slider_pagination%22%3Bs%3A4%3A%22none%22%3Bs%3A22%3A%22");
+        URLaddressTemplate += PQString("slider_pagination_type%22%3Bs%3A7%3A%22bullets%22%3Bs%3A24%3A%22slider_pagination_thumbs%22%3Bi%3A0%3Bs%3A15%3A%22slider_controls%22%3Bs%3A4%3A%22none%22%3Bs%3A12%3A%22slides_space%22%3Bi%3A0%3Bs%3A15%3A%22");
+        URLaddressTemplate += PQString("slides_centered%22%3Bs%3A0%3A%22%22%3Bs%3A15%3A%22slides_overflow%22%3Bs%3A0%3A%22%22%3Bs%3A18%3A%22slider_mouse_wheel%22%3Bs%3A0%3A%22%22%3Bs%3A15%3A%22slider_autoplay%22%3Bs%3A1%3A%221%22%3Bs%3A11%3A%22");
+        URLaddressTemplate += PQString("slider_loop%22%3Bs%3A1%3A%221%22%3Bs%3A16%3A%22slider_free_mode%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22title%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22title_align%22%3Bs%3A4%3A%22none%22%3Bs%3A11%3A%22title_style%22%3Bs%3A7%3A%22");
+        URLaddressTemplate += PQString("default%22%3Bs%3A9%3A%22title_tag%22%3Bs%3A4%3A%22none%22%3Bs%3A11%3A%22title_color%22%3Bs%3A0%3A%22%22%3Bs%3A12%3A%22title_color2%22%3Bs%3A0%3A%22%22%3Bs%3A18%3A%22gradient_direction%22%3Bs%3A1%3A%220%22%3Bs%3A18%3A%22");
+        URLaddressTemplate += PQString("title_border_color%22%3Bs%3A0%3A%22%22%3Bs%3A18%3A%22title_border_width%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A14%3A%22");
+        URLaddressTemplate += PQString("title_bg_image%22%3Ba%3A2%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3B%7Ds%3A6%3A%22title2%22%3Bs%3A0%3A%22%22%3Bs%3A12%3A%22title2_color%22%3Bs%3A0%3A%22%22%3Bs%3A19%3A%22");
+        URLaddressTemplate += PQString("title2_border_color%22%3Bs%3A0%3A%22%22%3Bs%3A19%3A%22title2_border_width%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A15%3A%22");
+        URLaddressTemplate += PQString("title2_bg_image%22%3Ba%3A2%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3B%7Ds%3A8%3A%22subtitle%22%3Bs%3A0%3A%22%22%3Bs%3A14%3A%22subtitle_align%22%3Bs%3A4%3A%22none%22%3Bs%3A17%3A%22");
+        URLaddressTemplate += PQString("subtitle_position%22%3Bs%3A5%3A%22above%22%3Bs%3A11%3A%22description%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22link%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22link_style%22%3Bs%3A7%3A%22default%22%3Bs%3A10%3A%22");
+        URLaddressTemplate += PQString("link_image%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22link_text%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22new_window%22%3Bi%3A0%3Bs%3A5%3A%22typed%22%3Bs%3A0%3A%22%22%3Bs%3A13%3A%22typed_strings%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22");
+        URLaddressTemplate += PQString("typed_loop%22%3Bs%3A1%3A%221%22%3Bs%3A12%3A%22typed_cursor%22%3Bs%3A1%3A%221%22%3Bs%3A17%3A%22typed_cursor_char%22%3Bs%3A1%3A%22_%22%3Bs%3A11%3A%22typed_color%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22");
+        URLaddressTemplate += PQString("typed_speed%22%3Bs%3A1%3A%226%22%3Bs%3A11%3A%22typed_delay%22%3Bs%3A1%3A%221%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22class%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22");
+        URLaddressTemplate += PQString("className%22%3Bs%3A0%3A%22%22%3Bs%3A3%3A%22css%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22type%22%3Bs%3A7%3A%22classic%22%3Bs%3A8%3A%22featured%22%3Bs%3A5%3A%22image%22%3Bs%3A17%3A%22");
+        URLaddressTemplate += PQString("featured_position%22%3Bs%3A3%3A%22top%22%3Bs%3A10%3A%22thumb_size%22%3Bs%3A5%3A%22large%22%3Bs%3A11%3A%22tabs_effect%22%3Bs%3A4%3A%22fade%22%3Bs%3A12%3A%22hide_excerpt%22%3Bs%3A0%3A%22%22%3Bs%3A13%3A%22");
+        URLaddressTemplate += PQString("hide_bg_image%22%3Bs%3A0%3A%22%22%3Bs%3A15%3A%22icons_animation%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22no_margin%22%3Bs%3A0%3A%22%22%3Bs%3A8%3A%22no_links%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22");
+        URLaddressTemplate += PQString("pagination%22%3Bs%3A5%3A%22pages%22%3Bs%3A4%3A%22page%22%3Bi%3A1%3Bs%3A13%3A%22posts_exclude%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22post_type%22%3Bs%3A12%3A%22cpt_services%22%3Bs%3A8%3A%22taxonomy%22%3Bs%3A18%3A%22");
+        URLaddressTemplate += PQString("cpt_services_group%22%3Bs%3A5%3A%22popup%22%3Bi%3A0%3Bs%3A9%3A%22more_text%22%3Bs%3A9%3A%22Read+more%22%3Bs%3A11%3A%22count_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bi%3A12%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A13%3A%22columns_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A3%3Bs%3A5%3A%22");
+        URLaddressTemplate += PQString("sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A20%3A%22columns_tablet_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A20%3A%22");
+        URLaddressTemplate += PQString("columns_mobile_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A12%3A%22offset_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A18%3A%22slides_space_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A24%3A%22gradient_direction_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22");
+        URLaddressTemplate += PQString("sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A17%3A%22typed_speed_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A6%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A17%3A%22");
+        URLaddressTemplate += PQString("typed_delay_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A1%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A10%3A%22link_extra%22%3Ba%3A4%3A%7Bs%3A3%3A%22");
+        URLaddressTemplate += PQString("url%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22is_external%22%3Bs%3A0%3A%22%22%3Bs%3A8%3A%22nofollow%22%3Bs%3A0%3A%22%22%3Bs%3A17%3A%22custom_attributes%22%3Bs%3A0%3A%22%22%3B%7Ds%3A16%3A%22");
+        URLaddressTemplate += PQString("link_image_extra%22%3Ba%3A2%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3B%7Ds%3A13%3A%22show_subtitle%22%3Bs%3A0%3A%22%22%3Bs%3A6%3A%22scheme%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22");
+        URLaddressTemplate += PQString("color_style%22%3Bs%3A7%3A%22default%22%3Bs%3A22%3A%22mouse_helper_highlight%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22sc%22%3Bs%3A11%3A%22sc_services%22%3B%7D&page=") + paramPlaceholder + PQString("&filters_active=all");
 
-        URLparams.numParams = 0;
+        URLparams.numParams = 1;
+        URLparams.param1Type = ptUint;
+        URLparams.UIparam1 = &flowParameters.currentPosition;
 
         flowParameters.currentPosition = 1;
         flowParameters.endingPosition = 1;
@@ -6490,7 +6583,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         initialRequest.instructions.Sec_Fetch_Mode = QString("cors");
         initialRequest.instructions.Sec_Fetch_Dest = QString("empty");
         initialRequest.instructions.Referer = baseURL.getString() + QString("/");
-        initialRequest.instructions.Accept_Encoding = QString("br");
+        //initialRequest.instructions.Accept_Encoding = QString("br");
         initialRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
         initialRequest.outputs.downloadFileName = QString("tempWebPage.htm");
 
@@ -6530,9 +6623,9 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         flowParameters.currentPosition = 0;
         if (flowParameters.initialSetup == false)
-            flowParameters.endingPosition = 0;
+            flowParameters.endingPosition = 80;
         else
-            flowParameters.endingPosition = 0;
+            flowParameters.endingPosition = 200;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -6662,39 +6755,14 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         flowParameters.currentPosition = 1;
         if (flowParameters.initialSetup)
-            flowParameters.endingPosition = 10;
+            flowParameters.endingPosition = 18;
         else
-            flowParameters.endingPosition = 5;
-
-        /*pageVariables.firstAvailableDate.setDate(fhFirstObit.year(), fhFirstObit.month(), 1);
-        pageVariables.paginatedResult = false;
-        flowParameters.initialSetup = false;
-        flowParameters.flowType = sequential;
-        flowParameters.indexOffset = -1;
-        flowParameters.flowIncrement = -1;
-
-        if (flowParameters.initialSetup)
-            pageVariables.cutoffDate = pageVariables.firstAvailableDate;
-        else
-            pageVariables.cutoffDate = pageVariables.latestDODdate.addDays(-daysOfOverlap);
-        flowParameters.currentPosition = 1;
-        flowParameters.endingPosition = 1;
-
-        URLbase = baseURL;
-
-        URLaddressTemplate  = URLbase + QString("/?paged=") + paramPlaceholder + QString("&m=") + paramPlaceholder + PQString("&post_type=obituaries");
-
-        URLparams.numParams = 2;
-        URLparams.param1Type = ptUint;
-        URLparams.UIparam1 = &flowParameters.endingPosition;
-        URLparams.param2Type = ptQTDmask;
-        URLparams.QTDdate2 = &pageVariables.queryTargetDate;
-        URLparams.maskType2 = mtYYYYMM;*/
+            flowParameters.endingPosition = 6;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
 
-    }   // 2033 Carness
+    }   // 2033 Carnell
         break;
 
     case 2035:  // JOsmond
@@ -6844,7 +6912,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.flowType = singleListing;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase;
+        URLaddressTemplate  = URLbase + PQString("/obituaries");
 
         URLparams.numParams = 0;
 
@@ -7103,7 +7171,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.flowType = startToEnd;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/ottawa-obituaries/page/") + paramPlaceholder + QString("/");
+        URLaddressTemplate  = URLbase + PQString("/ottawa-obituaries/page/") + paramPlaceholder + PQString("/?gclid=Cj0KCQiAz9ieBhCIARIsACB0oGLawVRbL_FK3a0Kpbn4xR9TLzJknh44C8TuCCNhYHI-MPf_lxZ0gDUaAqxlEALw_wcB");
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -8393,7 +8461,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.flowType = startToEnd;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/chatham-kent-obituaries/page/") + paramPlaceholder + PQString("/");
+        URLaddressTemplate  = URLbase + PQString("/runtime/390728/default.php?branchId=all&page=") + paramPlaceholder;
+        URLaddressTemplate += PQString("&type=current&sort=DateOfDeath&sortdir=DESC&sortLabel=Date+of+Death&start=&end=&datetype=ServiceDate&tpl=fsg&SiteId=&NavigatorId=&nowrap=1&widget=Services&search=&listclass=&rpp=5");;
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -8401,7 +8470,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         flowParameters.currentPosition = 1;
         if (flowParameters.initialSetup)
-            flowParameters.endingPosition = 31;
+            flowParameters.endingPosition = 9;
         else
             flowParameters.endingPosition = 3;
 
@@ -9232,6 +9301,30 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     }
         break; // 2147 Hommage NB
 
+    case 2148:  // Drake
+    {
+        daysOfOverlap = 61;
+        flowParameters.initialSetup = false;
+        flowParameters.flowType = startToEnd;
+
+        URLbase = baseURL;
+        URLaddressTemplate  = URLbase + PQString("/obituaries/page/") + paramPlaceholder + PQString("/");
+
+        URLparams.numParams = 1;
+        URLparams.param1Type = ptUint;
+        URLparams.UIparam1 = &flowParameters.currentPosition;
+
+        flowParameters.currentPosition = 1;
+        if (flowParameters.initialSetup)
+            flowParameters.endingPosition = 60;
+        else
+            flowParameters.endingPosition = 3;
+
+        determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
+        createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+    }
+        break; // 2148 Drake
+
     case 2149:  // CityLine
     {
         daysOfOverlap = 61;
@@ -9285,7 +9378,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
     case 2151:  // Driftwood
     {
-        flowParameters.initialSetup = true;
+        flowParameters.initialSetup = false;
         pageVariables.usePubDateForCutOff = true;
 
         daysOfOverlap = 61;
@@ -9366,6 +9459,25 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         }
     }
         break; // 2152 MLBW
+
+    case 2153:  // Sproing
+    {
+        daysOfOverlap = 61;
+        flowParameters.initialSetup = false;
+        flowParameters.flowType = singleListing;
+
+        URLbase = baseURL;
+        URLaddressTemplate  = URLbase + PQString("/obituaries");
+
+        URLparams.numParams = 0;
+
+        flowParameters.currentPosition = 1;
+        flowParameters.endingPosition =  1;
+
+        determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
+        createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+    }
+        break; // 2153 Sproing
 
     default:
         qDebug() << "Attempt to retrieve URLs for unknown/uncoded provider";
@@ -9524,147 +9636,33 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 8: // Domaine Funeraire
             {
-                QList<QString> firstName;
-                QString slug, uc;
-                QString dateFormat = QString("yyyy-MM-dd");
-                int index;
-
-                if (providerKey == 266)
+                while(sourceFile.consecutiveMovesTo(25, "class=\"card\"", "href="))
                 {
-                    while(sourceFile.consecutiveMovesTo(125, "class=\"description\"", "href="))
+                    record.clear();
+                    pageVariables.reset();
+
+                    pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    // Read YOB - YOD
+                    if (sourceFile.conditionalMoveTo("<span>", "</p>"))
+                        pageVariables.ucVariable = sourceFile.getUntil("</p>");
+
+                    // Read Location and DOD
+                    if (sourceFile.conditionalMoveTo(" | ", "</div>"))
                     {
-                        record.clear();
-                        pageVariables.reset();
-                        firstName.clear();
+                        sourceFile.moveBackwardTo(">");
+                        temp = sourceFile.getUntil(" | ");
+                        temp.cleanUpEnds();
+                        pageVariables.pcKey = temp.getString();
 
-                        pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
-                        pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
-
-                        temp = sourceFile.readNextBetween(BRACKETS);
-                        index = temp.getString().indexOf(",");
-                        if (index == -1)
-                            firstName.append(temp.getWord().proper().getString());
-                        else
-                        {
-                            temp = temp.right(temp.getLength() - index - 2).proper();
-                            if (temp.countWords() > 1)
-                            {
-                                OQStream tempStream = OQStream(temp);
-                                OQString word = tempStream.getWord();
-                                if (word.isTitle())
-                                    temp = tempStream.getWord();
-                                else
-                                    temp = word;
-                            }
-                            firstName.append(temp.getString());
-                        }
-
-                        // Read YOB - YOD
-                        if (sourceFile.conditionalMoveTo("<span", "class=\"date\""))
-                            pageVariables.ucVariable = sourceFile.readNextBetween(BRACKETS);
-
-                        // Read DOD
-                        if (sourceFile.conditionalMoveTo("class=\"date\"", "class=\"summary\""))
-                            pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
-
-                        // Process
-                        process(record, pageVariables, lang);
-                        if (((pageVariables.includeRecord) || flowParameters.initialSetup) && ((record.yod == 0) || (record.yod > 2020)))
-                            records.append(record);
+                        pageVariables.ucDOD = sourceFile.getUntil("<");
                     }
-                }
-                else
-                {
-                    while(sourceFile.consecutiveMovesTo(50, "class=\"description\"", "href="))
-                    {
-                        record.clear();
-                        pageVariables.reset();
-                        firstName.clear();
 
-                        pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
-                        pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
-                        slug = OQString(pageVariables.webAddress).readURLparameter("LAST", "/").getString();
-
-                        temp = sourceFile.readNextBetween(BRACKETS);
-                        index = temp.getString().indexOf(",");
-                        if (index == -1)
-                            firstName.append(temp.getWord().proper().getString());
-                        else
-                        {
-                            temp = temp.right(temp.getLength() - index - 2).proper();
-                            if (temp.countWords() > 1)
-                            {
-                                OQStream tempStream = OQStream(temp);
-                                OQString word = tempStream.getWord();
-                                if (word.isTitle())
-                                    temp = tempStream.getWord();
-                                else
-                                    temp = word;
-                            }
-                            firstName.append(temp.getString());
-                        }
-
-                        // Read YOB - YOD
-                        if (sourceFile.conditionalMoveTo("class=\"naissance\"", "class=\"date\""))
-                            pageVariables.ucVariable = sourceFile.readNextBetween(BRACKETS);
-
-                        // Intro summary
-                        if (sourceFile.conditionalMoveTo("<!--", "class=\"date\""))
-                        {
-                            sourceFile.moveTo("<p>", 25);
-                            temp = sourceFile.getUntil("...");
-                            pageVariables.ageAtDeath = temp.contentReadAgeAtDeath(firstName);
-                        }
-
-                        // Read DOD
-                        if (sourceFile.conditionalMoveTo("class=\"date\"", "class=\"summary\""))
-                            pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
-
-                        // Supplementary download to pull information used to fill in html
-                        /*followUpRequest.instructions.verb = "POST";
-                        followUpRequest.instructions.url = QString("https://www.domainefuneraire.com/Obituaries/load_info?slug=") + slug;
-                        followUpRequest.outputs.downloadFileName = QString("tempTempWebPage.htm");
-
-                        www->download(followUpRequest);
-                        while(www->processingDownload()){};
-                        if(www->lastDownloadSuccessful())
-                        {
-                            sourceFile.setSourceFile(downloadRequest.outputs.downloadFileName);
-                            sourceFile.loadValue(QString("church_postal_code"), pageVariables.pcKey, false);
-                            sourceFile.loadValue(QString("date_birth"), pageVariables.currentDOB, dateFormat, false);
-                            sourceFile.loadValue(QString("date_publication"), pageVariables.currentPubDate, dateFormat, false);
-                            if (!pageVariables.currentDOB.isValid() || !pageVariables.currentDOD.isValid())
-                            {
-                                sourceFile.loadValue(QString("description_en"), uc);
-                                if (uc.length() == 0)
-                                    sourceFile.loadValue(QString("description_en"), uc);
-                                if (uc.length() > 0)
-                                {
-                                    temp = uc;
-                                    pageVariables.ageAtDeath = temp.contentReadAgeAtDeath(firstName);
-                                }
-                            }
-                            if (!pageVariables.currentDOD.isValid())
-                            {
-                                sourceFile.loadValue(QString("photo_path"), uc);
-                                index = uc.indexOf("/");
-                                if (index >= 0)
-                                    uc.remove(0, index + 1);
-                                index = uc.indexOf("/");
-                                if (index >= 0)
-                                {
-                                    uc = uc.left(10);
-                                    temp = uc;
-                                }
-                                pageVariables.ucDOD = temp;
-                            }
-                        }*/
-
-                        // Process
-                        process(record, pageVariables, lang);
-                        if (((pageVariables.includeRecord) || flowParameters.initialSetup) && ((record.yod == 0) || (record.yod > 2020)))
-                            records.append(record);
-                    }
+                    // Process
+                    process(record, pageVariables, lang);
+                    if (((pageVariables.includeRecord) || flowParameters.initialSetup) && ((record.yod == 0) || (record.yod > 2020)))
+                        records.append(record);
                 }
 
                 updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
@@ -9675,6 +9673,27 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             {
                 switch(providerKey)
                 {
+                case 18:
+                    while(sourceFile.moveTo("<div class=\"media-left\">"))
+                    {
+                        record.clear();
+                        pageVariables.reset();
+
+                        sourceFile.moveBackwardTo("href=", 200);
+                        pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                        pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                        sourceFile.moveTo("</div>");
+                        if (sourceFile.conditionalMoveTo("datetime=\"", "<div class=\"media-left\">", 0))
+                            pageVariables.ucPubDate = sourceFile.getUntil("T");
+
+                        // Process
+                        process(record, pageVariables, lang);
+                        if ((pageVariables.includeRecord) || flowParameters.initialSetup)
+                            records.append(record);
+                    }
+                    break;
+
                 case 21:
                     while(sourceFile.moveTo("class=\"card card-block\""))
                     {
@@ -9699,6 +9718,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                     }
                     break;
 
+                case 20:
                 case 26:
                     while(sourceFile.moveTo("class=\"media media-bordered\""))
                     {
@@ -9725,8 +9745,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                         // Read DOP
                         if (sourceFile.conditionalMoveTo("datetime=\"", "href=", 0))
                             pageVariables.ucPubDate = sourceFile.getUntil("T");
-                        else
-                            sourceFile.forward(200);
+
+                        sourceFile.moveTo("</a>");
 
                         // Process
                         process(record, pageVariables, lang);
@@ -9794,6 +9814,45 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             }
                 break;
+
+            case 13:  // Echovita
+            {
+                while(sourceFile.consecutiveMovesTo(50, "text-name-obit-in-list", "href="))
+                {
+                    record.clear();
+                    pageVariables.reset();
+
+                    pageVariables.webAddress = baseURL + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    // DOD
+                    if (sourceFile.conditionalMoveTo("<span class=", "</div>"))
+                        pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
+
+                    // Age at Death
+                    if (sourceFile.conditionalMoveTo("<span class=", "</div>"))
+                    {
+                        temp = sourceFile.readNextBetween(BRACKETS);
+                        temp.cleanUpEnds();
+                        temp.removeBookEnds(PARENTHESES);
+                        int index = temp.findPosition(" ");
+                        if (index > 0)
+                        {
+                            int age = temp.left(index).asNumber();
+                            if ((age > 0) && (age < 125))
+                                pageVariables.ageAtDeath = age;
+                        }
+                    }
+
+                    // Process
+                    process(record, pageVariables, lang);
+                    if ((pageVariables.includeRecord) || flowParameters.initialSetup)
+                        records.append(record);
+                }
+
+                updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
+            }
+                break;  // Echovita
 
             case 14:  // Saltwire
             {
@@ -9910,6 +9969,12 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                 updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
             }
                 break;  // Aberdeen
+
+            case 17:  // Village
+            {
+
+            }
+                break;  // Village
 
 
             case 1000:
@@ -12152,23 +12217,10 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                     // Read YOB and YOD
                     if (sourceFile.moveBackwardTo("widget-sub-title dfd-sub-title", 10000))
                     {
-                        switch(providerKey)
-                        {
-                        case 1:
-                            sourceFile.moveTo(">");
-                            pageVariables.yob = sourceFile.getNext(4).getString().toUInt();
-                            sourceFile.forward(1);
-                            pageVariables.yod = sourceFile.getNext(4).getString().toUInt();
-                            break;
-
-                        case 2:
-                        default:
-                            sourceFile.moveTo(">");
-                            sourceFile.backward(1);
-                            pageVariables.ucDOBandDOD = sourceFile.readNextBetween(BRACKETS);
-                            break;
-                        }
-                   }
+                        sourceFile.moveTo(">");
+                        sourceFile.backward(1);
+                        pageVariables.ucDOBandDOD = sourceFile.readNextBetween(BRACKETS);
+                    }
                     else
                         sourceFile.moveTo("go to end of file");
 
@@ -13251,18 +13303,32 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 1086:  // Imago
             {
-                while (sourceFile.consecutiveMovesTo(300, "article id=\"post-", "href="))
+                while (sourceFile.consecutiveMovesTo(100, "entry-date published updated", "datetime="))
                 {
                     record.clear();
                     pageVariables.reset();
 
+                    // Read PubDate
+                    pageVariables.ucPubDate = sourceFile.getUntil("T");
+
+                    // YOB - YOD  age
+                    sourceFile.moveTo("class=\"deces-date\"");
+                    pageVariables.ucVariable = sourceFile.readNextBetween(BRACKETS);
+                    index = pageVariables.ucVariable.findPosition("(");
+                    if (index > 0)
+                    {
+                        temp = pageVariables.ucVariable.right(pageVariables.ucVariable.getLength() - index);
+                        temp.removeBookEnds(PARENTHESES);
+                        temp.removeEnding(" ans");
+                        pageVariables.ageAtDeath = temp.asNumber();
+
+                        pageVariables.ucVariable.dropRight(pageVariables.ucVariable.getLength() - index);
+                    }
+
                     // Read extension for each deceased
+                    sourceFile.moveTo("href=");
                     pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
-
-                    // Read PubDate
-                    if (sourceFile.consecutiveMovesTo(50, "entry-date published", "datetime=\""))
-                        pageVariables.ucPubDate = sourceFile.getUntil("T");
 
                     // Process
                     process(record, pageVariables, lang);
@@ -14084,6 +14150,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             case 1112:  // NMedia
             {
                 //  JSON format, but not one read the usual way
+                sourceFile.unescapeJSONformat();
+                sourceFile.JSONsimplify();
 
                 while (sourceFile.moveTo("17d538cf"))
                 {
@@ -14092,12 +14160,13 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
                     // DOD
                     sourceFile.moveBackwardTo("\"Value\":\"");
-                    pageVariables.ucDOD = sourceFile.getUntil(" 00:00:00");
+                    temp = sourceFile.getUntil("\"");
+                    pageVariables.ucDOD = temp.left(10);
 
                     // YOB
                     sourceFile.moveTo("f2fec77b");
                     sourceFile.moveBackwardTo("\"Value\":\"");
-                    pageVariables.ucDOD = sourceFile.getUntil("\"");
+                    pageVariables.yob = sourceFile.getUntil("\"").asNumber();
 
                     // Read extension for each deceased
                     sourceFile.moveTo("\"ProductModelUrl\":\"");
@@ -14920,7 +14989,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                 QString tempString, yyyy, mmm, dd;
                 int index;
 
-                while (sourceFile.consecutiveMovesTo(15, "class=\"btn\"", "href="))
+                while (sourceFile.consecutiveMovesTo(50, "class=\"btn btn-secondary\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
@@ -15249,18 +15318,21 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 1151:  // iClic
             {
-                while (sourceFile.consecutiveMovesTo(50, "<li>", "href="))
+                // New format is JSON
+                while (sourceFile.moveTo("postPageUrl:"))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read extension for each deceased
                     pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
-                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
-                    // YOB-YOD
-                    if (sourceFile.conditionalMoveTo("class=\"annee\"", "<li>", 0))
-                        pageVariables.ucVariable = sourceFile.readNextBetween(BRACKETS);
+                    //DOP
+                    sourceFile.consecutiveMovesTo(50, "publishedDate:", "$date", "\"");
+                    pageVariables.ucPubDate = sourceFile.getUntil("T");
+
+                    sourceFile.moveTo("slug:");
+                    pageVariables.ID = sourceFile.readNextBetween(QUOTES).getString();
 
                     // Process
                     process(record, pageVariables, lang);
@@ -15695,6 +15767,38 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                 updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
             }
                 break; // 1167 Etincelle
+
+            case 1168:  // ObitAssistant
+            {
+                pageVariables.numericDateOrder = doMDY;
+
+                while (sourceFile.consecutiveMovesTo(30, "VISITOR_NAME", "DATE"))
+                {
+                    record.clear();
+                    pageVariables.reset();
+
+                    // DOB
+                    sourceFile.consecutiveMovesTo(25, "BORN_DATE", ":");
+                    pageVariables.ucDOB = sourceFile.readNextBetween(QUOTES);
+
+                    // ID
+                    sourceFile.consecutiveMovesTo(25, "OBIT_URL_REWRITE", ":");
+                    pageVariables.ID = sourceFile.readNextBetween(QUOTES).getString();
+                    pageVariables.webAddress = PQString("https://www.williamsfuneralhomeltd.com/obituaries?name=") + pageVariables.ID;
+
+                    // DOD
+                    sourceFile.consecutiveMovesTo(25, "DIED_DATE", ":");
+                    pageVariables.ucDOD = sourceFile.readNextBetween(QUOTES);
+
+                    // Process
+                    process(record, pageVariables, lang);
+                    if ((pageVariables.includeRecord) || flowParameters.initialSetup)
+                        records.append(record);
+                }
+
+                updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
+            }
+                break; // 1168 ObitAssistant
 
             case 2000:  // Mike Purdy
             {
@@ -16309,21 +16413,18 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2023:  // Koru
             {
-                while (sourceFile.moveTo("title=\"Obituaries Title\""))
+                sourceFile.JSONsimplify();
+                sourceFile.unescapeJSONformat();
+                sourceFile.unQuoteHTML();
+
+                while (sourceFile.consecutiveMovesTo(50, "class=\"sc_services_item_title\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read URL
-                    sourceFile.moveBackwardTo("href=");
                     pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
-
-                    if(sourceFile.conditionalMoveTo("class=\"obituaries-meta\"", ">Read More<", 2))
-                    {
-                        pageVariables.ucVariable = sourceFile.readNextBetween(BRACKETS);
-                        pageVariables.ucVariable.removeBookEnds(PARENTHESES);
-                    }
 
                     // Process
                     process(record, pageVariables, lang);
@@ -16581,14 +16682,9 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2033:  // Carnell
             {
-                if (sourceFile.moveTo("class=\"next page-numbers"))
-                {
-                    pageVariables.paginatedResult = true;
-                    flowParameters.endingPosition++;
-                }
-                sourceFile.beg();
+                sourceFile.moveTo("class=\"archiveObit\"");
 
-                while (sourceFile.consecutiveMovesTo(100, "class=\"archiveObit-item\"", "href="))
+                while (sourceFile.consecutiveMovesTo(50, "</a>", "<h3>", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
@@ -16597,7 +16693,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                     pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
-                    if (sourceFile.conditionalMoveTo("<h6", "archiveObit-item", 0))
+                    if (sourceFile.conditionalMoveTo("</h3><h6", "</p>"))
                         pageVariables.ucDOBandDOD = sourceFile.readNextBetween(BRACKETS);
 
                     // Process
@@ -16786,15 +16882,15 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                 QString excluded = QString("about-us|about-1|account|biodegradable-urns|cart-page|checkout|contact|fullscreen-page|fullscreen-page-1|grief-and-healing|home|jewelry|keepsake-urns");
                 excluded += QString("|links|obituaries|organizations|our-staff|planning-ahead|pre-arrange-now|price-list|product-page|regular-urns|search-results|services|shop");
                 QStringList excludedList = excluded.split("|");
-                sourceFile.moveTo(".\\/copy-of-obituaries");
+                //sourceFile.moveTo(".\\/copy-of-obituaries");
 
-                while (sourceFile.consecutiveMovesTo(100, "Static", "pageId", ".\\"))
+                while (sourceFile.consecutiveMovesTo(100, "MazNVa rYiAuL", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read URL
-                    pageVariables.webAddress = URLbase + sourceFile.getUntil("\"");
+                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES);
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
                     // Process
@@ -17073,19 +17169,18 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2053:  // FirstMemorial
             {
-                while (sourceFile.moveTo("<div class=\"date\""))
+                while (sourceFile.consecutiveMovesTo(100, "class=\"inner-orbituary\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
-
-                    // Read PubDate
-                    pageVariables.ucPubDate = sourceFile.readNextBetween(BRACKETS);
-
                     // Read URL
-                    sourceFile.moveTo("href=");
                     pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    // Read Dates
+                    if (sourceFile.conditionalMoveTo("class=\"equal-height-date\"", "class=\"inner-orbituary\"", 0))
+                        pageVariables.ucDOBandDOD = sourceFile.readNextBetween(BRACKETS);
 
                     // Process
                     process(record, pageVariables, lang);
@@ -18508,17 +18603,22 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2108:  // Life Transitions
             {
-                while (sourceFile.consecutiveMovesTo(75, "class=\"entry-title\"", "href="))
+                while (sourceFile.consecutiveMovesTo(50, "target=\"_blank\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
-                    if (sourceFile.conditionalMoveTo("<span", "href=", 0))
-                        pageVariables.ucVariable = sourceFile.readNextBetween(BRACKETS);
-
                     // Read URL
-                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
-                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+                    temp = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.webAddress = temp;
+                    temp.dropRight(10); // /index.php
+                    pageVariables.ID = temp.readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    if (sourceFile.conditionalMoveTo("date-text", "target=\"_blank\"", 0))
+                    {
+                        sourceFile.moveTo("<h");
+                        pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
+                    }
 
                     // Process
                     process(record, pageVariables, lang);
@@ -18972,19 +19072,17 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2125:  // Hamel
             {
-                while (sourceFile.conditionalMoveTo("<div class=\"none\"", "class=\"pagination\""))
+                while (sourceFile.consecutiveMovesTo(100, "class=\"wpfh_obit_thumbnail_dates\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read URL
-                    sourceFile.moveTo("href=");
                     pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
                     // DOD
-                    if (sourceFile.conditionalMoveTo("class=\"the-date\"", "class=\"none\"", 0))
-                        pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
+                    pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
 
                     // Process
                     process(record, pageVariables, lang);
@@ -19524,6 +19622,27 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             }
                 break; // 2147 HommageNB
 
+            case 2148:  // Drake
+            {
+                while (sourceFile.consecutiveMovesTo(50, "class=\"entry-title-link\"", "href="))
+                {
+                    record.clear();
+                    pageVariables.reset();
+
+                    // Read URL
+                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    // Process
+                    process(record, pageVariables, lang);
+                    if (pageVariables.includeRecord || flowParameters.initialSetup)
+                        records.append(record);
+                }
+
+                updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
+            }
+                break; // 2148 Drake
+
             case 2149:  // CityLine
             {
                 while (sourceFile.consecutiveMovesTo(100, "<!-- <div class='catelinenolink'></div><br />-->", "href="))
@@ -19579,7 +19698,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2151:  // Driftwood
             {
-                while (sourceFile.consecutiveMovesTo(150, "class=\"title\"", "href="))
+                while (sourceFile.consecutiveMovesTo(50, "class=\"entry-title td-module-title\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
@@ -19589,7 +19708,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
                     // Publish Date
-                    if (sourceFile.conditionalMoveTo("datetime=\"", "class=\"title\"", 0))
+                    if (sourceFile.conditionalMoveTo("datetime=\"", "class=\"entry-title td-module-title\"", 0))
                         pageVariables.ucPubDate = sourceFile.getUntil("T");
 
                     // Process
@@ -19639,6 +19758,32 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             }   // end case 2152 MLBW
                 break;
+
+            case 2153:  // Sproing
+            {
+                while (sourceFile.consecutiveMovesTo(150, "js-img-obj-fit__container", "href="))
+                {
+                    record.clear();
+                    pageVariables.reset();
+
+                    // Read URL
+                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+
+                    // DOD
+                    if (sourceFile.conditionalMoveTo("small dod-2", "js-img-obj-fit__container", 0))
+                        pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
+
+                    // Process
+                    process(record, pageVariables, lang);
+                    if (pageVariables.includeRecord || flowParameters.initialSetup)
+                        records.append(record);
+                }
+
+                updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
+            }
+                break; // 2153 Sproing
+
 
             default:
                 qDebug() << "Attempt to retrieve URLs for unknown/uncoded provider";
@@ -20263,7 +20408,7 @@ void MINER::determineCutOffDate(const int &daysOfOverlap, FLOWPARAMETERS &flowPa
             if (pageVariables.sequentialID)
             {
                 pageVariables.cutOffID = dbSearch.IDforLastDeathPreceding(pageVariables.cutoffDate, pageVariables.providerID, pageVariables.providerKey, globals);
-                if (pageVariables.cutOffID.length() == 0)
+                if ((pageVariables.cutOffID.length() == 0) || (pageVariables.cutOffID.left(1) == QString("9")))  // Must exclude 9s for double recs with made up ID
                     pageVariables.cutOffID = QString("0");
             }
         }

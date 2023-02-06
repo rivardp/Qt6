@@ -586,9 +586,10 @@ void MATCHRECORD::compareMiddleNames(QStringList &recMiddleNameList, QStringList
 void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
 {
     double DBdateRange, recDateRange;
+    QDate minValidDate(1900,1,1);
 
     // Check for match
-    if (recDateInfo.exactDate.isValid() && DBdateInfo.exactDate.isValid())
+    if (recDateInfo.exactDate.isValid() && DBdateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate) && (DBdateInfo.exactDate > minValidDate))
     {
         if (recDateInfo.exactDate == DBdateInfo.exactDate)
             addToScore(mDOB);
@@ -621,7 +622,7 @@ void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
         else
             recDateRange = 99;
 
-        if (recDateInfo.exactDate.isValid() && !DBdateInfo.exactDate.isValid())
+        if (recDateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate) && !(DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > minValidDate)))
         {
             if (DBdateRange < 2.0)
             {
@@ -641,7 +642,7 @@ void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
         }
         else
         {
-            if (!recDateInfo.exactDate.isValid() && (DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > QDate(1875,1,1))))
+            if (!(recDateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate)) && (DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > minValidDate)))
             {
                 if (recDateRange < 2.0)
                 {
@@ -703,7 +704,7 @@ void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
             closeDOBrange = true;
     }
 
-    if (recDateInfo.exactDate.isValid() || DBdateInfo.exactDate.isValid())
+    if ((recDateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate)) || (DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > minValidDate)))
         potentialNumDataMatches++;
     else
     {
@@ -714,8 +715,10 @@ void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
 
 void MATCHRECORD::compareDODinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
 {
+    QDate minValidDate(1900,1,1);
+
     // Check for match
-    if (recDateInfo.exactDate.isValid() && DBdateInfo.exactDate.isValid())
+    if (recDateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate) && DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > minValidDate))
     {
         if (recDateInfo.exactDate == DBdateInfo.exactDate)
             addToScore(mDOD);
@@ -745,7 +748,7 @@ void MATCHRECORD::compareDODinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
     }
 
     // Check for any new information
-    if (recDateInfo.exactDate.isValid() && !DBdateInfo.exactDate.isValid())
+    if ((recDateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate)) && !(DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > minValidDate)))
         newInfoAvailable = true;
     else
     {
@@ -753,7 +756,7 @@ void MATCHRECORD::compareDODinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
             newInfoAvailable = true;
     }
 
-    if (recDateInfo.exactDate.isValid() || DBdateInfo.exactDate.isValid())
+    if ((recDateInfo.exactDate.isValid() && (recDateInfo.exactDate > minValidDate)) || (DBdateInfo.exactDate.isValid() && (DBdateInfo.exactDate > minValidDate)))
         potentialNumDataMatches++;
     else
     {
@@ -764,8 +767,11 @@ void MATCHRECORD::compareDODinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
 
 void MATCHRECORD::compareDOBDODinfo(DATEINFO &recDOBInfo, DATEINFO &DBDOBInfo, DATEINFO &recDODInfo, DATEINFO &DBDODInfo)
 {
+    QDate minValidDate(1900,1,1);
+
     // Catch inconsistency where maxDOB can be interpreted as maxDOD
-    if (recDODInfo.exactDate.isValid() && !DBDODInfo.exactDate.isValid() && (!DBDOBInfo.exactDate.isValid() || (DBDOBInfo.exactDate == QDate(1,1,1))) && (DBDOBInfo.minDate == QDate(1875,1,1)))
+    if ((recDODInfo.exactDate.isValid() && (recDODInfo.exactDate > minValidDate)) && !(DBDODInfo.exactDate.isValid() && (DBDODInfo.exactDate > minValidDate)) &&
+            (!(DBDOBInfo.exactDate.isValid() && (DBDOBInfo.exactDate > minValidDate)) || (DBDOBInfo.exactDate <= minValidDate)) && (DBDOBInfo.minDate <= minValidDate))
     {
         if (recDODInfo.exactDate > DBDOBInfo.maxDate)
         {
@@ -774,7 +780,8 @@ void MATCHRECORD::compareDOBDODinfo(DATEINFO &recDOBInfo, DATEINFO &DBDOBInfo, D
         }
     }
 
-    if (DBDODInfo.exactDate.isValid() && !recDODInfo.exactDate.isValid() && (!recDOBInfo.exactDate.isValid() || (recDOBInfo.exactDate == QDate(1,1,1))) && (recDOBInfo.minDate == QDate(1875,1,1)))
+    if ((DBDODInfo.exactDate.isValid() && (DBDODInfo.exactDate > minValidDate)) && !(recDODInfo.exactDate.isValid() &&(recDODInfo.exactDate > minValidDate)) &&
+            (!(recDOBInfo.exactDate.isValid() && (recDOBInfo.exactDate > minValidDate)) || (recDOBInfo.exactDate <= minValidDate)) && (recDOBInfo.minDate <= minValidDate))
     {
         if (DBDODInfo.exactDate > recDOBInfo.maxDate)
         {

@@ -120,6 +120,7 @@ public:
     bool isProvAbbreviation() const;
     bool isCompoundName() const;
     bool isUncapitalizedName() const;
+    bool isSingleVan() const;
     bool isNoVowelName() const;
     bool isHyphenatedName() const;
     bool isDegree() const;
@@ -216,6 +217,7 @@ protected:
     static QList<dayOfWeekInfo> daysOfWeekSpanish;
 
     static QList<QString> uncapitalizedNames;
+    static QList<QString> singleVans;
     static QList<QString> hyphenatedNameBeginnings;
     static QList<QString> aboriginalNames;
     static QList<QString> problematicAboriginalNames;

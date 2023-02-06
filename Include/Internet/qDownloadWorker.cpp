@@ -350,28 +350,37 @@ void DownloadWorker::startNextDownload()
         }
         else
         {
-            // POST
-            if (currentRequest.instructions.payload.length() > 0)
+            if (currentRequest.instructions.verb == "MULTIPART")
             {
-                networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, currentRequest.instructions.payload.count());
-
-                networkReply = networkMgr->post(networkRequest, currentRequest.instructions.payload.toUtf8());
+                QHttpMultiPart *multiPart = currentRequest.instructions.multiPartList.takeFirst();
+                networkReply = networkMgr->post(networkRequest, multiPart);
+                multiPart->setParent(networkReply);
             }
             else
             {
-                QByteArray messageBody;
-                if (currentRequest.instructions.X_Origin.length() == 0)
+                // Normal POST
+                if (currentRequest.instructions.payload.length() > 0)
                 {
-                    // Split off arguments from URL
-                    QString tempURL = currentRequest.instructions.qUrl.toString();
-                    int index = tempURL.lastIndexOf("?");
-                    currentRequest.instructions.qUrl = tempURL.left(index);
-                    networkRequest.setUrl(currentRequest.instructions.qUrl);
-                    messageBody.append(tempURL.right(tempURL.length() - index - 1).toUtf8());
-                }
-                networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, messageBody.count());
+                    networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, currentRequest.instructions.payload.count());
 
-                networkReply = networkMgr->post(networkRequest, messageBody);
+                    networkReply = networkMgr->post(networkRequest, currentRequest.instructions.payload);
+                }
+                else
+                {
+                    QByteArray messageBody;
+                    if (currentRequest.instructions.X_Origin.length() == 0)
+                    {
+                        // Split off arguments from URL
+                        QString tempURL = currentRequest.instructions.qUrl.toString();
+                        int index = tempURL.lastIndexOf("?");
+                        currentRequest.instructions.qUrl = tempURL.left(index);
+                        networkRequest.setUrl(currentRequest.instructions.qUrl);
+                        messageBody.append(tempURL.right(tempURL.length() - index - 1).toUtf8());
+                    }
+                    networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, messageBody.count());
+
+                    networkReply = networkMgr->post(networkRequest, messageBody);
+                }
             }
         }
     }

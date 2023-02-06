@@ -145,6 +145,7 @@ void readObit::read()
         globals->globalDr->runDateValidations();
         finalNameCleanup();
         runNameValidations();
+        treatmentNameCleanup();
         runGenderValidation();
         runRecordValidation();
         fixNameIssues();
@@ -298,19 +299,44 @@ void readObit::readInObitText()
         break;
 
     case DomainFuneraire:
-        if (consecutiveMovesTo(1000, "class=\"description\"", "<p class=\"js-", ">"))
-            uc = getUntil("<div class=\"sympathy-messages\">");
+        if (consecutiveMovesTo(50, "mt-10 text-sm wysiwyg", ">"))
+            uc = getUntil("</div>");
         break;
 
     case GreatWest:
     {
-        QRegularExpression target;
-        target.setPattern("(Sibling|sibling)");
-        itsString.replace(target, QString(" 99999 \\1"));
+        switch(globals->globalDr->getProviderKey())
+        {
+        case 18:
+            if (consecutiveMovesTo(150, "id=\"details-body\"", ">"))
+                uc = getUntil("<div");
+            break;
 
-        if (consecutiveMovesTo(150, "id=\"details-body\"", "itemprop=\"articleBody\">"))
-            uc = getUntil("<div id=\"details-widgets\">");
+        default:
+            QRegularExpression target;
+            target.setPattern("(Sibling|sibling)");
+            itsString.replace(target, QString(" 99999 \\1"));
+
+            if (consecutiveMovesTo(150, "id=\"details-body\"", "itemprop=\"articleBody\">"))
+                uc = getUntil("<div id=\"details-widgets\">");
+            break;
+        }
     }
+        break;
+
+    case EchoVita:
+        if (consecutiveMovesTo(200, "id=\"obituary\"", "</h1>"))
+        {
+            uc = getUntil("</div>");
+
+            // Remove (Ashern, Manitoba)
+            QRegularExpression target;
+            target.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+            target.setPattern("\\s+\\(\\w+,\\s+Manitoba\\)");
+            QString tempString = uc.getString();
+            tempString.replace(target, "");
+            uc = tempString;
+        }
         break;
 
     case SaltWire:
@@ -2289,8 +2315,8 @@ void readObit::readInObitText()
 
     case Canadian:
     {
-        consecutiveMovesTo(100, "class=\"fastsocialshare_clearer\"", ">");
-        uc = getUntilEarliestOf("DurhamObituaries.com</a>", "TorontoObituaries.com</a>");
+        if(consecutiveMovesTo(100, "itemprop=\"articleBody\"", ">"))
+            uc = getUntil("<script>");
     }
         break;
 
@@ -2811,10 +2837,10 @@ void readObit::readInObitText()
         break;
 
     case Alcock:
-        if (consecutiveMovesTo(4000, "data-testid=\"richTextElement\"", "</p>"))
+        if (moveTo("</span></span>"))
         {
-            moveBackwardTo("<span", 4000);
-            moveTo(">");
+            forward(5);
+            moveTo("</span></span>");
             uc = getUntil("</div>");
         }
         break;
@@ -2880,8 +2906,8 @@ void readObit::readInObitText()
         break;
 
     case FirstMemorial:
-        if (consecutiveMovesTo(150, "class=\"Obituaries-details\"", "</h", ">"))
-            uc = getUntil("<!-- You can start editing here. -->");
+        if (consecutiveMovesTo(150, "class=\"content-outer\"", "</ul>"))
+            uc = getUntil("</section>");
         break;
 
     case Haine:
@@ -3197,8 +3223,8 @@ void readObit::readInObitText()
         break;
 
     case LifeTransitions:
-        if (consecutiveMovesTo(100, "class=\"entry-content content\"", ">"))
-            uc = getUntil("div class=\"et_social_inline");
+        if (consecutiveMovesTo(100, "class=\"read-more-content\"", ">"))
+            uc = getUntil("</div>");
         break;
 
     case Davis:
@@ -3332,7 +3358,7 @@ void readObit::readInObitText()
 
     case Hamel:
     {
-        if (consecutiveMovesTo(100, "id=\"the-obit-info\"", "</p>"))
+        if (moveTo("<div id=\"memorial\">"))
             uc = getUntil("</div>");
     }
         break;
@@ -3531,6 +3557,13 @@ void readObit::readInObitText()
     }
         break;
 
+    case Drake:
+    {
+        if (consecutiveMovesTo(750, "class=\"entry-title\"", "<p>"))
+            uc = getUntil("</div>");
+    }
+        break;
+
     case CityLine:
     {
         if (consecutiveMovesTo(100, ">Write a Tribute<", "</div>"))
@@ -3547,8 +3580,19 @@ void readObit::readInObitText()
 
     case Driftwood:
     {
-        if (consecutiveMovesTo(50, "entry-content clearfix single-post-content", ">"))
-            uc = getUntil("</div>");
+        switch(style)
+        {
+        case 0:
+            if (consecutiveMovesTo(75, "entry-content clearfix single-post-content", ">"))
+                uc = getUntil("</div>");
+            break;
+
+        case 1:
+            moveTo("class=\"tdb-title-text\"");
+            if (consecutiveMovesTo(75, "tdb-block-inner td-fix-index", ">"))
+                uc = getUntil("</div>");
+            break;
+        }
     }
         break;
 
@@ -3559,6 +3603,12 @@ void readObit::readInObitText()
     }
         break;
 
+    case Sproing:
+    {
+        if (consecutiveMovesTo(1750, "class=\"row\"", "is-layout-flow wp-block-column", "</div>"))
+            uc = getUntil("</div>");
+    }
+        break;
 
     default:
         PQString errMsg;
@@ -3737,6 +3787,7 @@ void readObit::readInObitTitle()
             titleStream = getUntil("</title>");
         break;
 
+    case EchoVita:
     case SaltWire:
     case Tegara:
     case Arbor:
@@ -3767,7 +3818,6 @@ void readObit::readInObitTitle()
     case MontPetit:
     case RichardPhilibert:
     case Affordable:
-    case LifeTransitions:
     case PropulC:
     case iClic:
     case GyOrgy:
@@ -3778,7 +3828,10 @@ void readObit::readInObitTitle()
     case People:
     case Voyou:
     case CityLine:
+    case FirstMemorial:
     case Etincelle:
+    case Driftwood:
+    case Drake:
         if (moveTo("<title>"))
             titleStream = getUntilEarliestOf("|", "<");
         break;
@@ -3787,6 +3840,7 @@ void readObit::readInObitTitle()
     case CooperativeFuneraire:
     case GreatWest:
     case BlackPress:
+    case Village:
     case Aberdeen:
     case ConnellyMcKinley:
     case Codesign:
@@ -3806,7 +3860,6 @@ void readObit::readInObitTitle()
     case ChadSimpson:
     case InView:
     case Imago:
-    case FirstMemorial:
     case Steeles:
     case Globalia:
     case NBL:
@@ -3848,6 +3901,7 @@ void readObit::readInObitTitle()
     case CremAlt:
     case Dryden:
     case Lampman:
+    case LifeTransitions:
     case ecoPassages:
     case Peaceful:
     case LegacyCardstrom:
@@ -3859,8 +3913,8 @@ void readObit::readInObitTitle()
     case PassageCoop:
     case Brunet:
     case Kane:
-    case Driftwood:
     case Carve:
+    case Sproing:
         if (moveTo("<title>"))
             titleStream = getUntilEarliestOf(" - ", "<");
         break;
@@ -3963,7 +4017,6 @@ void readObit::readInObitTitle()
     case Loehmer:
     case NouvelleVie:
     case Granit:
-    case Hamel:
     case Forest:
     case TriCity:
         if (consecutiveMovesTo(100, "og:title", "content="))
@@ -4740,9 +4793,9 @@ void readObit::readInObitTitle()
         break;
 
     case Alcock:
-        if (consecutiveMovesTo(4000, "data-testid=\"richTextElement\"", "</p>"))
+        if (moveTo("</span></span>"))
         {
-            moveBackwardTo("<span", 4000);
+            moveBackwardTo("<span", 200);
             moveTo(">");
             backward(1);
             titleStream = readNextBetween(BRACKETS);
@@ -4962,6 +5015,11 @@ void readObit::readInObitTitle()
         }
         break;
 
+    case Hamel:
+        if (consecutiveMovesTo(250, "wpfh-single-header-right", "href", ">"))
+            titleStream = getUntil("<");
+        break;
+
     case London:
         if (moveTo("<title>"))
             titleStream = getUntilEarliestOf("-", "<");
@@ -4994,6 +5052,20 @@ void readObit::readInObitTitle()
         targetText = OQString(globals->globalDr->getID()).convertFromID();
         if (moveTo(targetText))
             titleStream = targetText;
+        break;
+
+    case ObitAssistant:
+    {
+        OQStream word;
+        OQStream tempStream = globals->globalDr->getURL();
+        int index = tempStream.findPosition("=");
+        tempStream.dropLeft(index+1);
+
+        while (!tempStream.isEOS()){
+            titleStream += tempStream.getUntil("-").proper() + PQString(" ");
+        }
+        titleStream.cleanUpEnds();
+    }
         break;
 
 
@@ -6460,7 +6532,7 @@ void readObit::readMessages()
 
     case FirstMemorial:
         commentDate = globals->today;
-        while (consecutiveMovesTo(200, "comment-meta commentmetadata", ">", ">"))
+        while (consecutiveMovesTo(200, "class=\"comment-author meta\"", "</strong>"))
         {
             tempUC = getUntil(" at ");
             tempUC.simplify();
@@ -6527,10 +6599,10 @@ void readObit::readMessages()
 
     case LifeTransitions:
         commentDate = globals->today;
-        while (consecutiveMovesTo(250, "class=\"x-comment-time\"", "datetime=\""))
+        while (moveTo("class=\"tributePost-postDate\""))
         {
-            tempUC = getUntil("T");
-            tempDate = tempUC.readDateField(doYMD);
+            tempUC = readNextBetween(BRACKETS);
+            tempDate = tempUC.readDateField();
             if (tempDate.isValid() && (tempDate < commentDate))
                 commentDate = tempDate;
         }
@@ -6895,6 +6967,7 @@ bool readObit::fillInDatesStructured(unstructuredContent &uc, bool reliable)
     DATES dates;
     bool newInfoFound = false;
     uc.replaceHTMLentities();
+    uc.removeHTMLtags();
     uc.unQuoteHTML();
     uc.simplify();
     uc.fixBasicErrors();
@@ -7666,158 +7739,212 @@ void readObit::readStructuredContent()
         break;
 
     case DomainFuneraire:
-        if (consecutiveMovesTo(100, "<title>", "Avis", " - "))
+        if (moveTo("<h1 class=\"text"))
         {
-            QString tempString = getUntilEarliestOf(" |", "<").getString();
-            QRegularExpression target;
-            target.setPattern("\\*\\*\\w+\\*\\*");
-            tempString.replace(target, "");
-            target.setPattern(" \\d{4}-\\d{4}");
-            tempString.replace(target, "");
-            tempUC = tempString;
+            tempUC = readNextBetween(BRACKETS);
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
-        }
 
+            if (moveTo("<span", 50))
+            {
+                tempUC = readNextBetween(BRACKETS);
+                tempUC.processStructuredYears();
+            }
+        }
         break;
 
     case GreatWest:
     {
-        OQStream tempStream(globals->uc->getString());
-        if (tempStream.moveTo("Date of death:"))
+        switch (globals->globalDr->getProviderKey())
         {
-            tempUC = tempStream.getUntil(".");
-            tempUC.cleanUpEnds();
-            if (tempUC.getLength() == 4)
-                tempUC.processYearField(dfDOD);
-            else
-                tempUC.processDateField(dfDOD);
-        }
-        tempStream.beg();
-        if (tempStream.moveTo("Date of birth:"))
-        {
-            tempUC = tempStream.getUntil(".");
-            tempUC.cleanUpEnds();
-            if (tempUC.getLength() == 4)
-                tempUC.processYearField(dfDOB);
-            else
-                tempUC.processDateField(dfDOB);
-        }
-        tempStream.beg();
-        if (tempStream.moveTo("Age: ", 150))
-        {
-            tempUC = tempStream.getUntil(" ");
-            tempUC.processAgeAtDeath();
-        }
-
-        this->itsString.replace(QString("</strong>:"), QString(":</strong>"), Qt::CaseSensitive);
-        if (consecutiveMovesTo(200, ">Obituaries<", "data-title="))
-        {
-            tempUC = getUntil(" data-tag");
-            tempUC.removeBookEnds(QUOTES);
-
-            // Fix problem of extra wording at front
-            int index = tempUC.getString().lastIndexOf(":");
-            if (index != -1)
-            {
-                bool dropBeg = false;
-                QString beginning = tempUC.left(index).lower().getString();
-                QStringList badWords = QString("announced|announcement|burial|celebration|funeral|mass|memorial|memoriam|service|visitation").split("|");
-                while (!dropBeg && !badWords.isEmpty())
-                {
-                    dropBeg = beginning.contains(badWords.takeFirst(), Qt::CaseInsensitive);
-                }
-                if (dropBeg)
-                    tempUC.dropLeft(index + 1);
-            }
-
-            // Fix double quote problem
-            index = tempUC.getString().indexOf("&quot;&quot;");
-            if (index != -1)
-            {
-                QString newString;
-                QString tempString = tempUC.getString();
-                int index2 = tempString.indexOf(" ", index);
-                if (index2 == -1)
-                    index2 = tempString.length() + 1;
-                newString  = tempUC.left(index).getString();
-                newString += QString("\"");
-                newString += tempString.mid(index + 12, index2 - index - 12);
-                newString += QString("\"");
-                if (index2 < tempString.length())
-                    newString += tempString.right(tempString.length() - index2);
-
-                tempUC = newString;
-            }
-
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
-
-            bool eitherFound = conditionalMoveTo("class=\"mt-0\"", "class=\"cp-obit-age\">", 0, 500);
-            if (eitherFound)
+        case 18:
+            if (moveTo("title text-noleading mb-2"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processDateField(dfDOD);
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            }
+            break;
 
-                if (moveTo("class=\"cp-obit-age\">", 100))
+        default:
+            OQStream tempStream(globals->uc->getString());
+            if (tempStream.moveTo("Date of death:"))
+            {
+                tempUC = tempStream.getUntil(".");
+                tempUC.cleanUpEnds();
+                if (tempUC.getLength() == 4)
+                    tempUC.processYearField(dfDOD);
+                else
+                    tempUC.processDateField(dfDOD);
+            }
+            tempStream.beg();
+            if (tempStream.moveTo("Date of birth:"))
+            {
+                tempUC = tempStream.getUntil(".");
+                tempUC.cleanUpEnds();
+                if (tempUC.getLength() == 4)
+                    tempUC.processYearField(dfDOB);
+                else
+                    tempUC.processDateField(dfDOB);
+            }
+            tempStream.beg();
+            if (tempStream.moveTo("Age: ", 150))
+            {
+                tempUC = tempStream.getUntil(" ");
+                tempUC.processAgeAtDeath();
+            }
+
+            this->itsString.replace(QString("</strong>:"), QString(":</strong>"), Qt::CaseSensitive);
+            if (consecutiveMovesTo(200, ">Obituaries<", "data-title="))
+            {
+                tempUC = getUntil(" data-tag");
+                tempUC.removeBookEnds(QUOTES);
+
+                // Fix problem of extra wording at front
+                int index = tempUC.getString().lastIndexOf(":");
+                if (index != -1)
+                {
+                    bool dropBeg = false;
+                    QString beginning = tempUC.left(index).lower().getString();
+                    QStringList badWords = QString("announced|announcement|burial|celebration|funeral|mass|memorial|memoriam|service|visitation").split("|");
+                    while (!dropBeg && !badWords.isEmpty())
+                    {
+                        dropBeg = beginning.contains(badWords.takeFirst(), Qt::CaseInsensitive);
+                    }
+                    if (dropBeg)
+                        tempUC.dropLeft(index + 1);
+                }
+
+                // Fix double quote problem
+                index = tempUC.getString().indexOf("&quot;&quot;");
+                if (index != -1)
+                {
+                    QString newString;
+                    QString tempString = tempUC.getString();
+                    int index2 = tempString.indexOf(" ", index);
+                    if (index2 == -1)
+                        index2 = tempString.length() + 1;
+                    newString  = tempUC.left(index).getString();
+                    newString += QString("\"");
+                    newString += tempString.mid(index + 12, index2 - index - 12);
+                    newString += QString("\"");
+                    if (index2 < tempString.length())
+                        newString += tempString.right(tempString.length() - index2);
+
+                    tempUC = newString;
+                }
+
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+
+                bool eitherFound = conditionalMoveTo("class=\"mt-0\"", "class=\"cp-obit-age\">", 0, 500);
+                if (eitherFound)
+                {
+                    tempUC = readNextBetween(BRACKETS);
+                    tempUC.processDateField(dfDOD);
+
+                    if (moveTo("class=\"cp-obit-age\">", 100))
+                    {
+                        tempUC = getUntilEarliestOf(" ", "<", 100);
+                        tempUC.processAgeAtDeath();
+                    }
+                }
+                else
+                    backward(500);
+
+                if (moveTo("class=\"cp-obit-age\">", 500))
                 {
                     tempUC = getUntilEarliestOf(" ", "<", 100);
                     tempUC.processAgeAtDeath();
                 }
-            }
-            else
-                backward(500);
-
-            if (moveTo("class=\"cp-obit-age\">", 500))
-            {
-                tempUC = getUntilEarliestOf(" ", "<", 100);
-                tempUC.processAgeAtDeath();
-            }
-            else
-            {
-                if (globals->globalDr->missingDOB() || globals->globalDr->missingDOD())
+                else
                 {
-                    beg();
-                    if (moveTo("<strong>Date of death:</strong>"))
-                    {
-                        tempUC = getUntil("<");
-                        tempUC.processDateField(dfDOD);
-
-                        if (moveTo("<strong>Date of birth:</strong>"))
-                        {
-                            tempUC = getUntil("<");
-                            tempUC.processDateField(dfDOB);
-                        }
-
-                        if (moveTo("<strong>Age:</strong>"))
-                        {
-                            tempUC = getUntil("<");
-                            tempUC.processAgeAtDeath();
-                        }
-                    }
-                    else
+                    if (globals->globalDr->missingDOB() || globals->globalDr->missingDOD())
                     {
                         beg();
-                        if (consecutiveMovesTo(250, ">Date of death", ": "))
+                        if (moveTo("<strong>Date of death:</strong>"))
                         {
                             tempUC = getUntil("<");
                             tempUC.processDateField(dfDOD);
 
-                            if (consecutiveMovesTo(250, ">Date of birth", ": "))
+                            if (moveTo("<strong>Date of birth:</strong>"))
                             {
                                 tempUC = getUntil("<");
-                                tempUC.processYearField(dfDOB);
+                                tempUC.processDateField(dfDOB);
                             }
 
-                            if (consecutiveMovesTo(250, ">Age", ": "))
+                            if (moveTo("<strong>Age:</strong>"))
                             {
                                 tempUC = getUntil("<");
                                 tempUC.processAgeAtDeath();
                             }
                         }
+                        else
+                        {
+                            beg();
+                            if (consecutiveMovesTo(250, ">Date of death", ": "))
+                            {
+                                tempUC = getUntil("<");
+                                tempUC.processDateField(dfDOD);
+
+                                if (consecutiveMovesTo(250, ">Date of birth", ": "))
+                                {
+                                    tempUC = getUntil("<");
+                                    tempUC.processYearField(dfDOB);
+                                }
+
+                                if (consecutiveMovesTo(250, ">Age", ": "))
+                                {
+                                    tempUC = getUntil("<");
+                                    tempUC.processAgeAtDeath();
+                                }
+                            }
+                        }
                     }
                 }
             }
+            break;
         }
+
     }
+        break;
+
+    case EchoVita:
+        if (moveTo("mobile-title"))
+        {
+            tempUC = readNextBetween(BRACKETS);
+            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+
+            if (consecutiveMovesTo(100, "fa-calendar-day", "</i>"))
+            {
+                tempUC = getUntil("<span class=");
+                fillInDatesStructured(tempUC);
+            }
+
+            tempUC = readNextBetween(BRACKETS);
+            tempUC.cleanUpEnds();
+            tempUC.removeBookEnds(PARENTHESES);
+
+            int index = tempUC.findPosition(" ");
+            if (index > 0)
+            {
+                int age = tempUC.left(index).asNumber();
+                if ((age > 0) && (age < 125))
+                    globals->globalDr->setAgeAtDeath(age);
+            }
+
+            // Potential backup read of YOB - YOD in title
+            if (!globals->globalDr->getDOB().isValid())
+            {
+                tempUC = globals->globalDr->getTitle();
+                tempUC.cleanUpEnds();
+                index = tempUC.findPosition("(", -1);
+                if (index > 0)
+                {
+                    tempTempUC = tempUC.right(tempUC.getLength() - index);
+                    tempTempUC.removeBookEnds(PARENTHESES);
+                    if (tempTempUC.getLength() == 11)
+                        tempTempUC.processStructuredYears();
+                }
+            }
+        }
         break;
 
     case SaltWire:
@@ -11782,7 +11909,15 @@ void readObit::readStructuredContent()
 
     case Canadian:
     {
-        tempUC = globals->globalDr->getTitle();
+        if (moveTo("itemprop=\"headline\""))
+        {
+            tempUC = readNextBetween(BRACKETS);
+            tempUC.fixBasicErrors(true);
+            tempUC.compressCompoundNames(globals->globalDr->getLanguage());
+            tempUC.removeRepeatedLastName();
+        }
+        else
+            tempUC = globals->globalDr->getTitle();
         tempUC.processStructuredNames(nameStatsList, fixHyphens);
     }
         break;
@@ -12349,6 +12484,14 @@ void readObit::readStructuredContent()
         }
     }
         break;
+
+    case ObitAssistant:
+    {
+        tempUC = globals->globalDr->getTitle();
+        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+    }
+        break;
+
     /***************/
     /*  One Offs   */
     /***************/
@@ -13180,30 +13323,23 @@ void readObit::readStructuredContent()
         break;
 
     case Alcock:
-        if (consecutiveMovesTo(4000, "data-testid=\"richTextElement\"", "</p>"))
+        if (moveTo("</span></span>"))
         {
-            moveBackwardTo("<span", 4000);
+            moveBackwardTo("<span", 200);
             moveTo(">");
             backward(1);
             tempUC = readNextBetween(BRACKETS);
+            tempUC.processStructuredNames(nameStatsList, fixHyphens);
 
-            OQStream tempStream(tempUC);
-            tempTempUC.clear();
-            int wordCount = 0;
-            bool keepGoing = true;
-            while (!tempStream.isEOS() && (wordCount <= 6) && keepGoing)
+            forward(5);
+            if (moveTo("</span></span>"))
             {
-                word = tempStream.getWord(true);
-                wordCount++;
-                if ((wordCount > 2) && word.isRecognized())
-                    keepGoing = false;
-                if (keepGoing)
-                {
-                    tempTempUC += word;
-                    tempTempUC += OQString(" ");
-                }
+                moveBackwardTo("<span", 200);
+                moveTo(">");
+                backward(1);
+                tempUC = readNextBetween(BRACKETS);
+                fillInDatesStructured(tempUC);
             }
-            tempTempUC.processStructuredNames(nameStatsList, fixHyphens);
         }
         break;
 
@@ -13348,8 +13484,12 @@ void readObit::readStructuredContent()
         break;
 
     case FirstMemorial:
-        if (consecutiveMovesTo(100, "class=\"Obituaries-details\"", "<h"))
+        if (moveTo("class=\"year\""))
         {
+            tempUC = readNextBetween(BRACKETS);
+            fillInDatesStructured(tempUC);
+
+            moveTo("<li><h");
             tempUC = readNextBetween(BRACKETS);
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
         }
@@ -14245,10 +14385,25 @@ void readObit::readStructuredContent()
         break;
 
     case LifeTransitions:
-        if (moveTo("class=\"entry-title\""))
+        if (consecutiveMovesTo(100, "<!-- obit name -->", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
+
+            if (moveTo("<!-- obit date -->"))
+            {
+                if (conditionalMoveTo("dateofBirth", "</div>"))
+                {
+                    tempUC = readNextBetween(BRACKETS);
+                    tempUC.processDateField(dfDOB);
+                }
+
+                if (conditionalMoveTo("dateofDeath", "</div>"))
+                {
+                    tempUC = readNextBetween(BRACKETS);
+                    tempUC.processDateField(dfDOD);
+                }
+            }
         }
         break;
 
@@ -14485,12 +14640,12 @@ void readObit::readStructuredContent()
         break;
 
     case Hamel:
-        if (consecutiveMovesTo(25, "id=\"the-obit-info\"", "<h"))
+        if (consecutiveMovesTo(250, "wpfh-single-header-right", "href", ">"))
         {
-            tempUC = readNextBetween(BRACKETS);
+            tempUC = getUntil("<");
             tempUC.processStructuredNames(nameStatsList, fixHyphens);
 
-            if (moveTo("class=\"wpfh_obit_date\""))
+            if (moveTo("wpfh-obit-alternate-dates"))
             {
                 tempUC = readNextBetween(BRACKETS);
                 tempUC.processStructuredYears();
@@ -14821,6 +14976,21 @@ void readObit::readStructuredContent()
         }
         break;
 
+    case Drake:
+        if (consecutiveMovesTo(100, "article:published_time", "content=\""))
+        {
+            tempUC = getUntil("T");
+            tempUC.processDateField(dfDOP);
+        }
+
+        beg();
+        if (moveTo("class=\"entry-title\""))
+        {
+            tempUC = readNextBetween(BRACKETS);
+            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        }
+        break;
+
     case CityLine:
         if (consecutiveMovesTo(350, "class='tributecontent-tributepost", "class='posts_head'", "<h1"))
         {
@@ -14846,11 +15016,23 @@ void readObit::readStructuredContent()
         break;
 
     case Driftwood:
-        moveTo("main-section");
-        if (consecutiveMovesTo(100, "class=\"post-title\"", "headline"))
+        switch(style)
         {
-            tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        case 0:
+            if (consecutiveMovesTo(100, "class=\"post-title\"", "headline"))
+            {
+                tempUC = readNextBetween(BRACKETS);
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            }
+            break;
+
+        case 1:
+            if (moveTo("class=\"tdb-title-text\""))
+            {
+                tempUC = readNextBetween(BRACKETS);
+                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            }
+            break;
         }
         break;
 
@@ -14875,6 +15057,22 @@ void readObit::readStructuredContent()
             if (moveTo(">décédé(e) le "))
             {
                 tempUC = getUntil("<");
+                tempUC.processDateField(dfDOD);
+            }
+        }
+        break;
+
+    case Sproing:
+        if (consecutiveMovesTo(300, "et-main-area", "h2-heading"))
+        {
+            conditionalMoveTo("strong", "</", 0);
+            moveTo(">");
+            tempUC = getUntil("<");
+            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+
+            if (moveTo("dod fs-5", 100))
+            {
+                tempUC = readNextBetween(BRACKETS);
                 tempUC.processDateField(dfDOD);
             }
         }
@@ -15456,6 +15654,16 @@ void readObit::readStyle()
         else
             style = 0;
     }
+        break;
+
+    case Driftwood:
+    {
+        if (moveTo("tdb-block-inner td-fix-index"))
+            style = 1;
+        else
+            style = 0;
+    }
+        break;
 
     default:
         // Do nothing
@@ -17987,6 +18195,11 @@ void readObit::readInCustomAddress()
     QString location;
     databaseSearches dbSearch;
 
+    QString searchArea;
+    QRegularExpression pcTarget;
+    QRegularExpressionMatch match;
+    pcTarget.setPattern("([A-Z][0-9][A-Z])\\s?([0-9][A-Z][0-9])");
+
     PROVIDER providerID = globals->globalDr->getProvider();
     unsigned int providerKey = globals->globalDr->getProviderKey();
     beg();
@@ -18002,6 +18215,17 @@ void readObit::readInCustomAddress()
             pc = readNextBetween(QUOTES).getString();
         break;
 
+    case 1000:
+        if (moveTo("<footer>"))
+        {
+            searchArea = getUntil("</footer>").getString();
+            match = pcTarget.match(searchArea);
+
+            if (match.hasMatch())
+                pc = match.captured(1) + QString(" ") + match.captured(2);
+        }
+        break;
+
     case 1080:
         if (providerKey == 1)
         {
@@ -18010,6 +18234,25 @@ void readObit::readInCustomAddress()
                 location = readNextBetween(QUOTES).getString();
                 pc = dbSearch.pcLookup(globals, providerID, providerKey, location);
             }
+        }
+        break;
+
+    case 1086:
+        if (moveTo("class=\"deces-lieu\""))
+        {
+            location = readNextBetween(BRACKETS).getString();
+            pc = pc = dbSearch.pcLookupPlaces(globals, providerID, providerKey, location).getPostalCode();
+        }
+        break;
+
+    case 1093:
+        if (consecutiveMovesTo(250, "class=\"location\"", "<p>"))
+        {
+            searchArea = getUntil("</p>").getString();
+            match = pcTarget.match(searchArea);
+
+            if (match.hasMatch())
+                pc = match.captured(1) + QString(" ") + match.captured(2);
         }
         break;
 
@@ -18076,13 +18319,24 @@ void readObit::readInCustomAddress()
             backward(14);
             pc = getUntil("<").getString();
         }
+        break;
 
+    case 2153:
+        if (moveTo(", BC V"))
+        {
+            backward(1);
+            pc = getUntil("<").getString();
+        }
+        break;
 
     default:
         break;
     }
 
-    if ((pc.length() >= 6) && (pc.length() <= 7))
+    if (pc.length() == 6)
+        pc = pc.left(3) + QString(" ") + pc.right(3);
+
+    if (pc.length() == 7)
         globals->globalDr->setPostalCode(pc);
 }
 
