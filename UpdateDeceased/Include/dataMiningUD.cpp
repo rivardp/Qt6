@@ -88,7 +88,7 @@ void MINER::mineData()
 
     success = query.prepare("SELECT providerID, providerKey, fhHTTP, fhWWW, fhURLforUpdate, fhURLparam1, fhURLparam2, fhURLid, fhURLidDivider, "
                             "       fhSpecialCode, fhFirstObit, fhSequentialID, fhAlphabeticalListing, fhFollowRedirects, fhLastRun "
-                            "FROM death_audits.funeralhomedata WHERE fhRunStatus = :fhRunStatus" );
+                            "FROM death_audits.funeralhomedata WHERE fhRunStatus = :fhRunStatus AND providerID <> 1" );
     query.bindValue(":fhRunStatus", QVariant(argValue));
     success = query.exec();
     numActiveSites = query.size();
@@ -180,6 +180,7 @@ void MINER::updateDeceased(const unsigned int &providerID, const unsigned int &p
                            const QString &fhURLid, const QString &fhURLidDivider, const unsigned int &fhSpecialCode, QDate fhFirstObit, const QString &fhSequentialID,
                            const QString fhAlphabeticalListing, QString &fhFollowRedirects, QDate fhLastRun)
 {
+    Q_UNUSED(fhFollowRedirects);
 
     QSqlQuery query;
     QSqlError error;
@@ -193,7 +194,6 @@ void MINER::updateDeceased(const unsigned int &providerID, const unsigned int &p
     bool success;
     int numRecsFound;
 
-    // SELECT MAX(d.DOD), MAX(ft.ID) FROM death_audits.deceased d INNER JOIN (SELECT dts.deceasedNumber, dts.ID FROM death_audits.deceasedidinfo dts WHERE dts.providerID = 1010 AND dts.providerKey = 77 ORDER BY dts.deceasedNumber) AS ft USING(deceasedNumber);
     success = query.prepare("SELECT MAX(d.DOD), MAX(ft.ID) FROM "
                             "death_audits.deceased d INNER JOIN "
                             "(SELECT dts.deceasedNumber, dts.ID FROM death_audits.deceasedidinfo dts WHERE dts.providerID = :providerID AND dts.providerKey = :providerKey ORDER BY dts.deceasedNumber) "
@@ -266,6 +266,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     Q_UNUSED(lastID)   // For possible later usage
     Q_UNUSED(fhParam2) // For possible later usage
     Q_UNUSED(fhSpecialCode) // For possible use if different approaches required for same providerID
+    Q_UNUSED(fhFollowRedirects)
 
     PQString paramPlaceholder("%p%");
     PQString HTTP(http);
@@ -4321,6 +4322,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         URLbase = baseURL;
         URLaddressTemplate  = URLbase + PQString("/avis-de-d-c-s-obituary");
+        //             https://www.jaguilbault.com/avis-de-d-c-s-obituary
 
         URLparams.numParams = 0;
         flowParameters.currentPosition = 1;
@@ -5687,10 +5689,12 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         case 5:
         case 6:
         case 7:
+        case 8:
             // https://manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=dc4dc470&page=2&per_page=10
             // https://manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=a804057b&page=2&q=&per_page=10&include_services=0&veterans_only=0
+            // manage2.tukioswebsites.com/api/v1/obituaries?siteAlias=00aceaf8&page=4&per_page=10
             URLbase = baseURL;
-            if ((providerKey == 6) || (providerKey == 7))
+            if ((providerKey == 6) || (providerKey == 7) || (providerKey == 8))
                 URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&per_page=10");
             else
                 URLaddressTemplate  = URLbase + PQString("/api/v1/obituaries?siteAlias=") + fhParam2 + PQString("&page=") + paramPlaceholder + PQString("&q=&per_page=10&include_services=0&veterans_only=0");
@@ -5701,7 +5705,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             flowParameters.currentPosition = 1;
             if (flowParameters.initialSetup == true)
-                flowParameters.endingPosition = 3;
+                flowParameters.endingPosition = 5;
             else
                 flowParameters.endingPosition = 2;
 
@@ -6449,7 +6453,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         URLbase = baseURL;
         URLaddressTemplate  = URLbase + PQString("/wp-admin/admin-ajax.php") + PQString("?");
-        URLaddressTemplate += PQString("action=trx_addons_item_pagination&nonce=79600f2a3e&params=a%3A91%3A%7Bs%3A3%3A%22cat%22%3Bs%3A3%3A%22177%22%3Bs%3A7%3A%22columns%22%3Bi%3A3%3Bs%3A14%3A%22columns_tablet%22%3Bs%3A0%3A%22%22%3Bs%3A14%3A%22");
+        URLaddressTemplate += PQString("action=trx_addons_item_pagination&nonce=f71dc9cba5&params=a%3A91%3A%7Bs%3A3%3A%22cat%22%3Bs%3A3%3A%22177%22%3Bs%3A7%3A%22columns%22%3Bi%3A3%3Bs%3A14%3A%22columns_tablet%22%3Bs%3A0%3A%22%22%3Bs%3A14%3A%22");
         URLaddressTemplate += PQString("columns_mobile%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22count%22%3Bi%3A12%3Bs%3A6%3A%22offset%22%3Bi%3A0%3Bs%3A7%3A%22orderby%22%3Bs%3A9%3A%22post_date%22%3Bs%3A5%3A%22order%22%3Bs%3A4%3A%22");
         URLaddressTemplate += PQString("desc%22%3Bs%3A3%3A%22ids%22%3Bs%3A0%3A%22%22%3Bs%3A6%3A%22slider%22%3Bb%3A0%3Bs%3A13%3A%22slider_effect%22%3Bs%3A5%3A%22slide%22%3Bs%3A17%3A%22slider_pagination%22%3Bs%3A4%3A%22none%22%3Bs%3A22%3A%22");
         URLaddressTemplate += PQString("slider_pagination_type%22%3Bs%3A7%3A%22bullets%22%3Bs%3A24%3A%22slider_pagination_thumbs%22%3Bi%3A0%3Bs%3A15%3A%22slider_controls%22%3Bs%3A4%3A%22none%22%3Bs%3A12%3A%22slides_space%22%3Bi%3A0%3Bs%3A15%3A%22");
@@ -6457,28 +6461,28 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         URLaddressTemplate += PQString("slider_loop%22%3Bs%3A1%3A%221%22%3Bs%3A16%3A%22slider_free_mode%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22title%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22title_align%22%3Bs%3A4%3A%22none%22%3Bs%3A11%3A%22title_style%22%3Bs%3A7%3A%22");
         URLaddressTemplate += PQString("default%22%3Bs%3A9%3A%22title_tag%22%3Bs%3A4%3A%22none%22%3Bs%3A11%3A%22title_color%22%3Bs%3A0%3A%22%22%3Bs%3A12%3A%22title_color2%22%3Bs%3A0%3A%22%22%3Bs%3A18%3A%22gradient_direction%22%3Bs%3A1%3A%220%22%3Bs%3A18%3A%22");
         URLaddressTemplate += PQString("title_border_color%22%3Bs%3A0%3A%22%22%3Bs%3A18%3A%22title_border_width%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A14%3A%22");
-        URLaddressTemplate += PQString("title_bg_image%22%3Ba%3A2%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3B%7Ds%3A6%3A%22title2%22%3Bs%3A0%3A%22%22%3Bs%3A12%3A%22title2_color%22%3Bs%3A0%3A%22%22%3Bs%3A19%3A%22");
-        URLaddressTemplate += PQString("title2_border_color%22%3Bs%3A0%3A%22%22%3Bs%3A19%3A%22title2_border_width%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A15%3A%22");
-        URLaddressTemplate += PQString("title2_bg_image%22%3Ba%3A2%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3B%7Ds%3A8%3A%22subtitle%22%3Bs%3A0%3A%22%22%3Bs%3A14%3A%22subtitle_align%22%3Bs%3A4%3A%22none%22%3Bs%3A17%3A%22");
-        URLaddressTemplate += PQString("subtitle_position%22%3Bs%3A5%3A%22above%22%3Bs%3A11%3A%22description%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22link%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22link_style%22%3Bs%3A7%3A%22default%22%3Bs%3A10%3A%22");
-        URLaddressTemplate += PQString("link_image%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22link_text%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22new_window%22%3Bi%3A0%3Bs%3A5%3A%22typed%22%3Bs%3A0%3A%22%22%3Bs%3A13%3A%22typed_strings%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22");
-        URLaddressTemplate += PQString("typed_loop%22%3Bs%3A1%3A%221%22%3Bs%3A12%3A%22typed_cursor%22%3Bs%3A1%3A%221%22%3Bs%3A17%3A%22typed_cursor_char%22%3Bs%3A1%3A%22_%22%3Bs%3A11%3A%22typed_color%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22");
-        URLaddressTemplate += PQString("typed_speed%22%3Bs%3A1%3A%226%22%3Bs%3A11%3A%22typed_delay%22%3Bs%3A1%3A%221%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22class%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22");
-        URLaddressTemplate += PQString("className%22%3Bs%3A0%3A%22%22%3Bs%3A3%3A%22css%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22type%22%3Bs%3A7%3A%22classic%22%3Bs%3A8%3A%22featured%22%3Bs%3A5%3A%22image%22%3Bs%3A17%3A%22");
+        URLaddressTemplate += PQString("title_bg_image%22%3Ba%3A3%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3B%7Ds%3A6%3A%22title2%22%3Bs%3A0%3A%22%22%3Bs%3A12%3A%22");
+        URLaddressTemplate += PQString("title2_color%22%3Bs%3A0%3A%22%22%3Bs%3A19%3A%22title2_border_color%22%3Bs%3A0%3A%22%22%3Bs%3A19%3A%22title2_border_width%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A15%3A%22title2_bg_image%22%3Ba%3A3%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bs%3A0%3A%22%22%3B%7Ds%3A8%3A%22subtitle%22%3Bs%3A0%3A%22%22%3Bs%3A14%3A%22subtitle_align%22%3Bs%3A4%3A%22none%22%3Bs%3A17%3A%22subtitle_position%22%3Bs%3A5%3A%22above%22%3Bs%3A11%3A%22");
+        URLaddressTemplate += PQString("description%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22link%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22link_style%22%3Bs%3A7%3A%22default%22%3Bs%3A10%3A%22link_image%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22link_text%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22");
+        URLaddressTemplate += PQString("new_window%22%3Bi%3A0%3Bs%3A5%3A%22typed%22%3Bs%3A0%3A%22%22%3Bs%3A13%3A%22typed_strings%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22typed_loop%22%3Bs%3A1%3A%221%22%3Bs%3A12%3A%22typed_cursor%22%3Bs%3A1%3A%221%22%3Bs%3A17%3A%22");
+        URLaddressTemplate += PQString("typed_cursor_char%22%3Bs%3A1%3A%22_%22%3Bs%3A11%3A%22typed_color%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22typed_speed%22%3Bs%3A1%3A%226%22%3Bs%3A11%3A%22typed_delay%22%3Bs%3A1%3A%221%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22");
+        URLaddressTemplate += PQString("class%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22className%22%3Bs%3A0%3A%22%22%3Bs%3A3%3A%22css%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22type%22%3Bs%3A7%3A%22classic%22%3Bs%3A8%3A%22featured%22%3Bs%3A5%3A%22image%22%3Bs%3A17%3A%22");
         URLaddressTemplate += PQString("featured_position%22%3Bs%3A3%3A%22top%22%3Bs%3A10%3A%22thumb_size%22%3Bs%3A5%3A%22large%22%3Bs%3A11%3A%22tabs_effect%22%3Bs%3A4%3A%22fade%22%3Bs%3A12%3A%22hide_excerpt%22%3Bs%3A0%3A%22%22%3Bs%3A13%3A%22");
-        URLaddressTemplate += PQString("hide_bg_image%22%3Bs%3A0%3A%22%22%3Bs%3A15%3A%22icons_animation%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22no_margin%22%3Bs%3A0%3A%22%22%3Bs%3A8%3A%22no_links%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22");
-        URLaddressTemplate += PQString("pagination%22%3Bs%3A5%3A%22pages%22%3Bs%3A4%3A%22page%22%3Bi%3A1%3Bs%3A13%3A%22posts_exclude%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22post_type%22%3Bs%3A12%3A%22cpt_services%22%3Bs%3A8%3A%22taxonomy%22%3Bs%3A18%3A%22");
-        URLaddressTemplate += PQString("cpt_services_group%22%3Bs%3A5%3A%22popup%22%3Bi%3A0%3Bs%3A9%3A%22more_text%22%3Bs%3A9%3A%22Read+more%22%3Bs%3A11%3A%22count_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
-        URLaddressTemplate += PQString("size%22%3Bi%3A12%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A13%3A%22columns_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A3%3Bs%3A5%3A%22");
-        URLaddressTemplate += PQString("sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A20%3A%22columns_tablet_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A20%3A%22");
-        URLaddressTemplate += PQString("columns_mobile_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A12%3A%22offset_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22");
-        URLaddressTemplate += PQString("unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A18%3A%22slides_space_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
-        URLaddressTemplate += PQString("size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A24%3A%22gradient_direction_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22");
-        URLaddressTemplate += PQString("sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A17%3A%22typed_speed_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A6%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A17%3A%22");
-        URLaddressTemplate += PQString("typed_delay_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A1%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A10%3A%22link_extra%22%3Ba%3A4%3A%7Bs%3A3%3A%22");
-        URLaddressTemplate += PQString("url%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22is_external%22%3Bs%3A0%3A%22%22%3Bs%3A8%3A%22nofollow%22%3Bs%3A0%3A%22%22%3Bs%3A17%3A%22custom_attributes%22%3Bs%3A0%3A%22%22%3B%7Ds%3A16%3A%22");
-        URLaddressTemplate += PQString("link_image_extra%22%3Ba%3A2%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3B%7Ds%3A13%3A%22show_subtitle%22%3Bs%3A0%3A%22%22%3Bs%3A6%3A%22scheme%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22");
-        URLaddressTemplate += PQString("color_style%22%3Bs%3A7%3A%22default%22%3Bs%3A22%3A%22mouse_helper_highlight%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22sc%22%3Bs%3A11%3A%22sc_services%22%3B%7D&page=") + paramPlaceholder + PQString("&filters_active=all");
+        URLaddressTemplate += PQString("hide_bg_image%22%3Bs%3A0%3A%22%22%3Bs%3A15%3A%22icons_animation%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22no_margin%22%3Bs%3A0%3A%22%22%3Bs%3A8%3A%22no_links%22%3Bs%3A0%3A%22%22%3Bs%3A10%3A%22pagination%22%3Bs%3A5%3A%22");
+        URLaddressTemplate += PQString("pages%22%3Bs%3A4%3A%22page%22%3Bi%3A1%3Bs%3A13%3A%22posts_exclude%22%3Bs%3A0%3A%22%22%3Bs%3A9%3A%22post_type%22%3Bs%3A12%3A%22cpt_services%22%3Bs%3A8%3A%22taxonomy%22%3Bs%3A18%3A%22cpt_services_group%22%3Bs%3A5%3A%22");
+        URLaddressTemplate += PQString("popup%22%3Bi%3A0%3Bs%3A9%3A%22more_text%22%3Bs%3A9%3A%22Read+more%22%3Bs%3A11%3A%22count_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A12%3Bs%3A5%3A%22");
+        URLaddressTemplate += PQString("sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A13%3A%22columns_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A3%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A20%3A%22");
+        URLaddressTemplate += PQString("columns_tablet_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A20%3A%22columns_mobile_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bs%3A0%3A%22%22%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A12%3A%22offset_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A18%3A%22slides_space_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A24%3A%22");
+        URLaddressTemplate += PQString("gradient_direction_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A0%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A17%3A%22typed_speed_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22size%22%3Bi%3A6%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A17%3A%22typed_delay_extra%22%3Ba%3A3%3A%7Bs%3A4%3A%22unit%22%3Bs%3A2%3A%22px%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bi%3A1%3Bs%3A5%3A%22sizes%22%3Ba%3A0%3A%7B%7D%7Ds%3A10%3A%22link_extra%22%3Ba%3A4%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22is_external%22%3Bs%3A0%3A%22%22%3Bs%3A8%3A%22");
+        URLaddressTemplate += PQString("nofollow%22%3Bs%3A0%3A%22%22%3Bs%3A17%3A%22custom_attributes%22%3Bs%3A0%3A%22%22%3B%7Ds%3A16%3A%22link_image_extra%22%3Ba%3A3%3A%7Bs%3A3%3A%22url%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22id%22%3Bs%3A0%3A%22%22%3Bs%3A4%3A%22");
+        URLaddressTemplate += PQString("size%22%3Bs%3A0%3A%22%22%3B%7Ds%3A13%3A%22show_subtitle%22%3Bs%3A0%3A%22%22%3Bs%3A6%3A%22scheme%22%3Bs%3A0%3A%22%22%3Bs%3A11%3A%22color_style%22%3Bs%3A7%3A%22default%22%3Bs%3A22%3A%22");
+        URLaddressTemplate += PQString("mouse_helper_highlight%22%3Bs%3A0%3A%22%22%3Bs%3A2%3A%22sc%22%3Bs%3A11%3A%22sc_services%22%3B%7D&page=") + paramPlaceholder + PQString("&filters_active=all");
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -6611,7 +6615,6 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
         flowParameters.flowIncrement = 40;
-        pageVariables.usePubDateForCutOff = true;
 
         URLbase = baseURL;
         URLaddressTemplate  = URLbase + QString("/_api/communities-blog-node-api/_api/posts?offset=") + paramPlaceholder;
@@ -7047,13 +7050,19 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     {
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
-        flowParameters.flowType = startToEnd;
-        flowParameters.flowIncrement = -1;
+        flowParameters.flowType = singleListing;
+        //flowParameters.flowType = startToEnd;
+        //flowParameters.flowIncrement = -1;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/funerals/year/") + paramPlaceholder;
+        //URLaddressTemplate  = URLbase + PQString("/current-funerals/categories/") + paramPlaceholder;
+        URLaddressTemplate  = URLbase + PQString("/current-funerals");
 
-        URLparams.numParams = 1;
+        URLparams.numParams = 0;
+        flowParameters.currentPosition = 0;
+        flowParameters.endingPosition = 0;
+
+        /*URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
         URLparams.UIparam1 = &flowParameters.currentPosition;
 
@@ -7064,7 +7073,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         {
             QDate tempDate(globals->today.addDays(-daysOfOverlap));
             flowParameters.endingPosition = tempDate.year();
-        }
+        }*/
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -8661,15 +8670,17 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
     {
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
-        flowParameters.flowType = singleListing;
+        flowParameters.flowType = startToEnd;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/necrologie");
+        URLaddressTemplate  = URLbase + PQString("/avis-de-deces/page/") + paramPlaceholder + PQString("/");
 
-        URLparams.numParams = 0;
+        URLparams.numParams = 1;
+        URLparams.param1Type = ptUint;
+        URLparams.UIparam1 = &flowParameters.currentPosition;
 
         flowParameters.currentPosition = 1;
-        flowParameters.endingPosition =  1;
+        flowParameters.endingPosition =  8;
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -16544,7 +16555,6 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                     tempString.clear();
                     keepGoing = false;
 
-                    sourceFile.loadValue(QString("lastPublishedDate"), pageVariables.currentPubDate, dateFormat);
                     sourceFile.loadValue(QString("seoSlug"), tempString);
                     newURL = URLbase + PQString("/post/") + tempString;
                     followUpRequest.instructions.url = newURL.getString();
@@ -17037,18 +17047,18 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2047:  // Brenneman
             {
-                while (sourceFile.consecutiveMovesTo(250, "class=\"funeral_listing\"", "href="))
+                while (sourceFile.consecutiveMovesTo(50, "so9KdE TBrkhx", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read URL
-                    pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
                     // Read DOB and DOD
-                    if (sourceFile.moveTo("<br /"))
-                        pageVariables.ucDOBandDOD = sourceFile.readNextBetween(BRACKETS);
+                    //if (sourceFile.moveTo("<br /"))
+                    //    pageVariables.ucDOBandDOD = sourceFile.readNextBetween(BRACKETS);
 
                     // Process
                     process(record, pageVariables, lang);
@@ -18826,13 +18836,13 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 2116:  // Richelieu
             {
-                while (sourceFile.consecutiveMovesTo(75, "class=\"necrologie_details clearfix\"", "href="))
+                while (sourceFile.consecutiveMovesTo(300, "<div class=\"news-list\">", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
 
                     // Read URL
-                    pageVariables.webAddress = URLbase + sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
+                    pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
                     pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
 
                     // Process

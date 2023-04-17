@@ -4,7 +4,7 @@
 #include "../UpdateFuneralHomes/Include/dataRecord.h"
 #include "qdebug.h"
 
-int databaseSearches::surnameLookup(const QString name, GLOBALVARS *globals)
+int databaseSearches::surnameLookup(const QString name, GLOBALVARS *globals) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -39,7 +39,7 @@ int databaseSearches::surnameLookup(const QString name, GLOBALVARS *globals)
     return numMatches;
 }
 
-bool databaseSearches::areUniquelySurnames(QList<OQString> &listOfNames, GLOBALVARS *gv, GENDER gender)
+bool databaseSearches::areUniquelySurnames(QList<QString> listOfNames, GLOBALVARS *gv, GENDER gender) const
 {
     if (listOfNames.size() == 0)
         return false;
@@ -49,7 +49,7 @@ bool databaseSearches::areUniquelySurnames(QList<OQString> &listOfNames, GLOBALV
 
     while (valid && !listOfNames.isEmpty())
     {
-        word = listOfNames.takeFirst().getString();
+        word = listOfNames.takeFirst();
         valid = (surnameLookup(word, gv) > 0);
         if (valid)
             valid = !givenNameLookup(word, gv, gender);
@@ -58,7 +58,7 @@ bool databaseSearches::areUniquelySurnames(QList<OQString> &listOfNames, GLOBALV
     return valid;
 }
 
-bool databaseSearches::areAllNames(QList<OQString> &listOfNames, GLOBALVARS *gv)
+bool databaseSearches::areAllNames(QList<QString> listOfNames, GLOBALVARS *gv) const
 {
     if (listOfNames.size() == 0)
         return false;
@@ -68,7 +68,7 @@ bool databaseSearches::areAllNames(QList<OQString> &listOfNames, GLOBALVARS *gv)
 
     while (valid && !listOfNames.isEmpty())
     {
-        word = listOfNames.takeFirst().getString();
+        word = listOfNames.takeFirst();
         valid = givenNameLookup(word, gv);
         if (!valid)
             valid = nicknameLookup(word, gv);
@@ -77,21 +77,25 @@ bool databaseSearches::areAllNames(QList<OQString> &listOfNames, GLOBALVARS *gv)
     return valid;
 }
 
-bool databaseSearches::areAllLocations(QList<QString> &listOfNames, GLOBALVARS *gv)
+bool databaseSearches::areAllLocations(QList<QString> listOfNames, GLOBALVARS *gv) const
 {
+    Q_UNUSED(gv);
+
     if (listOfNames.size() == 0)
         return false;
 
     bool valid = true;
-    QString word;
+    QString Qword;
+    OQString OQword;
     QSqlQuery query;
     QSqlError error;
 
     while (valid && !listOfNames.isEmpty())
     {
-        word = OQString(listOfNames.takeFirst()).getUnaccentedString().toLower();
+        Qword = listOfNames.takeFirst().toLower();
+        OQword = OQString(PQString(Qword).getUnaccentedString());
 
-        if(!OQString(word).isProvince())
+        if(!OQword.isProvince())
         {
             bool success;
             valid = false;
@@ -99,7 +103,7 @@ bool databaseSearches::areAllLocations(QList<QString> &listOfNames, GLOBALVARS *
             success = query.prepare("SELECT LOWER(location) FROM death_audits.postalcodes WHERE location = :location");
             if (!success)
                 qDebug() << "Problem with SQL statement formulation in areAllLocations()";
-            query.bindValue(":location", QVariant(word));
+            query.bindValue(":location", QVariant(Qword));
 
             success = query.exec();
             if (success)
@@ -113,7 +117,7 @@ bool databaseSearches::areAllLocations(QList<QString> &listOfNames, GLOBALVARS *
     return valid;
 }
 
-bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, GENDER gender)
+bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, GENDER gender) const
 {
     int maleCount = 0;
     int femaleCount = 0;
@@ -121,7 +125,7 @@ bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, 
     return givenNameLookup(name, globals, maleCount, femaleCount, gender);
 }
 
-bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, int &maleCount, int &femaleCount, GENDER gender)
+bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, int &maleCount, int &femaleCount, GENDER gender) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -186,7 +190,7 @@ bool databaseSearches::givenNameLookup(const QString name, GLOBALVARS *globals, 
     return result;
 }
 
-bool databaseSearches::nicknameLookup(const QString name, GLOBALVARS *gv)
+bool databaseSearches::nicknameLookup(const QString name, GLOBALVARS *gv) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -215,7 +219,7 @@ bool databaseSearches::nicknameLookup(const QString name, GLOBALVARS *gv)
     }
 }
 
-bool databaseSearches::pureNickNameLookup(const QString name, GLOBALVARS *gv)
+bool databaseSearches::pureNickNameLookup(const QString name, GLOBALVARS *gv) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -253,30 +257,7 @@ bool databaseSearches::pureNickNameLookup(const QString name, GLOBALVARS *gv)
     return isPure;
 }
 
-bool databaseSearches::nickNameInList(const OQString name, QList<QString> &listOfNames, GLOBALVARS *gv)
-{
-    bool isNickName = false;
-    PQString errMsg;
-
-    if ((name.getLength() == 2) && !name.isSuffix() && !name.isPrefix() && !name.isTitle())
-    {
-        if (!name.containsVowel())
-            isNickName = true;
-    }
-
-    if (!isNickName)
-    {
-        for (int i = 0; i < listOfNames.size(); i++)
-            isNickName = isNickName || name.isInformalVersionOf(listOfNames.at(i), errMsg);
-
-        if (errMsg.getLength() > 0)
-            gv->logMsg(ErrorRecord, errMsg);
-    }
-
-    return isNickName;
-}
-
-void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTATS &nameStats, GENDER gender, bool skipClear)
+void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTATS &nameStats, GENDER gender, bool skipClear, bool corrected) const
 {
     if (!skipClear)
         nameStats.clear();
@@ -294,6 +275,7 @@ void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTA
     bool success;
     unsigned int count = 0;
     double factor = 1;
+    double tolerance;
     PQString errorMessage;
 
     success = query.prepare("SELECT maleCount, femaleCount, malePct FROM death_audits.firstnames WHERE name = :name");
@@ -312,6 +294,23 @@ void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTA
             nameStats.maleCount = query.value(0).toUInt();
             nameStats.femaleCount = query.value(1).toUInt();
             nameStats.malePct = query.value(2).toDouble();
+
+            if (corrected)
+            {
+                // Adjust results to account for read errors in database
+                tolerance = 0.9975;
+                if ((nameStats.femaleCount > 0) && (nameStats.malePct > tolerance))
+                {
+                    nameStats.femaleCount = 0;
+                    nameStats.malePct = 1.0;
+                }
+                if ((nameStats.maleCount > 0) && (nameStats.malePct < (1.0 - tolerance)))
+                {
+                    nameStats.maleCount = 0;
+                    nameStats.malePct = 0.0;
+                }
+            }
+
             nameStats.determineCredibility();
 
             switch (gender)
@@ -337,6 +336,13 @@ void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTA
         }
 
         nameStats.surnameCount = static_cast<unsigned int>(surnameLookup(name, globals));
+
+        if (corrected)
+        {
+            if ((nameStats.surnameCount < 10) && (count > 5000))
+                nameStats.surnameCount = 0;
+        }
+
         nameStats.isSurname = (nameStats.surnameCount > 0);
 
         if ((count > 0) && (nameStats.surnameCount == 0))
@@ -369,7 +375,7 @@ void databaseSearches::nameStatLookup(QString name, GLOBALVARS *globals, NAMESTA
 
 }
 
-bool databaseSearches::validRecordExists(downloadOutputs &outputs, GLOBALVARS *globals)
+bool databaseSearches::validRecordExists(downloadOutputs &outputs, GLOBALVARS *globals) const
 {
     bool validRecordAlready, success;
 
@@ -414,7 +420,7 @@ bool databaseSearches::validRecordExists(downloadOutputs &outputs, GLOBALVARS *g
     return validRecordAlready;
 }
 
-void databaseSearches::removeLowConviction(QList<QString> &nameList, GLOBALVARS *globals)
+void databaseSearches::removeLowConviction(QList<QString> &nameList, GLOBALVARS *globals) const
 {
     int position = 0;
     double threshold = 0.80;
@@ -448,7 +454,7 @@ void databaseSearches::removeLowConviction(QList<QString> &nameList, GLOBALVARS 
                     nameStats.maleCount = query.value(0).toUInt();
                     nameStats.femaleCount = query.value(1).toUInt();
                     nameStats.malePct = query.value(2).toDouble();
-                    if ((nameStats.malePct >= threshold) || (nameStats.malePct <= (1.0 - threshold)))
+                    if (((nameStats.malePct >= threshold) || (nameStats.malePct <= (1.0 - threshold))) && ((nameStats.maleCount + nameStats.femaleCount) >= 10))
                         position++;
                     else
                         nameList.removeAt(position);
@@ -470,7 +476,7 @@ void databaseSearches::removeLowConviction(QList<QString> &nameList, GLOBALVARS 
     }
 }
 
-QString databaseSearches::IDforLastDeathPreceding(const QDate &DOD, const unsigned int providerID, const unsigned int providerKey, GLOBALVARS *gv)
+QString databaseSearches::IDforLastDeathPreceding(const QDate &DOD, const unsigned int providerID, const unsigned int providerKey, GLOBALVARS *gv) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -535,7 +541,7 @@ QString databaseSearches::IDforLastDeathPreceding(const QDate &DOD, const unsign
     return result;
 }
 
-QDate databaseSearches::getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey)
+QDate databaseSearches::getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -604,7 +610,7 @@ QDate databaseSearches::getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned
     return result;
 }
 
-QString databaseSearches::lookupPostalCode(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey)
+QString databaseSearches::lookupPostalCode(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -644,7 +650,7 @@ QString databaseSearches::lookupPostalCode(GLOBALVARS *gv, PROVIDER provID, unsi
     return result;
 }
 
-QString databaseSearches::pcLookup(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString location)
+QString databaseSearches::pcLookup(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString location) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -695,7 +701,7 @@ QString databaseSearches::pcLookup(GLOBALVARS *gv, PROVIDER provID, unsigned int
     return result;
 }
 
-bool databaseSearches::fillInPostalCodeInfo(GLOBALVARS *gv, POSTALCODE_INFO &pci, QString pc)
+bool databaseSearches::fillInPostalCodeInfo(GLOBALVARS *gv, POSTALCODE_INFO &pci, QString pc) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -733,7 +739,7 @@ bool databaseSearches::fillInPostalCodeInfo(GLOBALVARS *gv, POSTALCODE_INFO &pci
     return pcInfoLookup.isValid();
 }
 
-POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString location)
+POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey, QString location) const
 {
     // Try to assign a postal base on the following order of priority
     // 1. Use the funeralhomelocation database (locations entered based on funeral home website)
@@ -844,7 +850,7 @@ POSTALCODE_INFO databaseSearches::pcLookupPlaces(GLOBALVARS *gv, PROVIDER provID
     return pcResult;
 }
 
-QList<QString> databaseSearches::getURLlist(unsigned int deceasedID, GLOBALVARS *gv)
+QList<QString> databaseSearches::getURLlist(unsigned int deceasedID, GLOBALVARS *gv) const
 {
     QList<QString> urlList;
 
@@ -877,7 +883,7 @@ QList<QString> databaseSearches::getURLlist(unsigned int deceasedID, GLOBALVARS 
     return urlList;
 }
 
-bool databaseSearches::deceasedRecordExists(const unsigned int &providerID, const unsigned int &providerKey, const QString &deceasedID, const QString &url, const QDate &pubDate)
+bool databaseSearches::deceasedRecordExists(const unsigned int &providerID, const unsigned int &providerKey, const QString &deceasedID, const QString &url, const QDate &pubDate) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -918,7 +924,7 @@ bool databaseSearches::deceasedRecordExists(const unsigned int &providerID, cons
     return result;
 }
 
-dataRecord databaseSearches::readRecord(unsigned int deceasedID, QString lastName, GLOBALVARS *gv)
+dataRecord databaseSearches::readRecord(unsigned int deceasedID, QString lastName, GLOBALVARS *gv) const
 {
     // Load separated into two queries, one to "deceased" and one to "deceasedidinfo"
 
@@ -1072,7 +1078,7 @@ dataRecord databaseSearches::readRecord(unsigned int deceasedID, QString lastNam
     return record;
 }
 
-dataRecord databaseSearches::readMonitoredRecord(unsigned int memberID, QString lastName, GLOBALVARS *gv)
+dataRecord databaseSearches::readMonitoredRecord(unsigned int memberID, QString lastName, GLOBALVARS *gv) const
 {
     dataRecord record;
     QSqlQuery query;
@@ -1158,7 +1164,7 @@ dataRecord databaseSearches::readMonitoredRecord(unsigned int memberID, QString 
     return record;
 }
 
-double databaseSearches::genderLookup(dataRecord *dr, GLOBALVARS *globals)
+double databaseSearches::genderLookup(dataRecord *dr, GLOBALVARS *globals) const
 {
     QList<QString> names;
     dr->pullUniqueGivenNames(names);
@@ -1166,7 +1172,7 @@ double databaseSearches::genderLookup(dataRecord *dr, GLOBALVARS *globals)
     return genderLookup(names, globals);
 }
 
-double databaseSearches::genderLookup(QList<QString> &listOfNames, GLOBALVARS *globals)
+double databaseSearches::genderLookup(QList<QString> &listOfNames, GLOBALVARS *globals) const
 {
     double result, conviction, convictionShortfall, convictionTopUp;
     double probabilityWrongMale, probabilityWrongFemale, probGood;
@@ -1248,10 +1254,12 @@ double databaseSearches::genderLookup(QList<QString> &listOfNames, GLOBALVARS *g
             nameStatLookup(listOfNames.at(i), globals, nameStats);
             conviction += ((1.0 - firstWeight) / (listOfNames.size() - 1)) * (0.5 - nameStats.malePct);
 
-            probabilityWrongMale   = probabilityWrongMale * (1.0 - nameStats.malePct);
-            probabilityWrongFemale = probabilityWrongFemale * nameStats.malePct;
-
+            probabilityWrongMale   += 1.0 - nameStats.malePct;
+            probabilityWrongFemale += nameStats.malePct;
         }
+        probabilityWrongMale   = probabilityWrongMale / listOfNames.size() ;
+        probabilityWrongFemale = probabilityWrongFemale / listOfNames.size();
+
 
         // Increase conviction if probability of a wrong guess is small as a result of multiple names
         if (conviction <= 0)
@@ -1279,7 +1287,7 @@ double databaseSearches::genderLookup(QList<QString> &listOfNames, GLOBALVARS *g
     return result;
 }
 
-bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
+bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv) const
 {
     QSqlQuery query;
     QSqlError error;
@@ -1367,7 +1375,7 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv)
     return updated;
 }
 
-bool databaseSearches::savePostalCodeInfo(int deceasedNumber, int providerID, int providerKey, POSTALCODE_INFO &pc)
+bool databaseSearches::savePostalCodeInfo(int deceasedNumber, int providerID, int providerKey, POSTALCODE_INFO &pc) const
 {
     QSqlQuery query, queryAdd, queryUpdate;
     QSqlError error;
@@ -1444,7 +1452,7 @@ bool databaseSearches::savePostalCodeInfo(int deceasedNumber, int providerID, in
     return updated;
 }
 
-POSTALCODE_INFO databaseSearches::getPostalCodeInfo(int deceasedNumber, GLOBALVARS *gv)
+POSTALCODE_INFO databaseSearches::getPostalCodeInfo(int deceasedNumber, GLOBALVARS *gv) const
 {
     QSqlQuery query;
     QSqlError error;

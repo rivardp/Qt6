@@ -129,19 +129,27 @@ void mostCommonName::consolidateWords()
     }
 }
 
-NAMEINFO mostCommonName::readMostCommonName(GLOBALVARS *gv)
+NAMEINFO mostCommonName::readMostCommonName(GLOBALVARS *gv, QString structuredNamesProcessed)
 {
+    // Function is called twice, once before and once structured read
+
     // This function looks at the first word of each sentence
     // Reads through listOfFirstWords, which was previously filled in and partially cleansed of common words
     // Initial sorting and processing is assumed to have occurred as part of startsWithGenderWord function called earlier
-    // Objective is to find a the person's commonly used name, as opposed to formal name
+    // Objective is to find the person's used name that (i) was included in structured names and (ii) was used in unstructured obit
 
     databaseSearches dbSearch;
+    NAMESTATS nameStats;
     NAMEINFO nameInfo;
-    QString potentialName;
+    QString potentialName, usedFirstNameFromStructured, usedFirstNameFromUnstructured, title;
     OQString word;
-    bool isGivenName, isCommonlyUsedName, isFormalName;
+    bool isGivenName, isCommonlyUsedName, isFormalName, isUsedName, isUsedUnstructuredName, structuredSet, unstructuredSet;
     int i;
+    int freq;
+
+    QRegularExpression targetI;
+    QRegularExpressionMatch match;
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
 
     int origSize = listOfFirstWords.size();
     if (origSize == 0)
@@ -155,102 +163,84 @@ NAMEINFO mostCommonName::readMostCommonName(GLOBALVARS *gv)
         sortOnFrequency();
     }
 
-    /*if ((gv->globalDr->getID() == 1388647) || (gv->globalDr->getID() == 4379220))
-    {
-        unsigned int br8k = 2;
-    }*/
-
     i = 0;
     isGivenName = false;
     isCommonlyUsedName = false;
     isFormalName = false;
+
+    usedFirstNameFromStructured = gv->globalDr->getUsedFirstNameFromStructured();
+    usedFirstNameFromUnstructured = gv->globalDr->getUsedFirstNameFromUnstructured();
+
+    structuredSet = (usedFirstNameFromStructured.length() > 0);
+    unstructuredSet = false;  // Set to false even with a prior mcn match to capture case where first real usage is mid sentence
+    title = structuredNamesProcessed;
     int lastRec = listOfFirstWords.size();
 
-    while (!isGivenName && (i < lastRec))
+    while (!unstructuredSet && (i < lastRec))
     {
-        word = OQString(listOfFirstWords.at(i));
+        freq = frequencyCounts.at(i);
+        word = OQString(listOfFirstWords.at(i)).proper();
         word.removeEnding(",");
-        if ((word.getLength() > 1) && word.isAlpha() && !word.isPronoun() && !gv->globalDr->isASavedName(word))
+
+        isUsedUnstructuredName = (word == usedFirstNameFromUnstructured);
+        isUsedName = isUsedUnstructuredName || gv->globalDr->isASavedName(word);
+        if (!isUsedName)
+        {
+            // This will always be true on first call of function
+            targetI.setPattern("\\b" + word.getString() + "\\b");
+            match = targetI.match(title);
+            isUsedName = match.hasMatch();
+            /*if (!isUsedName)
+            {
+                // problem with extra words in title like "residence"
+                title = gv->globalDr->getTitle().getString();
+                match = targetI.match(title);
+                isUsedName = match.hasMatch();
+            }*/
+        }
+
+        if ((word.getLength() > 1) && word.isAlpha() && !word.isPronoun() && !(word.isWrittenMonth() && (freq == 1)))
         {
             potentialName = word.getString();
-            isGivenName = dbSearch.givenNameLookup(potentialName, gv, gv->globalDr->getGender());
-            if (isGivenName)
+            dbSearch.nameStatLookup(potentialName, gv, nameStats, gv->globalDr->getGender());
+            isGivenName = nameStats.isGivenName && !word.isFoundIn(OQString::problematicFirstNames);
+
+            if (!structuredSet && isUsedName && ((isGivenName && !nameStats.isLikelySurname) || (freq >= 3)))
+            {
+                usedFirstNameFromStructured = potentialName;
+                gv->globalDr->setUsedFirstNameFromStructured(usedFirstNameFromStructured);
+                structuredSet = true;
+            }
+
+            if ((isGivenName || isUsedName)  && !gv->globalDr->isASavedName(word) && (potentialName != gv->globalDr->getUsedFirstNameFromStructured()))
             {
                 isCommonlyUsedName = !OQString(potentialName).isProblematicFirstName() &&
                                      (gv->globalDr->isAMiddleName(word) || gv->globalDr->isANickName(word));
                 if (!isCommonlyUsedName)
-                    isFormalName = gv->globalDr->isAFormalName(word);
-            }
-
-            if ((potentialName.size() < 7) && !isFormalName && !isCommonlyUsedName && !word.isRecognized() && !word.isRecognizedFirstWord() && !word.isGenderWord() && !word.isWrittenMonth(gv->globalDr->getLanguage()) && !gv->globalDr->isASavedName(word.proper()))
-            {
-                PQString warningMessage;
-                warningMessage << "Most common first word \"" << potentialName << "\" was rejected for: \"" << gv->globalDr->getFullName() << "\"  source: " << gv->globalDr->getURL();
-                gv->logMsg(DefdErrorRecord, warningMessage);
-
-                isGivenName = false;
+                    isFormalName = gv->globalDr->isAFormalName(word) || (isUsedName && !nameStats.isLikelySurname);
             }
         }
 
-        if (!(isCommonlyUsedName || isFormalName))
-            i++;
-    }
+        if (isCommonlyUsedName || isFormalName)
+        {
+            nameInfo.name = PQString(potentialName).proper();
+            nameInfo.numWords = nameInfo.name.countWords();
+            nameInfo.type = ntFirst;
+            nameFreq = frequencyCounts.at(i);
 
-    if (isCommonlyUsedName || isFormalName)
-    {
-        nameInfo.name = PQString(potentialName).proper();
-        nameInfo.numWords = nameInfo.name.countWords();
-        nameInfo.type = ntFirst;
-        nameFreq = frequencyCounts.at(i);
+            usedFirstNameFromUnstructured = potentialName;
+            gv->globalDr->setUsedFirstNameFromUnstructured(usedFirstNameFromUnstructured);
+            unstructuredSet = true;
+        }
+        else
+        {
+            i++;
+            if (isUsedUnstructuredName)
+                unstructuredSet = true;
+        }
     }
 
     return nameInfo;
-}
-
-QString mostCommonName::readPotentialFirstName(GLOBALVARS *gv)
-{    
-    // This function looks at the first word of each sentence
-    // Reads through listOfFirstWords, which was previously filled in and partially cleansed of common words
-    // Initial sorting and processing is assumed to have occurred, or that processing is triggered
-    // Objective is to find the first potential given name that starts a sentence
-
-    databaseSearches dbSearch;
-    QString potentialName;
-    OQString word;
-    bool isGivenName;
-    int i;
-
-    int origSize = listOfFirstWords.size();
-    if (origSize == 0)
-        return potentialName;
-
-    if (!SetupCompleted)
-    {
-        cleanUpList();
-        sortOnWords();
-        consolidateWords();
-        sortOnFrequency();
-    }
-
-    i = 0;
-    isGivenName = false;
-    int lastRec = listOfFirstWords.size();
-
-    while (!isGivenName && (i < lastRec))
-    {
-        word = OQString(listOfFirstWords.at(i));
-        word.removeEnding(",");
-        if ((word.getLength() > 1) && word.isAlpha() && !word.isWrittenMonth())
-        {
-            potentialName = word.getString();
-            isGivenName = dbSearch.givenNameLookup(potentialName, gv, gv->globalDr->getGender());
-            if (!isGivenName || (potentialName == QString("elle")))
-                potentialName.clear();
-        }
-        i++;
-    }
-
-    return potentialName;
 }
 
 GENDER mostCommonName::startsWithGenderWord(GLOBALVARS *gv)

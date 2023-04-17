@@ -11,6 +11,7 @@
 #include "../UpdateFuneralHomes/Include/dataStructure.h"
 #include "../UpdateFuneralHomes/Include/dataRecord.h"
 #include "../Include/PMySQL/databaseSearches.h"
+#include "../Include/Penser/OQString.h"
 
 class mostCommonName
 {
@@ -22,8 +23,8 @@ public:
     QList<QString> listOfFirstWords;
     unsigned int nameFreq;
 
-    NAMEINFO readMostCommonName(GLOBALVARS *gv);
-    QString readPotentialFirstName(GLOBALVARS *gv);
+    NAMEINFO readMostCommonName(GLOBALVARS *gv, QString structuredNameProcessed);
+    //QString determinePotentialFirstName(GLOBALVARS *gv);
     GENDER startsWithGenderWord(GLOBALVARS *gv);
 
     bool setupCompleted() const;

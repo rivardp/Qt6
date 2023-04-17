@@ -8,11 +8,14 @@
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 #include "../Include/PMySQL/pMySQL.h"
 #include "../Include/Internet/qDownloadWorker.h"
-#include "Include/dataMiningUD.h"
+#include "Include/dataMiningULD.h"
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+
+    // Intent here is to build a program under an independent thread that could be added to
+    // the current UpdateLegacyDeceased executable as a separate thread if desired down the road
 
     /*******************************************/
     /*           Run initial setup             */
@@ -33,7 +36,7 @@ int main(int argc, char *argv[])
     }
 
     // Setup the MySQL connection with database manager 'db'
-    if (!createConnection(QString("deceasedUpdater")))
+    if (!createConnection(QString("deceasedLegacyUpdater")))
     {
         qDebug() << "Error connecting to SQL database 'death_audits'";
         globals.logMsg(ErrorConnection, QString("Error connecting to SQL database death_audits"));
@@ -56,7 +59,7 @@ int main(int argc, char *argv[])
         if(file->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         {
             outputStream = new QTextStream(file);
-            *outputStream << QString("UpdateDeceased commenced at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
+            *outputStream << QString("UpdateLegacyDeceased commenced at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
         }
 
         delete outputStream;
@@ -67,24 +70,24 @@ int main(int argc, char *argv[])
     /*  Create thread to handle all downloads  */
     /*******************************************/
 
-    QThread* downloadThread = new QThread;
-    DownloadWorker* www = new DownloadWorker();
-    www->setGlobalVars(globals);
-    www->moveToThread(downloadThread);
+    QThread* downloadThreadLegacy = new QThread;
+    DownloadWorker* wwwLegacy = new DownloadWorker();
+    wwwLegacy->setGlobalVars(globals);
+    wwwLegacy->moveToThread(downloadThreadLegacy);
 
-    QObject::connect(downloadThread, SIGNAL(started()), www, SLOT(initiate()));
-    QObject::connect(www, SIGNAL(finished()), downloadThread, SLOT(quit()));
-    QObject::connect(www, SIGNAL(finished()), www, SLOT(deleteLater()));
-    QObject::connect(downloadThread, SIGNAL(finished()), downloadThread, SLOT(deleteLater()));
+    QObject::connect(downloadThreadLegacy, SIGNAL(started()), wwwLegacy, SLOT(initiate()));
+    QObject::connect(wwwLegacy, SIGNAL(finished()), downloadThreadLegacy, SLOT(quit()));
+    QObject::connect(wwwLegacy, SIGNAL(finished()), wwwLegacy, SLOT(deleteLater()));
+    QObject::connect(downloadThreadLegacy, SIGNAL(finished()), downloadThreadLegacy, SLOT(deleteLater()));
 
-    downloadThread->start();
+    downloadThreadLegacy->start();
 
     /********************************************/
     /*  Create miner to manage all data mining  */
     /********************************************/
 
     MINER miner;
-    miner.setDownloadWorker(www);
+    miner.setDownloadWorker(wwwLegacy);
     miner.setGlobalVars(globals);
 
     QObject::connect(&miner, SIGNAL(finished()), &app, SLOT(quit()));

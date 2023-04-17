@@ -53,13 +53,14 @@ public:
     void readInCustomAddress();
     void readInObitDates();
     void readInObitText();
-    void processObitText(bool UndoBadSentence, bool insertPeriods);
+    void processObitText(bool UndoBadSentence, int insertPeriods);
     void readLookupFields(const SEARCHPARAM &sp, const fieldNames &fn);
     void readMessages();
     void readPublishDate();
     void readServiceDate();
     void readTitleInfo();
-    void readStructuredContent();
+    void readAndPrepareStructuredContent();
+    void processStructuredNames();
     void readUnstructuredContent(bool UseFirstDateAsDOD);
     void readImageNameInfo();
     void readParentsLastName();
@@ -78,7 +79,7 @@ public:
     int  runRecordValidation();
     void fixNameIssues();
     void determinePotentialFirstName();
-    void runStdProcessing(unstructuredContent &uc, bool insertPeriods);
+    void runStdProcessing(unstructuredContent &uc, int insertPeriods);
     void addressMissingGender();
     void genderBySentencesStartingWithPronouns();
     void genderByRelationshipWords();
@@ -106,6 +107,8 @@ public:
     void fillInDatesNinthPass();
     void fillInDatesTenthPass();
     void fillInDatesEleventhPass();
+    void fillInDatesTwelfthPass();
+    void fillInDates85Pass(); // new style using regex
     void assignFirstDateToDOD();
     bool useFirstSentenceSingleDate();
     QDate getFirstSentenceSingleDate();
@@ -121,6 +124,8 @@ public:
 
     unstructuredContent* getUCaddress();
     unstructuredContent* getJustInitialNamesAddress();
+    unstructuredContent* getStructuredNamesAddress();
+    mostCommonName* getMCNaddress();
     GLOBALVARS *globals;
 
 private:
@@ -130,7 +135,7 @@ private:
     unstructuredContent ucFillerRemoved;                // With dates and "born...to" filler eliminated
     unstructuredContent ucFillerRemovedAndTruncated;    // With dates and "born...to" filler eliminated
     unstructuredContent justInitialNamesUC;             // All words until a "key" word or "divider" is encountered
-    unstructuredContent structuredNamesProcessed;        // The UC used for the structured name read
+    unstructuredContent structuredNamesProcessed;       // The UC used for the structured name read
     mostCommonName mcn;                                 // List of first words of each sentence (to find most common name)
     QList<NAMESTATS> nameStatsList;
     bool godReference;

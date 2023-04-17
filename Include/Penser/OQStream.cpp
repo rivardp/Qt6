@@ -676,14 +676,6 @@ OQStream OQStream::getSentence(const QList<QString> &firstNames, bool &realSente
                         tempStream = OQStream(result + space + word);
                         tempStream.removeBookEnds(PARENTHESES);
                         justDates = tempStream.streamIsJustDates();
-                        /*OQString tempWord;
-                        justDates = true;
-                        while (justDates && !tempStream.isEOS())
-                        {
-                            tempWord = tempStream.getWord();
-                            if (!(tempWord.isHyphen() || tempWord.isNumeric() || tempWord.isWrittenMonth()))
-                                justDates = false;
-                        }*/
                     }
 
                     if (justDates)
@@ -1056,13 +1048,16 @@ OQString OQStream::readQuotedMetaContent()
     return result;
 }
 
-void OQStream::removeLinks()
+void OQStream::removeLinks(bool removeAnyLink)
 {
     QRegularExpression targetI;
     QRegularExpressionMatch match;
 
-    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::InvertedGreedinessOption);
-    targetI.setPattern("<a href=\"(.*)(\">)(.*)(?!<a)(watch|click|view|video|stream|book|reserve|http|sign|@)(.*)(?!<a)</a>");
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::InvertedGreedinessOption | QRegularExpression::UseUnicodePropertiesOption);
+    if (removeAnyLink)
+        targetI.setPattern("<a href=\"(.*)(\">)(.*)(?!<a)</a>");
+    else
+        targetI.setPattern("<a href=\"(.*)(\">)(.*)(?!<a)(watch|click|view|video|stream|book|reserve|http|sign|@)(.*)(?!<a)</a>");
 
     // Coding for debugging
     match = targetI.match(this->itsString);
@@ -1080,10 +1075,11 @@ void OQStream::removeLinks()
 
 OQStream& OQStream::removeHTMLtags(int insertPeriods)
 {
-    itsString.replace("<br", " <br");
-    itsString.replace("  ", " ");
+    itsString.replace("<br", "§<br");
+    itsString.replace(" §", " ");
 
     // Remove all HTML tags and the content within them, along with consecutive blank spaces
+    // insertPeriods == 2 inserts at all break tags while == 1 excludes <br> and some dates
 
     OQString openTag("<");		// 60
     OQString closeTag(">");     // 62
@@ -1093,7 +1089,10 @@ OQStream& OQStream::removeHTMLtags(int insertPeriods)
 
     OQString singleChar, lastChar, HTMLtag;
     OQStream heldSoFar;
+    OQString lastTwoChars;
+    OQString before2, before1, after1, after2;
 
+    bool brException;
     bool tagOpen = false;
     lastChar = space;
 
@@ -1110,7 +1109,8 @@ OQStream& OQStream::removeHTMLtags(int insertPeriods)
 
         if (!tagOpen)
         {
-            if(!((singleChar == space) && (lastChar == space)))
+            lastTwoChars = lastChar + singleChar;
+            if(!(singleChar.isDeemedSpace() && lastChar.isDeemedSpace()))
                 heldSoFar += singleChar;
             lastChar = singleChar;
         }
@@ -1118,10 +1118,27 @@ OQStream& OQStream::removeHTMLtags(int insertPeriods)
         if (singleChar == closeTag)
         {
             tagOpen = false;
-            if (((insertPeriods == 2) && HTMLtag.isEndOfBlockTag()) ||
+
+            brException = false;
+            if ((insertPeriods == 2) && (HTMLtag.left(3) == PQString("<br")))
+            {
+                before2 = lastTwoChars.left(1);
+                before1 = lastTwoChars.right(1);
+                after1 = peekAtNext(1);
+                after2 = peekAtNext(2);
+                after2.dropLeft(1);
+
+                if ((before2 != space) && (before1 == space) && (after1 != space) && !after1.isCapitalized())
+                    brException = true;
+                if ((before1 != space) && (after1 == space) && (after2 != space) && !after2.isCapitalized())
+                    brException = true;
+            }
+
+            if (((insertPeriods == 2) && HTMLtag.isEndOfBlockTag() && !brException) ||
                     ((insertPeriods == 1) && ((HTMLtag.left(3) != PQString("<br")) || heldSoFar.streamIsJustDates()) && HTMLtag.isEndOfBlockTag()))
             {
-                heldSoFar.removeEnding(space.getString());
+                heldSoFar.removeEnding(" ");
+                heldSoFar.removeEnding("§");
                 if ((heldSoFar.right(1) != period) && (heldSoFar.right(1) != comma))
                 {
                     heldSoFar += period;
@@ -1141,6 +1158,7 @@ OQStream& OQStream::removeHTMLtags(int insertPeriods)
 
     heldSoFar.removeLeading(period.getString());
     itsString = heldSoFar.getString();
+    itsString.replace("§", " ");
     position = 0;
     EOS = (itsString.length() == 0);
 
@@ -1458,9 +1476,9 @@ bool OQStream::removeLeading(const unsigned int charCode)
     return result;
 }
 
-bool OQStream::removeLeading(const std::wstring target)
+bool OQStream::removeLeading(const std::wstring target, Qt::CaseSensitivity cs)
 {
-    bool result = PQString::removeLeading(target);
+    bool result = PQString::removeLeading(target, cs);
     if (itsString.length() == 0)
         EOS = true;
     position = 0;
@@ -1468,9 +1486,9 @@ bool OQStream::removeLeading(const std::wstring target)
     return result;
 }
 
-bool OQStream::removeLeading(const QString target)
+bool OQStream::removeLeading(const QString target, Qt::CaseSensitivity cs)
 {
-    bool result = PQString::removeLeading(target);
+    bool result = PQString::removeLeading(target, cs);
     if (itsString.length() == 0)
         EOS = true;
     position = 0;
@@ -1488,18 +1506,18 @@ bool OQStream::removeEnding(const unsigned int charCode)
     return result;
 }
 
-bool OQStream::removeEnding(const std::wstring target)
+bool OQStream::removeEnding(const std::wstring target, Qt::CaseSensitivity cs)
 {
-    bool result = PQString::removeEnding(target);
+    bool result = PQString::removeEnding(target, cs);
     if (itsString.length() == 0)
         EOS = true;
     position = 0;
 
     return result;
 }
-bool OQStream::removeEnding(const QString target)
+bool OQStream::removeEnding(const QString target, Qt::CaseSensitivity cs)
 {
-    bool result = PQString::removeEnding(target);
+    bool result = PQString::removeEnding(target, cs);
     if (itsString.length() == 0)
         EOS = true;
     position = 0;
@@ -1507,9 +1525,9 @@ bool OQStream::removeEnding(const QString target)
     return result;
 }
 
-bool OQStream::removeAll(const QString target)
+bool OQStream::removeAll(const QString target, Qt::CaseSensitivity cs)
 {
-    bool result = PQString::removeAll(target);
+    bool result = PQString::removeAll(target, cs);
     if (itsString.length() == 0)
         EOS = true;
     position = 0;
@@ -1618,4 +1636,58 @@ bool OQStream::removeInternalPeriods()
     position = 0;
 
     return result;
+}
+
+bool OQStream::adjustInsertsCheck(int &insertPeriods)
+{
+    if (insertPeriods != 2)
+        return false;
+
+    OQString before2, before1, after1, after2;
+    QRegularExpression targetS;
+    QRegularExpressionMatch match;
+    int totalCount, insertException;
+    OQString space(" ");
+
+    totalCount = insertException = 0;
+
+    targetS.setPatternOptions(QRegularExpression::UseUnicodePropertiesOption | QRegularExpression::InvertedGreedinessOption);
+    targetS.setPattern("(.{1})(.{1})(<br\\s?/?>)(.{1})(.{1})");
+
+    match = targetS.match(itsString);
+    while (match.hasMatch())
+    {
+        before2 = match.captured(1);
+        before1 = match.captured(2);
+        after1 = match.captured(4);
+        after2 = match.captured(5);
+        itsString.replace(targetS,"\\1\\2<processed>\\4\\5");
+
+        totalCount++;
+        if ((before2 != space) && (before1 == space) && (after1 != space) && !after1.isCapitalized())
+            insertException++;
+        if ((before1 != space) && (after1 == space) && (after2 != space) && !after2.isCapitalized())
+            insertException++;
+    }
+
+    itsString.replace("<processed>", "<br/>");
+
+    if (insertException > 0)
+        return true;
+    else
+        return false;
+}
+
+void OQStream::insertBreaks()
+{
+    QRegularExpression target;
+    target.setPattern("     \n");
+    itsString.replace(target, QString(QChar(65533)));
+    target.setPattern("\n     ");
+    itsString.replace(target, QString(QChar(65533)));
+    target.setPattern("\n\n");
+    itsString.replace(target, QString(QChar(65533)));
+    removeLeading(CCRLF);
+    removeEnding(CCRLF);
+    cleanUpEnds();
 }

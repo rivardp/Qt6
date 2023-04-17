@@ -1060,11 +1060,36 @@ bool PQString::removeHyphens()
     return (itsString != orig);
 }
 
-void PQString::removeBlankSentences()
+void PQString::removeBlankSentences(bool firstPass)
 {
-    while (itsString.contains(QString(". .")))
+    QRegularExpression target1;
+    target1.setPattern("\\. \\.");
+
+    while (itsString.contains(QString(". ."))){
+        itsString.replace(target1,". ");}
+
+    itsString.replace(QString("  "), QString(" "));
+
+    QString target2 = QString(". ") + QChar(65533) + QString(".");
+    itsString.replace(target2, ". ");
+
+    QString target3 = QString(" ") + QChar(65533);
+    itsString.replace(target3, QChar(65533));
+
+    QString target4 = QChar(65533) + QString(".") + QChar(65533);
+    itsString.replace(target4, ".");
+
+    QString target5 = QString(QChar(65533)) + QString(QChar(65533));
+    while (itsString.contains(target5)){
+        itsString.replace(target5, QChar(65533));}
+
+    itsString.replace(target4, ".");
+
+    // Second pass to capture anything left over
+    if (firstPass)
     {
-        itsString.replace(QRegularExpression("\\. \\."),". ");
+        firstPass = false;
+        removeBlankSentences(firstPass);
     }
 }
 
@@ -1094,6 +1119,7 @@ void PQString::replaceHTMLentities()
     itsString.replace(QString("&mdash;"), QString("-"), Qt::CaseInsensitive);
     itsString.replace(QString("&ndash;"), QString("-"), Qt::CaseInsensitive);
     itsString.replace(QString("&nbsp;"), QString(" "), Qt::CaseInsensitive);
+    itsString.replace(QString("&nbsp"), QString(" "), Qt::CaseInsensitive);  // Weird issue with a few sites omitting the semi-colon
     itsString.replace(QString("&lt;"), QString("<"), Qt::CaseInsensitive);
     itsString.replace(QString("&gt;"), QString(">"), Qt::CaseInsensitive);
     itsString.replace(QString("&amp;"), QString("&"), Qt::CaseInsensitive);
@@ -1310,16 +1336,27 @@ bool PQString::removeBookEnds(unsigned int bookends, bool runRecursive)
 	return hasParentheses || hasQuotes;
 }
 
-bool PQString::removeLeading(const std::wstring target)
+bool PQString::removeLeading(std::wstring target, const Qt::CaseSensitivity cs)
 {
     int length = static_cast<int>(target.size());
     if (length > itsString.length())
         return false;
 
-    bool matched = true;
+    bool matched;
+    QString itsStringCompare, targetCompare;
 
-    for (int i = 0; i < length; i++)
-        matched = matched && (itsString.at(i) == target[static_cast<unsigned long long>(i)]);
+    if (cs == Qt::CaseInsensitive)
+    {
+        targetCompare = QString::fromStdWString(target).toLower();
+        itsStringCompare = itsString.left(length).toLower();
+    }
+    else
+    {
+        targetCompare = QString::fromStdWString(target);
+        itsStringCompare = itsString.left(length);
+    }
+
+    matched = (targetCompare == itsStringCompare);
 
     if (matched)
     {
@@ -1349,16 +1386,27 @@ bool PQString::removeLeading(const unsigned int charCode)
     return false;
 }
 
-bool PQString::removeLeading(const QString target)
+bool PQString::removeLeading(const QString target, const Qt::CaseSensitivity cs)
 {
     int length = static_cast<int>(target.size());
     if (length > itsString.length())
         return false;
 
-    bool matched = true;
+    bool matched;
+    QString itsStringCompare, targetCompare;
 
-    for (int i = 0; i < length; i++)
-        matched = matched && (itsString.at(i) == target.at(i));
+    if (cs == Qt::CaseInsensitive)
+    {
+        targetCompare = target.toLower();
+        itsStringCompare = itsString.left(length).toLower();
+    }
+    else
+    {
+        targetCompare = target;
+        itsStringCompare = itsString.left(length);
+    }
+
+    matched = (targetCompare == itsStringCompare);
 
     if (matched)
     {
@@ -1370,19 +1418,30 @@ bool PQString::removeLeading(const QString target)
     return matched;
 }
 
-bool PQString::removeEnding(const std::wstring target)
+bool PQString::removeEnding(const std::wstring target, const Qt::CaseSensitivity cs)
 {
     int itsLength = itsString.length();
     int removeLength = static_cast<int>(target.size());
     if (removeLength > itsLength){
         return false;}
 
-	bool matched = true;
+    bool matched;
+    QString itsStringCompare, targetCompare;
 
-    for (int i = 0; i < removeLength; i++){
-        matched = matched && (itsString.at(itsLength - removeLength + i) == target[static_cast<unsigned long long>(i)]);}
+    if (cs == Qt::CaseInsensitive)
+    {
+        targetCompare = QString::fromStdWString(target).toLower();
+        itsStringCompare = itsString.right(removeLength).toLower();
+    }
+    else
+    {
+        targetCompare = QString::fromStdWString(target);
+        itsStringCompare = itsString.right(removeLength);
+    }
 
-	if (matched)
+    matched = (targetCompare == itsStringCompare);
+
+    if (matched)
 	{
         dropRight(static_cast<unsigned int>(removeLength));
 		// check if multiple targets existed (e.g. trailing blanks)
@@ -1411,18 +1470,28 @@ bool PQString::removeEnding(const unsigned int charCode)
 	return false;
 }
 
-bool PQString::removeEnding(const QString target)
+bool PQString::removeEnding(const QString target, const Qt::CaseSensitivity cs)
 {
     int itsLength = itsString.length();
     int removeLength = static_cast<int>(target.size());
     if (removeLength > itsLength)
         return false;
 
-    bool matched = true;
+    bool matched;
+    QString itsStringCompare, targetCompare;
 
-    for (int i = 0; i < removeLength; i++)
-        matched = matched && (itsString.at(itsLength - removeLength + i) == target.at(i));
+    if (cs == Qt::CaseInsensitive)
+    {
+        targetCompare = target.toLower();
+        itsStringCompare = itsString.right(removeLength).toLower();
+    }
+    else
+    {
+        targetCompare = target;
+        itsStringCompare = itsString.right(removeLength);
+    }
 
+    matched = (targetCompare == itsStringCompare);
     if (matched)
     {
         dropRight(static_cast<unsigned int>(removeLength));
@@ -1434,14 +1503,22 @@ bool PQString::removeEnding(const QString target)
     return matched;
 }
 
-bool PQString::removeAll(const QString target)
+bool PQString::removeAll(const QString target, const Qt::CaseSensitivity cs)
 {
-    bool matched = itsString.contains(target);
+    bool matched;
+    QRegularExpression reTarget;
+    QRegularExpressionMatch match;
+
+    reTarget.setPattern(target);
+    reTarget.setPatternOptions(QRegularExpression::UseUnicodePropertiesOption);
+    if (cs == Qt::CaseInsensitive)
+        reTarget.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+
+    match = reTarget.match(itsString);
+    matched = match.hasMatch();
+
     if (matched)
-    {
-        QString nothing;
-        itsString.replace(target, nothing);
-    }
+        itsString.replace(reTarget, "");
 
     return matched;
 }
@@ -1483,6 +1560,34 @@ bool PQString::removePossessive()
     }
 
     return changesMade;
+}
+
+bool PQString::removeCelebrations()
+{
+    bool removed = false;
+
+    QRegularExpression targetI;
+    QRegularExpressionMatch match;
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+    targetI.setPattern("-? ?celebration( of life)? ?(-|for|of)?");
+
+    match = targetI.match(itsString);
+    if (match.hasMatch())
+    {
+        itsString.replace(targetI, "");
+        removed = true;
+    }
+
+    // The passing of
+    targetI.setPattern("(the )?passing of ");
+    match = targetI.match(itsString);
+    if (match.hasMatch())
+    {
+        itsString.replace(targetI, "");
+        removed = true;
+    }
+
+    return removed;
 }
 
 bool PQString::cleanUpEnds()
@@ -1539,6 +1644,14 @@ bool PQString::isNumeric() const
 bool PQString::isAlphaNumeric() const
 {
 	return (getCharType() & ALPHANUMERIC) == ALPHANUMERIC;
+}
+
+bool PQString::isDeemedSpace() const
+{
+   if ((itsString == " ") || (itsString == "§"))
+       return true;
+   else
+       return false;
 }
 
 bool PQString::isCapitalized() const

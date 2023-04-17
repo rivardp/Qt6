@@ -12,6 +12,24 @@ void MINER::execute()
 {
    qDebug() << "Data mining has started";
 
+    /*******************************************/
+    /*  Determine run type based on arguments  */
+    /*******************************************/
+
+    // From QtCreator, no arguments provided and value is set by choice
+    // For production version, a single argument of "0" will be provided
+
+    int argValue;
+    QStringList argList = QCoreApplication::arguments();
+    if (argList.size() == 1)
+        argValue = 2;
+    else
+    {
+        QString argString = argList.at(1);
+        argValue = argString.toInt();
+    }
+    globals->runStatus = argValue;
+
    processObits();
 
    quit();
@@ -62,6 +80,7 @@ void MINER::processObits()
     globals->globalObit = &obit;
     globals->uc = obit.getUCaddress();
     globals->justInitialNamesUC = obit.getJustInitialNamesAddress();
+    globals->structuredNamesProcessed = obit.getStructuredNamesAddress();
     dataRecord dr;
     globals->globalDr = &dr;
     obit.setGlobalVars(*globals);

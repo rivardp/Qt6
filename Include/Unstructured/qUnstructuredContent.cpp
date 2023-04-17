@@ -59,8 +59,10 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
     bool hisWifeEncountered = false;
     bool herHusbandEncountered = false;
     bool mustAllBeAlpha = false;
+    bool namesChecked = false;
     NAMESTATS nameStats;
     databaseSearches dbSearch;
+    unstructuredContent tempUC;
 
     numCommas = 0;
     totalWordCount = 0;
@@ -196,7 +198,7 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
         wordLength = word.getLength();
 
         // Used to identify sentences as well
-        wordIsInitial = word.isInitial();
+        wordIsInitial = checkCap.isInitial();
         if (lastChar == period)
         {
             if (!(word.isTitle() || word.isSaint() || word.isPrefix() || word.isSuffix()))
@@ -512,7 +514,7 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
 				{
                     // Check for odd ball stuff
                     OQStream tmpStream(justNames);
-                    tmpStream.compressCompoundNames(lang);
+                    tempUC.compressCompoundNames(tmpStream, lang);
                     OQString wordCheck = tmpStream.getWord(true);
                     wordCheck.removeEnding(PUNCTUATION);
                     wordCheck.removeEnding(CCRLF);
@@ -535,7 +537,7 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
                             unsigned int i = 1;
                             nextWord = tempStream.peekAtWord(false, i);
                             possibleMaidenName = nextWord;
-                            while (nextWord.isCompoundName())
+                            while (nextWord.isCompoundName(lang))
                             {
                                 validName = true;
                                 i++;
@@ -555,7 +557,7 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
 
                             possibleMaidenName.removeEnding(PUNCTUATION);
                             possibleMaidenName.removeEnding(CCRLF);
-                            possibleMaidenName.compressCompoundNames(language_unknown);
+                            tempUC.compressCompoundNames(possibleMaidenName, language_unknown);
                             validName = validName || possibleMaidenName.isCapitalized();
                             if (validName)
                             {
@@ -744,6 +746,22 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
             namesFinished = true;
         firstWord = false;
 
+        if (namesFinished && !namesChecked)
+        {
+            unstructuredContent tempNames = justInitialNames;
+            tempNames.removeLeading(space);
+            tempNames.cleanUpEnds();
+            tempNames.removeEnding(PUNCTUATION);
+            if (tempNames.areAllLocationWords())
+            {
+                justInitialNames.clear();
+                listOfNames.clear();
+                firstWord = true;
+                namesFinished = false;
+            }
+            else
+                namesChecked = true;
+        }
     }  // end while
 
 	// Copy cleaned up list of words to itsString
@@ -751,6 +769,7 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
 
     justInitialNames.removeLeading(space);
     justInitialNames.cleanUpEnds();
+    justInitialNames.removeEnding(PUNCTUATION);
     justInitialNamesUC = justInitialNames;
 
 	// Add in dates to counts while leaving them in the content
@@ -834,18 +853,22 @@ void unstructuredContent::determineLanguageAndGender(OQStream &justInitialNamesU
     if (globals->globalObit->hasGodReference() && (contentGender == Male))
     {
         double unisex = 0.5;
+        QList<QString> list;
         QString potentialName = globals->globalDr->getFirstName().getString();
+        potentialName = globals->globalDr->getUsedFirstNameFromStructured();
+        if (!list.contains(potentialName))
+            list.append(potentialName);
+        potentialName = globals->globalDr->getUsedFirstNameFromUnstructured();
+        if (!list.contains(potentialName))
+            list.append(potentialName);
         if (potentialName.size() == 0)
-            potentialName = globals->globalDr->getPotentialFirstName();
-        if (potentialName.size() == 0)
+        {
             potentialName = globals->globalDr->getTitleKey().getString();
+            list.append(potentialName);
+        }
 
         if (potentialName.size() > 0)
-        {
-            QList<QString> list;
-            list.append(potentialName);
             unisex = dbSearch.genderLookup(list, globals);
-        }
 
         if (unisex < 0.75)
         {
@@ -1176,8 +1199,20 @@ unsigned int unstructuredContent::pullOutEnglishDates(QList<QDate> &dateList, un
                         if (word.isNumeric())
                         {
                             dd = static_cast<int>(word.asNumber());
-                            stillOK = true;
-                            cumulativeGet += originalWord + space;
+                            if ((dd >= 1) && (dd <= 31))
+                            {
+                                stillOK = true;
+                                cumulativeGet += originalWord + space;
+                            }
+                            else
+                            {
+                                backward(wordLength + 1);  // back up position by last word (plus space) and don't add to cumulativeGet
+                                numWordsRead--;
+
+                                // Look for rare "...born August 1945"
+                                if ((priorWord.lower() == PQString("born")) && (dd >= 1900) && (dd < globals->today.year()))
+                                    globals->globalDr->setMonthYearOfBirth(mm, dd);
+                            }
                         }
                         else
                         {
@@ -1275,17 +1310,67 @@ unsigned int unstructuredContent::pullOutEnglishDates(QList<QDate> &dateList, un
                                 // Following coding handles reporting of partial date, or creation of complete date, depending on "forceYear"
                                 if (forceYear == 0)
                                 {
-                                    if (globals->globalDr->getDeemedYOD() > 0)
+                                    if (globals->forceYearFlag)
                                     {
+                                        if (serviceDate)
+                                        {
+                                            QDate referenceDate = globals->globalDr->getDOD();
+                                            if (!referenceDate.isValid())
+                                                referenceDate = globals->globalDr->getPublishDate();
+                                            if (!referenceDate.isValid())
+                                                referenceDate = globals->globalDr->getCommentDate();
+                                            if (referenceDate.isValid())
+                                            {
+                                                if (mm > referenceDate.month())
+                                                    yyyy = referenceDate.year();
+                                                else
+                                                {
+                                                    if ((mm == referenceDate.month() && (dd >= referenceDate.day())))
+                                                        yyyy = referenceDate.year();
+                                                    else
+                                                        yyyy = referenceDate.year() + 1;
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Look for rare reference to DOB, otherwise most likely DOB
+                                            QDate existingDOB = globals->globalDr->getDOB();
+                                            if (existingDOB.isValid() && (existingDOB.month() == mm) && (existingDOB.day() == dd))
+                                                yyyy = existingDOB.year();
+                                            else
+                                            {
+                                                // Regular run where we should only be seeing current deaths
+                                                if (mm > globals->today.month())
+                                                    yyyy = globals->today.year() - 1;
+                                                else
+                                                {
+                                                    if ((mm == globals->today.month()) && (dd > globals->today.day()))
+                                                        yyyy = globals->today.year() - 1;
+                                                    else
+                                                        yyyy = globals->today.year();
+                                                }
+                                            }
+                                        }
                                         stillOK = true;
-                                        yyyy = globals->globalDr->getDeemedYOD();
                                         maxDates++;
                                         cumulativeGet += originalWord + space;
                                     }
                                     else
                                     {
-                                        numPartialDates++;
-                                        partialDateMonth = mi.monthNumeric;
+                                        // Historical run where DOD could be more than a year
+                                        if (globals->globalDr->getDeemedYOD() > 0)
+                                        {
+                                            stillOK = true;
+                                            yyyy = globals->globalDr->getDeemedYOD();
+                                            maxDates++;
+                                            cumulativeGet += originalWord + space;
+                                        }
+                                        else
+                                        {
+                                            numPartialDates++;
+                                            partialDateMonth = mi.monthNumeric;
+                                        }
                                     }
                                 }
                                 else
@@ -1329,38 +1414,87 @@ unsigned int unstructuredContent::pullOutEnglishDates(QList<QDate> &dateList, un
                             // Following coding handles reporting of partial date, or creation of complete date, depending on "forceYear"
                             if (forceYear == 0)
                             {
-                                if (globals->globalDr->getDOB().isValid() && (globals->globalDr->getDOB().month() == mm) && (globals->globalDr->getDOB().day() == dd))
+                                if (globals->forceYearFlag)
                                 {
+                                    if (serviceDate)
+                                    {
+                                        QDate referenceDate = globals->globalDr->getDOD();
+                                        if (!referenceDate.isValid())
+                                            referenceDate = globals->globalDr->getPublishDate();
+                                        if (!referenceDate.isValid())
+                                            referenceDate = globals->globalDr->getCommentDate();
+                                        if (referenceDate.isValid())
+                                        {
+                                            if (mm > referenceDate.month())
+                                                yyyy = referenceDate.year();
+                                            else
+                                            {
+                                                if ((mm == referenceDate.month() && (dd >= referenceDate.day())))
+                                                    yyyy = referenceDate.year();
+                                                else
+                                                    yyyy = referenceDate.year() + 1;
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        QDate existingDOB = globals->globalDr->getDOB();
+                                        if (existingDOB.isValid() && (existingDOB.month() == mm) && (existingDOB.day() == dd))
+                                            yyyy = existingDOB.year();
+                                        else
+                                        {
+                                            // Regular run where we should only be seeing current deaths
+                                            if (mm > globals->today.month())
+                                                yyyy = globals->today.year() - 1;
+                                            else
+                                            {
+                                                if ((mm == globals->today.month()) && (dd > globals->today.day()))
+                                                    yyyy = globals->today.year() - 1;
+                                                else
+                                                    yyyy = globals->today.year();
+                                            }
+                                        }
+                                    }
                                     stillOK = true;
-                                    yyyy = globals->globalDr->getDOB().year();
                                     maxDates++;
                                     cumulativeGet += originalWord + space;
                                 }
                                 else
                                 {
-                                    if (globals->globalDr->getDOD().isValid() && (globals->globalDr->getDOD().month() == mm) && (globals->globalDr->getDOD().day() == dd))
+                                    // Historical run where DOD could be more than a year
+                                    if (globals->globalDr->getDOB().isValid() && (globals->globalDr->getDOB().month() == mm) && (globals->globalDr->getDOB().day() == dd))
                                     {
                                         stillOK = true;
-                                        yyyy = globals->globalDr->getDOD().year();
+                                        yyyy = globals->globalDr->getDOB().year();
                                         maxDates++;
                                         cumulativeGet += originalWord + space;
                                     }
                                     else
                                     {
-                                        if (globals->globalDr->getDeemedYOD() > 0)
+                                        if (globals->globalDr->getDOD().isValid() && (globals->globalDr->getDOD().month() == mm) && (globals->globalDr->getDOD().day() == dd))
                                         {
                                             stillOK = true;
-                                            yyyy = globals->globalDr->getDeemedYOD();
-                                            QDate testDate(yyyy,mm,dd);
-                                            if (testDate > globals->today)
-                                                yyyy -= 1;
+                                            yyyy = globals->globalDr->getDOD().year();
                                             maxDates++;
                                             cumulativeGet += originalWord + space;
                                         }
                                         else
                                         {
-                                            numPartialDates++;
-                                            partialDateMonth = mi.monthNumeric;
+                                            if (globals->globalDr->getDeemedYOD() > 0)
+                                            {
+                                                stillOK = true;
+                                                yyyy = globals->globalDr->getDeemedYOD();
+                                                QDate testDate(yyyy,mm,dd);
+                                                if (testDate > globals->today)
+                                                    yyyy -= 1;
+                                                maxDates++;
+                                                cumulativeGet += originalWord + space;
+                                            }
+                                            else
+                                            {
+                                                numPartialDates++;
+                                                partialDateMonth = mi.monthNumeric;
+                                            }
                                         }
                                     }
                                 }
@@ -1557,17 +1691,66 @@ unsigned int unstructuredContent::pullOutFrenchDates(QList<QDate> &dateList, uns
                     // Following coding handles reporting of partial date, or creation of complete date, depending on "forceYear"
                     if (forceYear == 0)
                     {
-                        if (globals->globalDr->getDeemedYOD() > 0)
+                        if (globals->forceYearFlag)
                         {
+                            if (serviceDate)
+                            {
+                                QDate referenceDate = globals->globalDr->getDOD();
+                                if (!referenceDate.isValid())
+                                    referenceDate = globals->globalDr->getPublishDate();
+                                if (!referenceDate.isValid())
+                                    referenceDate = globals->globalDr->getCommentDate();
+                                if (referenceDate.isValid())
+                                {
+                                    if (mm > referenceDate.month())
+                                        yyyy = referenceDate.year();
+                                    else
+                                    {
+                                        if ((mm == referenceDate.month() && (dd >= referenceDate.day())))
+                                            yyyy = referenceDate.year();
+                                        else
+                                            yyyy = referenceDate.year() + 1;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                QDate existingDOB = globals->globalDr->getDOB();
+                                if (existingDOB.isValid() && (existingDOB.month() == mm) && (existingDOB.day() == dd))
+                                    yyyy = existingDOB.year();
+                                else
+                                {
+                                    // Regular run where we should only be seeing current deaths
+                                    if (mm > globals->today.month())
+                                        yyyy = globals->today.year() - 1;
+                                    else
+                                    {
+                                        if ((mm == globals->today.month()) && (dd > globals->today.day()))
+                                            yyyy = globals->today.year() - 1;
+                                        else
+                                            yyyy = globals->today.year();
+                                    }
+                                }
+                            }
                             stillOK = true;
-                            yyyy = globals->globalDr->getDeemedYOD();
                             maxDates++;
                             cumulativeGet += originalWord + space;
                         }
                         else
                         {
-                            numPartialDates++;
-                            partialDateMonth = mi.monthNumeric;
+                            // Historical run where DOD could be more than a year
+                            if (globals->globalDr->getDeemedYOD() > 0)
+                            {
+                                stillOK = true;
+                                yyyy = globals->globalDr->getDeemedYOD();
+                                maxDates++;
+                                cumulativeGet += originalWord + space;
+                            }
+                            else
+                            {
+                                numPartialDates++;
+                                partialDateMonth = mi.monthNumeric;
+                            }
                         }
                     }
                     else
@@ -2066,9 +2249,10 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
     NAMEINFO nameInfo;
     QList<QString> otherNameList;
     databaseSearches dbSearch;
+    unstructuredContent tempUC;
     OQString name, word, tempWord, nextWord, doubleWord, tripleWord, wordBefore1, wordBefore2, wordAfter1, wordAfter2, followingWord;
     bool inParentheses, inQuotes, exclude;
-    bool isPureNickName, tempWasNeeEtAl, abandon, processed, fullFormerName, alternativeNickNames, recognized;
+    bool isPureNickName, isNickName, tempWasNeeEtAl, abandon, processed, fullFormerName, alternativeNickNames, recognized;
     bool preProcessNeeEtAlEncountered;
     unsigned int numWords, numWordsInSentence;
 	unsigned int numWordsRead = 0;
@@ -2108,11 +2292,14 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
         if (sentence.getLength() > 0)
         {
             sentence = QString(" ") + sentence.getString();
-            sentence.truncateAfterParentReference(lang);
-            sentence.truncateAfterSiblingReference(lang);
-            sentence.truncateAfterChildReference(lang);
-            sentence.truncateAfterRelationshipWords(lang);
+            sentence.truncateAfter(OQString::getParentReferences(lang), lang);
+            sentence.truncateAfter(OQString::getSiblingReferences(lang), lang);
+            sentence.truncateAfter(OQString::getChildReferences(lang), lang);
+            sentence.truncateAfter(OQString::getRelativeReferences(lang), lang);
+            sentence.truncateAfter(OQString::getRelationshipWords(lang), lang);
+            sentence.truncateAfter(OQString::getMiscWords(lang), lang);
             sentence.removeSpousalReference(lang);
+            sentence.removeAtTheHospitalFiller(lang);
             sentencesRead++;
         }
 
@@ -2130,7 +2317,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
             if (!word.hasBookEnds(PARENTHESES) && word.isNeeEtAl(nextWord))
             {
                 tempWord = word;
-                while (word.isNeeEtAl(nextWord) || globals->globalDr->isASavedName(nextWord))
+                while (word.isNeeEtAl(nextWord) || globals->globalDr->isASavedName(nextWord) || (word.lower() == OQString("name")))
                 {
                     word = sentence.getWord(true);
                     word.removeEnding(PUNCTUATION);
@@ -2194,7 +2381,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                 word.cleanUpEnds();
                 word.removeEnding(QString(","));
                 word.removeEnding(QString("."));
-                word.compressCompoundNames(language_unknown);
+                tempUC.compressCompoundNames(word, language_unknown);
 
                 if ((numWordsInSentence == 1) && sentence.isEOS())
                     standAloneBookEnds = true;
@@ -2208,13 +2395,15 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                 numWords = tempTempContent.countWords();               
                 if (numWords == 1)
                 {
-                    exclude = dbSearch.pureNickNameLookup(tempTempContent.lower().getString(), globals) &&
-                            (!(dbSearch.surnameLookup(tempTempContent.lower().getString(), globals) > 0) || ((workingGender == Male) && !globals->globalDr->isASavedName(tempTempContent) && (globals->globalDr->getLastName().getLength() > 0)));
+                    QString QtempTempContent = tempTempContent.lower().getString();
+                    exclude = dbSearch.pureNickNameLookup(QtempTempContent, globals) &&
+                            (!(dbSearch.surnameLookup(QtempTempContent, globals) > 0) || ((workingGender == Male) && !globals->globalDr->isASavedName(tempTempContent) && (globals->globalDr->getLastName().getLength() > 0)));
 
+                    exclude = exclude || (QtempTempContent == globals->globalDr->getUsedFirstNameFromStructured()) || (QtempTempContent == globals->globalDr->getUsedFirstNameFromUnstructured());
                     if (exclude)
                         globals->globalDr->setFirstNames(tempTempContent);
                     else
-                        exclude = (preProcessNeeEtAlEncountered && globals->globalDr->isASavedName(tempTempContent)) || (tempTempContent.lower() == OQString("to")) || tempTempContent.isSuffix();
+                        exclude = (preProcessNeeEtAlEncountered && globals->globalDr->isASavedName(tempTempContent)) || (tempTempContent.lower() == OQString("to")) || (tempTempContent.lower() == OQString("in")) || tempTempContent.isSuffix();
 
                     if (!exclude)
                     {
@@ -2251,6 +2440,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                     tempContent.removeLeadingNeeEtAl();
                     globals->globalDr->setNeeEtAlEncountered(true);
                     globals->globalDr->setMaidenNames(tempContent.getWord());
+                    globals->globalDr->setGender(Female);
                     exclude = true;
                 }
 
@@ -2319,8 +2509,8 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                     // Look for locations
                     if (sList5.count() >= 2)
                     {
-                        QStringList locationWords = globals->globalObit->getLocationWords(globals->globalDr->getProvider(), globals->globalDr->getProviderKey());
-                        locationWords += QString("ave|avenue|county|drive|highway|road|route|rd|street|st|rue|secteur").split("|");
+                        QStringList locationWords = globals->websiteLocationWords;
+                        locationWords += problematicRoadReferences;
                         for (int j= 0; j < locationWords.count(); j++)
                         {
                             if (sList5.contains(locationWords.at(j)))
@@ -2332,6 +2522,13 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                             if (dbSearch.areAllLocations(sList5, globals))
                                 abandon = true;
                         }
+                    }
+
+                    if (sList5.count() >= 2)
+                    {
+                        QStringList badFirstWords = problematicBookEndContents;
+                        if (badFirstWords.contains(sList5.at(0).toLower()) || PQString(sList5.at(0)).isNumeric())
+                            abandon = true;
                     }
 
                     while (!abandon && (i < sList5.count()))
@@ -2356,7 +2553,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                         if (OQtempWord.isNeeEtAl(nextWord))
                         {
                             // Check for "formerly of Calgary"
-                            if ((tempQString.toLower() == "formerly") && ((i + 1) < sList5.count()) && (sList5.at(i + 1).toLower() == "of"))
+                            if ((tempQString.toLower() == "formerly") && ((i + 1) < sList5.count()) && ((sList5.at(i + 1).toLower() == "of") || (sList5.at(i + 1).toLower() == "from")))
                             {
                                 //i += 3;
                                 i = sList5.count();
@@ -2607,8 +2804,9 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
                                                 nameInfoList[0].nameStats.isLikelyGivenName && nameInfoList[2].nameStats.isLikelyGivenName;
                         for (int i = 0; i < nameInfoList.count(); i++)
                         {
-                            allGivenNames = allGivenNames && (nameInfoList[i].nameStats.isGivenName || (nameInfoList[i].hadAKAindicator == true));
-                            allLastNames  = allLastNames && (nameInfoList[i].nameStats.isSurname || nameInfoList[i].hadNeeEtAl);
+                            isNickName = globals->globalDr->isANickName(nameInfoList[i].name) || globals->globalDr->isAFormalName(nameInfoList[i].name);
+                            allGivenNames = allGivenNames && (nameInfoList[i].nameStats.isGivenName || (nameInfoList[i].hadAKAindicator == true) || isNickName);
+                            allLastNames  = allLastNames && ((nameInfoList[i].nameStats.isSurname && !isNickName) || nameInfoList[i].hadNeeEtAl);
                             if (nameInfoList[i].hadAKAindicator == false)
                                 errorFree = errorFree && (nameInfoList[i].nameStats.isSurname || nameInfoList[i].hadNeeEtAl);
                         }
@@ -2662,7 +2860,7 @@ QList<NAMEINFO> unstructuredContent::readAlternates(unsigned int endPoints, bool
 
                                     if (name.getLength() > 0)
                                     {
-                                        if (((i == 0) && !globals->globalDr->isAMiddleName(name)) || globals->globalDr->isAFirstName(name) || globals->globalDr->isAFormalName(name))
+                                        if (((i == 0) && !globals->globalDr->isAMiddleName(name)) || globals->globalDr->isAFirstName(name) || globals->globalDr->isAFormalName(name) || globals->globalDr->isANickName(name))
                                             nameInfo.type = ntFirst;
                                         else
                                             nameInfo.type = ntMiddle;
@@ -3007,6 +3205,11 @@ DATES unstructuredContent::readDOBandDOD(bool reliable)
     {
     case french:
         pullOutFrenchDates(dateList, maxDates, cleanString, limitWords, serviceDate);
+        if (dateList.size() == 0)
+        {
+            cleanString.clear();
+            pullOutEnglishDates(dateList, maxDates, cleanString, limitWords, serviceDate);
+        }
         break;
 
     case spanish:
@@ -3016,6 +3219,11 @@ DATES unstructuredContent::readDOBandDOD(bool reliable)
     case english:
     default:
         pullOutEnglishDates(dateList, maxDates, cleanString, limitWords, serviceDate);
+        if (dateList.size() == 0)
+        {
+            cleanString.clear();
+            pullOutFrenchDates(dateList, maxDates, cleanString, limitWords, serviceDate);
+        }
         break;
     }
 
@@ -3257,29 +3465,25 @@ bool unstructuredContent::isJustSavedNames()
     return isJustNames(true);
 }
 
-void unstructuredContent::processStructuredNames(QList<NAMESTATS> &nameStatsList, bool fixHyphens)
+void unstructuredContent::prepareStructuredNames()
 {
     replaceHTMLentities();
     removeHTMLtags(false);
     simplify();
     unQuoteHTML();
-    fixQuotes();
+    standardizeQuotes();
     fixParentheses();
     fixBasicErrors(true);
     stripOutAndProcessDates();
     checkForDates();
-    if (fixHyphens)
-        fixHyphenatedNames();       // Must be confident content only contains names
-    bool removeRecognized = false;  // Must be confident content only contains names
-    prepareNamesToBeRead(removeRecognized);
+    fixHyphenatedNames();
     removeAllSuffixPrefix();
     removeIntroductions();
     globals->globalObit->saveStructuredNamesProcessed(itsString);
-    bool ignoreBookendedLetters = true;
-    if (contains(",", ignoreBookendedLetters))
-        readLastNameFirst(nameStatsList);
-    else
-        readFirstNameFirst(nameStatsList);
+    globals->globalObit->getMCNaddress()->readMostCommonName(globals, globals->structuredNamesProcessed->getString());
+    bool removeRecognized = false;  // Must be confident content only contains names
+    prepareNamesToBeRead(removeRecognized);
+    globals->globalObit->saveStructuredNamesProcessed(itsString);
 }
 
 void unstructuredContent::processStructuredYears()
@@ -3401,7 +3605,7 @@ PQString unstructuredContent::processAllNames()
     OQString space(" ");
     OQStream existingMiddleNames;
     bool wordMatched, hasBookEnds, possibleName, hasComma, standAloneComma, hasPeriod, skipWordLookup;
-    bool compoundException, deException, delException, inParentheses, inQuotes;
+    bool compoundException, deException, delException, vanException, inParentheses, inQuotes;
 	unsigned int position = 1;
 	unsigned int commaPositionAfter = 0;
 	unsigned int numRotate = 0;
@@ -3415,7 +3619,6 @@ PQString unstructuredContent::processAllNames()
     commaIndex = itsString.indexOf(QString(","),0);
 
 	beg();      // go to beginning of content
-    //compressCompoundNames();
 
 	while (!EOS && !nameEnded)
 	{
@@ -3494,16 +3697,18 @@ PQString unstructuredContent::processAllNames()
 		temp = word;
         deException = false;
         delException = false;
+        vanException = false;
         if (((originalWord == OQString("de")) || (originalWord == OQString("du"))) && (globals->globalDr->getLanguage() == french))
             deException = true;
         if ((word == OQString("Del")) && globals->globalDr->isAFirstName(word))
             delException = true;
-        compoundException = (originalWord == OQString("E.")) ||
-                           ((originalWord == OQString("E")) && globals->globalDr->isAnInitial(originalWord)) ||
-                             deException || delException;		// Includes "St.", but exclude "E."
+        if ((word.lower() == OQString("van")) && (nextWord.isSingleVan()))
+            vanException = true;
+        compoundException = (originalWord == OQString("E.")) || (originalWord == OQString("E")) ||
+                             deException || delException || vanException;		// Includes "St.", but exclude "E."
 
-        isAboriginal = !hasComma && word.isAboriginalName(peekAtWord());
-        compoundName = (word.isCompoundName() && !compoundException && !isEOS()) || (isAboriginal && !hasBookEnds) || word.isSaint();
+        isAboriginal = !hasComma && word.isAboriginalName(nextWord) && (dbSearch.surnameLookup(nextWord.getString(), globals) < 25);
+        compoundName = (word.isCompoundName(lang) && !compoundException && !isEOS()) || (isAboriginal && !hasBookEnds) || word.isSaint();
 		while (compoundName)
 		{
 			compoundNameFound = true;
@@ -3518,7 +3723,7 @@ PQString unstructuredContent::processAllNames()
             hasPeriod = word.removeEnding(".");
 			temp += word;
             isAboriginal = !hasComma && isAboriginal && word.isAboriginalName(peekAtWord());
-            compoundName = word.isCompoundName() || isAboriginal;
+            compoundName = word.isCompoundName(lang) || isAboriginal;
 		}
         word = temp.proper();
         globals->globalDr->simplifyInitials(word);
@@ -4170,255 +4375,6 @@ PQString unstructuredContent::processAllNames()
 	return middleName;
 }
 
-void unstructuredContent::splitIntoBlocks(CONTENTREAD &cr)
-{
-    // Strip out everything within HTML tags as well
-    // Separation of blocks limited to </p>, <br> and </div> html tags
-
-    bool validBlock, endOfBlock;
-
-    OQString block, HTMLtag;
-    OQString openTag("<");
-    OQString closeTag(">");
-    QString space(" ");
-    QString period(".");
-    unsigned int blocksKept = 0;
-    unsigned int blockLength;
-    int firstOpenTag, firstCloseTag;
-
-    cr.clear();
-
-    if (this->getLength() == 0)
-        return;
-
-    // In the unlikely event we are starting within an HTML tag, discard the starting codes
-    firstOpenTag = this->getString().indexOf(QChar('<'));
-    firstCloseTag = this->getString().indexOf(QChar('>'));
-    bool startWithinHTMLtag = false;
-    if ((firstCloseTag >= 0) && (firstOpenTag == -1))
-        startWithinHTMLtag = true;
-    if ((firstCloseTag >= 0) && (firstOpenTag >= 0) && (firstCloseTag < firstOpenTag))
-        startWithinHTMLtag = true;
-    if (startWithinHTMLtag)
-        moveTo(closeTag.getString());
-
-    while (!isEOS())
-    {
-        // Read in all data until an open HTML tag "<" is encountered
-        block += getUntil(openTag.getString(), 3000);
-
-        // Read the next chunk of data within the HTML tags
-        endOfBlock = false;
-        if (!isEOS())
-        {
-            HTMLtag = openTag + getUntil(closeTag.getString(), 500, false);
-            endOfBlock = HTMLtag.isEndOfBlockTag();
-        }
-
-        // Deal with the block if no more data is to be added to it
-        if (isEOS() || endOfBlock)
-        {
-            block = block.unQuoteHTML();
-            block.cleanUpEnds();
-            blockLength = block.getLength();
-            validBlock = blockLength > 2;
-
-            if (validBlock)
-            {
-                // Ensure the block ends with a period
-                block.removeEnding(space);
-                if (block.right(1) != period)
-                    block += period;
-
-                block.fixBasicErrors();
-
-                // Next part fixes quotes by reading sentence by sentence
-                if (block.fixQuotes())
-                {
-                    PQString errMsg;
-                    errMsg << "Potential issue with mismatched quotes for: " << globals->globalDr->getURL();
-                    globals->logMsg(ErrorRecord, errMsg);
-                }
-
-                cr.allContent += block;
-                cr.allContent += space;
-
-                // Save any block containing the TitleKey into the separate blocks
-                bool matched = false;
-                unsigned int i = 0;
-                unsigned int cutOff = block.countWords();
-                if (cutOff > 13)
-                    cutOff = 13;
-                OQStream checkStream(block);
-                PQString checkWord;
-                PQString titleKey = globals->globalDr->getTitleKey().lower();
-                while (!matched && (i < cutOff))
-                {
-                    checkWord = checkStream.getWord().getString();
-                    checkWord.removeBookEnds();
-                    checkWord = checkWord.lower();
-                    if (checkWord == titleKey)
-                        matched = true;
-                    i++;
-                }
-                if (matched)
-                {
-                    switch(blocksKept)
-                    {
-                    case 0:
-                        cr.firstBlock = block;
-                        break;
-                    case 1:
-                        cr.secondBlock = block;
-                        break;
-                    case 2:
-                        cr.thirdBlock = block;
-                        break;
-                    }
-                    blocksKept++;
-                }
-            } // end valid block
-            block.clear();  // Since it was either saved or deemed to be garbage
-        }
-        else
-        {
-            // Ignore HTML tag and keep reading next chunk of data
-            block += space;
-        }
-    }
-
-    cr.allContent = cr.allContent.getString().replace(QString("  "), QString(" "));
-    cr.cleanUpEnds();
-
-    if (cr.firstBlock.getLength() == 0)
-        cr.firstBlock = cr.allContent;
-}
-
-void unstructuredContent::splitIntoBlocks(CONTENTREAD &cr, QList<QString> &firstWordList)
-{
-    // Strip out everything within HTML tags as well
-    // Separation of blocks limited to </p>, <br> and </div> html tags
-    // Separation into sentences achieved by recording positions of sentence starts
-
-    bool validBlock, endOfBlock;
-
-    OQString block, HTMLtag;
-    OQString openTag("<");
-    OQString closeTag(">");
-    QString space(" ");
-    QString period(".");
-    unsigned int blocksKept = 0;
-    unsigned int blockLength;
-    int firstOpenTag, firstCloseTag;
-
-    cr.clear();
-
-    if (this->getLength() == 0)
-        return;
-
-    // In the unlikely event we are starting within an HTML tag, discard the starting codes
-    firstOpenTag = this->getString().indexOf(QChar('<'));
-    firstCloseTag = this->getString().indexOf(QChar('>'));
-    bool startWithinHTMLtag = false;
-    if ((firstCloseTag >= 0) && (firstOpenTag == -1))
-        startWithinHTMLtag = true;
-    if ((firstCloseTag >= 0) && (firstOpenTag >= 0) && (firstCloseTag < firstOpenTag))
-        startWithinHTMLtag = true;
-    if (startWithinHTMLtag)
-        moveTo(closeTag.getString());
-
-    while (!isEOS())
-    {
-        // Read in all data until an open HTML tag "<" is encountered
-        block += getUntil(openTag.getString(), 3000);
-
-        // Read the next chunk of data within the HTML tags
-        endOfBlock = false;
-        if (!isEOS())
-        {
-            HTMLtag = openTag + getUntil(closeTag.getString(), 500, false);
-            endOfBlock = HTMLtag.isEndOfBlockTag();
-        }
-
-        // Deal with the block if no more data is to be added to it
-        if (isEOS() || endOfBlock)
-        {
-            block = block.unQuoteHTML();
-            block.cleanUpEnds();
-            blockLength = block.getLength();
-            validBlock = blockLength > 2;
-
-            if (validBlock)
-            {
-                // Ensure the block ends with a period
-                block.removeEnding(space);
-                if (block.right(1) != period)
-                    block += period;
-
-                block.fixBasicErrors();
-
-                // Next part fixes quotes by reading sentence by sentence
-                if (block.fixQuotes(firstWordList, globals->globalDr->getGender(), globals->globalDr->getLanguage()))
-                {
-                    PQString errMsg;
-                    errMsg << "Potential issue with mismatched quotes for: " << globals->globalDr->getURL();
-                    globals->logMsg(ErrorRecord, errMsg);
-                }
-
-                cr.allContent += block;
-                cr.allContent += space;
-
-                // Save any block containing the TitleKey into the separate blocks
-                bool matched = false;
-                unsigned int i = 0;
-                unsigned int cutOff = block.countWords();
-                if (cutOff > 13)
-                    cutOff = 13;
-                OQStream checkStream(block);
-                PQString checkWord;
-                PQString titleKey = globals->globalDr->getTitleKey().lower();
-                while (!matched && (i < cutOff))
-                {
-                    checkWord = checkStream.getWord().getString();
-                    checkWord.removeBookEnds();
-                    checkWord = checkWord.lower();
-                    if (checkWord == titleKey)
-                        matched = true;
-                    i++;
-                }
-                if (matched)
-                {
-                    switch(blocksKept)
-                    {
-                    case 0:
-                        cr.firstBlock = block;
-                        break;
-                    case 1:
-                        cr.secondBlock = block;
-                        break;
-                    case 2:
-                        cr.thirdBlock = block;
-                        break;
-                    }
-                    blocksKept++;
-                }
-            } // end valid block
-            block.clear();  // Since it was either saved or deemed to be garbage
-        }
-        else
-        {
-            // Ignore HTML tag and keep reading next chunk of data
-            block += space;
-        }
-    }
-
-    cr.allContent = cr.allContent.getString().replace(QString("  "), QString(" "));
-    cr.cleanUpEnds();
-
-    if (cr.firstBlock.getLength() == 0)
-        cr.firstBlock = cr.allContent;
-}
-
 void unstructuredContent::splitIntoSentences()
 {
     QList<QString> dummyList;
@@ -4433,8 +4389,9 @@ void unstructuredContent::splitIntoSentences(QList<QString> &firstWordList, QStr
     databaseSearches dbSearch;
     unstructuredContent sentence;
     OQString firstWord, nextWord;
-    bool hadComma;
+    bool hadComma, isAllCaps, hadPunctuation;
     bool pastFirstRealSentence = false;
+    bool restrictNamesToDR = false;
     int sentenceCount = 0;
 
     while (!isEOS())
@@ -4443,7 +4400,7 @@ void unstructuredContent::splitIntoSentences(QList<QString> &firstWordList, QStr
         sentenceCount++;
 
         // Make adjustments to initial headings/titles if appropriate
-        if ((sentenceCount == 1) && (sentence.countWords() == 1))
+        if ((sentenceCount == 1) && (sentence.countWords() == 1) && !isEOS())
         {
             NAMESTATS nameStats1, nameStats2;
             firstWord = sentence.getWord();
@@ -4464,18 +4421,24 @@ void unstructuredContent::splitIntoSentences(QList<QString> &firstWordList, QStr
                 sentence.beg();
         }
 
-        firstWord = sentence.getWord();
-        if (firstWord.getLength() > 0)
+        if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates() || sentence.isJustNames(restrictNamesToDR) || sentence.startsWithClick(true)) && (sentence.countWords() > 5))
         {
-            firstWord.removeEnding(" ");
-            firstWord.removeBookEnds(QUOTES | PARENTHESES);
-            hadComma = firstWord.removeEnding(COMMA);
-            firstWord.removeEnding(PUNCTUATION);
-            firstWord = firstWord.lower();
-            firstWord.removePossessive();
-            if ((firstWord.getLength() > 0) && !hadComma && (firstWord.isGenderWord(globals->globalDr->getGender(), globals->globalDr->getLanguage()) ||
-                                                             !(firstWord.isRecognized() || firstWord.isWrittenMonth())))
-                firstWordList.append(firstWord.getString());
+            sentence.beg();
+            firstWord = sentence.getWord();
+            if (firstWord.getLength() > 0)
+            {
+                firstWord.removeEnding(" ");
+                firstWord.removeBookEnds(QUOTES | PARENTHESES);
+                hadComma = firstWord.removeEnding(COMMA);
+                hadPunctuation = firstWord.removeEnding(PUNCTUATION);
+                isAllCaps = firstWord.isAllCaps(false);
+                firstWord = firstWord.lower();
+                firstWord.removePossessive();
+                nextWord = sentence.peekAtWord();
+                if ((firstWord.getLength() > 0) && !hadComma && !isAllCaps && !hadPunctuation && !nextWord.isHyphen() &&
+                        (firstWord.isGenderWord(globals->globalDr->getGender(), globals->globalDr->getLanguage()) || !firstWord.isRecognized() || firstWord.isWrittenMonth()))
+                    firstWordList.append(firstWord.getString());
+            }
         }
     }
 
@@ -4638,16 +4601,39 @@ OQStream unstructuredContent::getSentence(const QList<QString> &firstNames, bool
     return result;
 }
 
+OQStream unstructuredContent::getNextRealSentence(bool restrictNamesToDR, unsigned int minWordCount)
+{
+    OQStream result;
+    unstructuredContent sentence;
+    LANGUAGE lang = globals->globalDr->getLanguage();
+    bool keepGoing = true;
+
+    while (!isEOS() && keepGoing)
+    {
+        sentence = getSentence(lang);
+        keepGoing = (sentence.getLength() == 0) || (sentence.countWords() < minWordCount) || sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates()
+                                                || sentence.isJustNames(restrictNamesToDR) || sentence.startsWithClick(true)  || sentence.hasAllWordsCapitalized();
+        if (keepGoing)
+            sentence.clear();
+    }
+
+    if (sentence.getLength() > 0)
+        result = sentence.getString();
+
+    return result;
+}
+
 void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
 {
     // The  logic is aligned with justInitialNames contained in determineLanguageAndGender
     // It is assumed that the first words are names
 
+    this->removeCelebrations();
+
     QRegularExpression targetI, target;
     QRegularExpressionMatch match;
-    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
-    targetI.setPattern("-? ?celebration of life ?(-|for|of)?");
-    itsString.replace(targetI, "");
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+
     targetI.setPattern(" ?achat columbarium ?");
     itsString.replace(targetI, "");
     targetI.setPattern("\\bP\\.?\\s?ENG\\b");
@@ -4661,6 +4647,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     this->fixParentheses();
 
     databaseSearches dbSearch;
+    unstructuredContent tempUC;
     OQString word, originalWord, nextWord;
     OQString newString, firstChar, lastChar;
     bool hadComma, hadPeriod, wordAssessed, breakExemption, inQuotes, isForeign, standAloneComma;
@@ -4773,7 +4760,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
         NAMESTATS nameStatsA, nameStatsB;
         dbSearch.nameStatLookup(word.getString(), globals, nameStatsA, genderUnknown);
         dbSearch.nameStatLookup(nextWord.getString(), globals, nameStatsB, genderUnknown);
-        if (nameStatsA.isLikelySurname && nameStatsB.isLikelySurname)
+        if ((nameStatsA.isLikelySurname && nameStatsB.isLikelySurname) || (nameStatsA.isLikelyGivenName && nameStatsB.isLikelyGivenName) || (nextWord.getLength() == 1))
             itsString = itsString.left(indexB) + itsString.right(itsString.length() - indexB - 1);
         else
             itsString = itsString.left(indexA) + itsString.right(itsString.length() - indexA - 1);
@@ -4853,8 +4840,12 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
             dbSearch.nameStatLookup(originalWord.getString(), globals, nameStat1);
             dbSearch.nameStatLookup(nextWord.getString(), globals, nameStat2);
 
-            if (nameStat1.isLikelySurname && nameStat2.isLikelyGivenName)
-                hadComma = true;
+            if (nameStat1.isLikelySurname && nameStat2.isLikelyGivenName && !originalWord.isCompoundName(globals->globalDr->getLanguage()))
+            {
+                // Rule out other believed uses of first name
+                if (!(originalWord.lower() == globals->globalDr->getUsedFirstNameFromStructured().toLower()) && !(originalWord.lower() == globals->globalDr->getUsedFirstNameFromUnstructured().toLower()))
+                    hadComma = true;
+            }
         }
 
         originalWord.removeInternalPeriods();
@@ -4981,7 +4972,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
                 // Strip out any incidence of "| nee"
                 if (originalWord.getString().contains("|"))
                 {
-                    originalWord.compressCompoundNames(language_unknown);
+                    tempUC.compressCompoundNames(originalWord, language_unknown);
                     OQStream tempTempStream(originalWord);
                     OQString newWord;
 
@@ -5002,6 +4993,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
                                 nextWord.cleanUpEnds();
                                 globals->globalDr->setNeeEtAlEncountered(true);
                                 globals->globalDr->setMaidenNames(nextWord);
+                                globals->globalDr->setGender(Female);
                             }
                         }
                         if (!tempTempStream.isEOS())
@@ -5190,7 +5182,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     // Tidy up, remove spaces from compound names and and store the other strings
     newString.removeEnding(space);
     newString.cleanUpEnds();
-    newString.compressCompoundNames(language_unknown);
+    tempUC.compressCompoundNames(newString, language_unknown);
 
     // Copy cleaned up list of words to itsString
     setItsString(newString.getString());
@@ -5300,7 +5292,7 @@ void unstructuredContent::pickOffNames()
 
         isAboriginal = !hadComma && word.isAboriginalName(peekAtWord());
         lastWasCompound = isCompound;
-        isCompound = (word.isCompoundName() && !((lang == french) && ((word == OQString("de")) || (word == OQString("du"))))) || (capitalized && isAboriginal && !hadBookEnds);
+        isCompound = word.isCompoundName(lang) || (capitalized && isAboriginal && !hadBookEnds);
         doubleInitial = (word.getLength() == 3) && (word.middle(1,1) == OQString("."));
 
         if ((word.getLength() < 2) || doubleInitial)
@@ -5604,7 +5596,10 @@ void unstructuredContent::pickOffNames()
         }
     }
 
-    setItsString(newString.getString());
+    if (namesKept < 6)
+        setItsString(newString.getString());
+    else
+        setItsString(QString());
 }
 
 void unstructuredContent::checkForDates()
@@ -5894,6 +5889,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
     OQString newString, originalWord;
     bool wordRemoved;
     bool firstWord = true;
+    bool containsAnd = false;
     wordsKept = 0;
     while (!EOS)
     {
@@ -5987,6 +5983,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                         {
                             QList<OQString> WordList = word.createList();
                             QList<OQString> wordList = WordList;
+                            QList<QString> QwordList;
 
                             if (isEOS())
                             {
@@ -6128,7 +6125,8 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                                         }
                                         else
                                         {
-                                            if (dbSearch.areUniquelySurnames(wordList, globals, globals->globalDr->getGender()))
+                                            QwordList = OQString::convertToQStringList(wordList);
+                                            if (dbSearch.areUniquelySurnames(QwordList, globals, globals->globalDr->getGender()))
                                             {
                                                 wordList = WordList;
                                                 globals->globalDr->setFamilyNames(wordList);
@@ -6141,8 +6139,9 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                                                 if (!(nameStats.isSurname || nameStats.isGivenName))
                                                 {
                                                     wordList = WordList;
+                                                    QwordList = OQString::convertToQStringList(wordList);
                                                     // Assume to be a location if not a name
-                                                    if (!dbSearch.areAllNames(wordList, globals))
+                                                    if (!dbSearch.areAllNames(QwordList, globals))
                                                         wordRemoved = true;
                                                 }
                                             }
@@ -6204,13 +6203,16 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                 }
             }
 
+            if (word.isAnd())
+                containsAnd = true;
+
             firstWord = false;
             if (!wordRemoved)
                 wordsKept++;
         }
     }
     newString.cleanUpEnds();
-    newString.compressCompoundNames(language_unknown);
+    tempUC.compressCompoundNames(newString, language_unknown);
     *this = newString;   
 
     beg();
@@ -6229,8 +6231,16 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
 	
     // Check for potential flipping of names (easy case only) like Smith George
     // ValidateNameOrder may get run again later
-    if((totalWordsRemaining >= 2) && (totalBookEndsRemaining == 0) && (totalSuffixesRemaining == 0))
-        validateNameOrder();
+    if (!containsAnd)
+    {
+        if((totalWordsRemaining >= 2) && (totalBookEndsRemaining == 0) && (totalSuffixesRemaining == 0))
+            validateNameOrder();
+        else
+        {
+            if (totalBookEndsRemaining == 1)
+                validateNameOrder2();
+        }
+    }
 
     beg();
     priorWordJeanne = false;
@@ -6250,6 +6260,8 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
 
         if (word.getLength() > 0)
 		{
+            bool containsProblematicWord;
+
             inParentheses = word.removeBookEnds(PARENTHESES);
             if (inParentheses)
                 word.removeBookEnds(PARENTHESES);       // Needed for weird entries
@@ -6300,6 +6312,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                             int j = 0;
                             bool allMiddleNames = true;
                             bool allLastNames = true;
+                            containsProblematicWord = false;
                             QString singleWord;
                             QList<QString> nameList = word.getString().split(" ", Qt::SkipEmptyParts);
                             while ((j < nameList.size()) && (allMiddleNames || allLastNames))
@@ -6308,10 +6321,29 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                                 allMiddleNames = allMiddleNames && dbSearch.givenNameLookup(singleWord, globals, gender);
                                 allLastNames = allLastNames && ((dbSearch.surnameLookup(singleWord, globals) > 0) || globals->globalDr->isALastName(singleWord));
                                 j++;
+
+                                if (problematicBookEndContents.contains(singleWord))
+                                {
+                                    containsProblematicWord = true;
+                                    allMiddleNames = false;
+                                    allLastNames = false;
+                                }
                             }
 
                             if (allMiddleNames || allLastNames)
                             {
+                                if (allMiddleNames && allLastNames)
+                                {
+                                    if ((gender == Male) || inQuotes)
+                                        allLastNames = false;
+                                    else
+                                    {
+                                        if (gender == Female)
+                                            allMiddleNames = false;
+                                        else
+                                            allMiddleNames = false; // Perhaps to be reconsidered
+                                    }
+                                }
                                 for (j = 0; j < nameList.size(); j++)
                                 {
                                     OQString name = OQString(nameList.at(j));
@@ -6355,7 +6387,8 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                             errMsg << "Couldn't determine how to handle (" << word << ") for: " << globals->globalDr->getURL();
                             //globals->logMsg(ErrorRecord, errMsg);
                             word.replace(",", "COMMA");     // Needed to avoid extraneous comman in CSV file
-                            globals->globalDr->wi.confirmTreatmentName = word.getString();
+                            if (!containsProblematicWord)
+                                globals->globalDr->wi.confirmTreatmentName = word.getString();
 
                             skipWord = true;
                             handled = true;
@@ -6392,6 +6425,14 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                 // Check for initial
                 word.removeEnding(QString("."));
                 wordIsInitial = word.isInitial();
+
+                // Deal with multiple deceased
+                if (word.isAnd())
+                {
+                    skipWord = true;
+                    handled = true;
+                    globals->globalDr->wi.doubleMemorialFlag = 10;
+                }
 
                 // Remove potential duplicates
                 tempWord = word.proper();
@@ -6556,7 +6597,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                     dbSearch.nameStatLookup(word.getString(), globals, nameStats, gender, true);
                     if (nameStats.inParentheses || nameStats.inQuotes)
                     {
-                        nameStats.isNickName = nameStats.inQuotes || dbSearch.nickNameInList(word.lower(), firstNames, globals) || dbSearch.pureNickNameLookup(word.getString(), globals);
+                        nameStats.isNickName = nameStats.inQuotes || word.isNickNameRelativeToList(firstNames) || dbSearch.pureNickNameLookup(word.getString(), globals);
 
                         // Check for occasional inclusion of formal name in parentheses "Bob (Robert) Smith"
                         PQString errMsg;
@@ -6731,8 +6772,8 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                     }
 
                     // Use database search info
-                    // Only add a second last name for females, other a male middleName
-                    if (!handled && (!nameStats.isGivenName || nameStats.isLikelySurname) && ((gender == Female) || ((gender == genderUnknown) && (unisex <= 0.5))))
+                    // Only add a second last name for females, other a male middleName, but only if length is greater than 2 to avoid double initial with periods removed
+                    if (!handled && (word.getLength() > 2) && (!nameStats.isGivenName || nameStats.isLikelySurname) && ((gender == Female) || ((gender == genderUnknown) && (unisex <= 0.5))))
                     {
                         numLastNames++;
                         if (!(inParentheses || inQuotes))
@@ -6913,6 +6954,13 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
         }
     }
 
+    // Fix male middlename saved as last name
+    if ((gender == Male) && (numMiddleNames == 0) && (numLastNames >= 2) && !globals->globalDr->getMaleHyphenated())
+    {
+        iter.toFront();
+
+    }
+
     i = 0;
     iter.toFront();
     while (iter.hasNext())
@@ -6939,7 +6987,7 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
 	}
 }
 
-void unstructuredContent::validateNameOrder(bool initialCheck)
+bool unstructuredContent::validateNameOrder(bool initialCheck)
 {
     // Coded to look at names in the first and last positions only
     // Proper expected order is firstName secondName
@@ -6948,17 +6996,19 @@ void unstructuredContent::validateNameOrder(bool initialCheck)
     bool firstIsSurname, firstIsGivenName, secondIsSurname, secondIsGivenName;
     double firstRatio, secondRatio;
     QString firstWord, secondWord, prefix;
-    OQString temp;
-    NAMESTATS nameStats1, nameStats2;
+    OQString temp, firstGivenNameUsedInSentence;
+    NAMESTATS nameStats1, nameStats2, nameStatsPotential;
     databaseSearches dbSearch;
+    LANGUAGE lang = globals->globalDr->getLanguage();
+    GENDER gender = globals->globalDr->getGender();
     bool valid;
     bool reversed = false;
     bool flip = false;
-    bool safeFlip = false;
     int exposures1, exposures2;
+    PQString errMsg;
 
     temp = getWord();
-    while (temp.isCompoundName())
+    while (temp.isCompoundName(lang))
     {
         firstWord += temp.getString();
         firstWord += QString(" ");
@@ -6979,9 +7029,10 @@ void unstructuredContent::validateNameOrder(bool initialCheck)
 
     while (!EOS)
     {
+        // Should pick off the final name
         secondWord.clear();
         temp = getWord();
-        while (temp.isCompoundName())
+        while (temp.isCompoundName(lang))
         {
             secondWord += temp.getString();
             secondWord += QString(" ");
@@ -6990,134 +7041,203 @@ void unstructuredContent::validateNameOrder(bool initialCheck)
         secondWord += temp.getString();
     }
 
-    dbSearch.nameStatLookup(firstWord, globals, nameStats1);
-    dbSearch.nameStatLookup(secondWord, globals, nameStats2);
-    exposures1 = nameStats1.surnameCount + nameStats1.maleCount + nameStats1.femaleCount;
-    exposures2 = nameStats2.surnameCount + nameStats2.maleCount + nameStats2.femaleCount;
-
-    // There are approximately 1.25 first names for every last name
-    if ((nameStats1.maleCount + nameStats1.femaleCount) > 0)
-        firstRatio = nameStats1.surnameCount * 1.25 / (nameStats1.maleCount + nameStats1.femaleCount);
+    firstGivenNameUsedInSentence = globals->globalDr->getFirstGivenNameUsedInSentence();
+    if ((firstWord == firstGivenNameUsedInSentence.getString()) || firstGivenNameUsedInSentence.isFormalVersionOf(firstWord, errMsg)
+                                                                || firstGivenNameUsedInSentence.isInformalVersionOf(firstWord, errMsg))
+        return true;
     else
-        firstRatio = nameStats1.surnameCount * 1.25 / 0.5;
-
-    if ((nameStats2.maleCount + nameStats2.femaleCount) > 0)
-        secondRatio = nameStats2.surnameCount * 1.25 / (nameStats2.maleCount + nameStats2.femaleCount);
-    else
-        secondRatio = nameStats2.surnameCount * 1.25 / 0.5;
-
-    firstIsGivenName = nameStats1.isGivenName;
-    firstIsSurname = nameStats1.isSurname;
-    secondIsGivenName = nameStats2.isGivenName;
-    secondIsSurname = nameStats2.isSurname;
-
-    valid = (firstIsGivenName && !firstIsSurname && secondIsSurname && !secondIsGivenName) || (prefix.length() > 0);
-
-    if (!valid)
     {
-        reversed = !firstIsGivenName && firstIsSurname && !secondIsSurname && secondIsGivenName;
-        if (reversed)
-            flip = true;
-    }
+        dbSearch.nameStatLookup(firstWord, globals, nameStats1, gender);
+        dbSearch.nameStatLookup(secondWord, globals, nameStats2, gender);
+        exposures1 = nameStats1.surnameCount + nameStats1.maleCount + nameStats1.femaleCount;
+        exposures2 = nameStats2.surnameCount + nameStats2.maleCount + nameStats2.femaleCount;
 
-    // Next most reliable approach is to look for first name in the unstructured text
-    if (!valid && !reversed)
-    {
-        OQString OQpotentialName, OQword;
-        PQString warningMessage;
-        QString potentialName = globals->globalDr->getPotentialFirstName();
+        // There are approximately 1.25 first names for every last name
+        int count1, count2;
+        double weight;
 
-        OQpotentialName = potentialName;
-        OQword = firstWord;
-        if ((potentialName.compare(firstWord, Qt::CaseInsensitive) == 0) || OQpotentialName.isInformalVersionOf(firstWord, warningMessage) || OQword.isInformalVersionOf(potentialName, warningMessage))
-            valid = true;
+        switch(gender)
+        {
+        case Male:
+            count1 = nameStats1.maleCount;
+            count2 = nameStats2.maleCount;
+            weight = 1.25 * 0.5;
+            break;
+
+        case Female:
+            count1 = nameStats1.femaleCount;
+            count2 = nameStats2.femaleCount;
+            weight = 1.25 * 0.5;
+            break;
+
+        default:
+            count1 = nameStats1.maleCount + nameStats1.femaleCount;
+            count2 = nameStats2.maleCount + nameStats2.femaleCount;
+            weight = 1.25;
+            break;
+        }
+
+        if (count1 > 0)
+            firstRatio = nameStats1.surnameCount * weight / count1;
         else
-        {
-            OQword = secondWord;
-            if ((potentialName.compare(secondWord, Qt::CaseInsensitive) == 0) || OQpotentialName.isInformalVersionOf(secondWord, warningMessage) || OQword.isInformalVersionOf(potentialName, warningMessage))
-                reversed = true;
-        }
-    }
+            firstRatio = nameStats1.surnameCount * weight / 0.5;
 
-    // If still not determined, start taking educated guesses
-    if (!valid && !reversed)
-    {
-        // Err slightly to data being correct
+        if (count2 > 0)
+            secondRatio = nameStats2.surnameCount * weight / count2;
+        else
+            secondRatio = nameStats2.surnameCount * weight / 0.5;
 
-        // Case A - Brand new secondWord
-        if (!(secondIsGivenName || secondIsSurname))
-        {
-            valid = (firstRatio <= 12.5);
-            reversed = (firstRatio > 12.5);
-        }
+        firstIsGivenName = nameStats1.isGivenName;
+        firstIsSurname = nameStats1.isSurname;
+        secondIsGivenName = nameStats2.isGivenName;
+        secondIsSurname = nameStats2.isSurname;
 
-        // Case B - Brand new firstWord
-        if (!valid && !reversed && !(firstIsGivenName || firstIsSurname))
+        valid = (firstIsGivenName && !firstIsSurname && secondIsSurname && !secondIsGivenName) || (prefix.length() > 0);
+
+        if (!valid)
         {
-            valid =  (secondRatio >= 0.08);
-            reversed = (secondRatio < 0.08);
+            reversed = !firstIsGivenName && firstIsSurname && !secondIsSurname && secondIsGivenName;
+            if (reversed)
+                flip = true;
         }
 
-        // Case C - Both names can be either first name or last name
+        // Next most reliable approach is to look for first name in the unstructured text
         if (!valid && !reversed)
-            reversed = ((firstRatio > 2) && (secondRatio < 0.5)) ||
-                       ((((nameStats1.maleCount + nameStats1.femaleCount) == 0) && ((nameStats2.maleCount + nameStats2.femaleCount) > 0) && ((nameStats1.surnameCount + nameStats2.maleCount + nameStats2.femaleCount) >= 3))) ||
-                       (((nameStats2.surnameCount == 0) && (nameStats1.surnameCount > 0) && ((nameStats1.surnameCount + nameStats2.maleCount + nameStats2.femaleCount) >= 3)));
-
-        // If the wording was reversed through this group of analysis, issue warning if same logic would reverse it back
-        if (reversed && initialCheck)
         {
-            unstructuredContent checkLogicA, checkLogicB;
-            checkLogicA = secondWord + QString(" ") + firstWord;
-            checkLogicB = checkLogicA;
-            checkLogicA.validateNameOrder(false);
-            if (checkLogicA != checkLogicB)
+            OQString OQpotentialName, OQword;
+            PQString warningMessage;
+            bool usedJIN = false;
+            QString potentialName = globals->globalDr->getUsedFirstNameFromUnstructured();
+            if (potentialName.length() == 0)
+                potentialName = globals->globalDr->getUsedFirstNameFromStructured();
+            if (potentialName.length() == 0)
             {
-                reversed = false;
-                PQString errMsg;
-                errMsg << "Check for potential reversing of names for: " << globals->globalDr->getURL();
-                //globals->logMsg(ErrorRecord, errMsg);
-                globals->globalDr->wi.nameReversalFlag = 10;
-            }
-        }
-    }
-
-    if (reversed)
-    {
-        // Too many false positives - changed to simply a flag initially - some switching now included
-        if (!flip)
-        {
-            if ((globals->globalDr->getLastNameAlt1().getLength() == 0) && (globals->globalDr->getMiddleNames().getLength() == 0) && (globals->globalDr->getFirstNameAKA1().getLength() == 0))
-            {
-                if (((firstRatio > 17.5) && (exposures1 >= 10)) || ((secondRatio < 0.01) && (exposures2 >= 10)))
-                    flip = true;
+                potentialName = globals->justInitialNamesUC->getWord().getString();
+                if (OQString(potentialName).removeEnding(PUNCTUATION))
+                    potentialName.clear();
                 else
                 {
-                    int index1, index2, index3;
-                    QString names = globals->justInitialNamesUC->getString();
-                    index1 = names.indexOf(",", Qt::CaseInsensitive);
-                    index2 = names.indexOf(nameStats1.name, Qt::CaseInsensitive);
-                    index3 = names.indexOf(nameStats2.name, Qt::CaseInsensitive);
-                    if ((index1 == -1) && (index2 >= 0) && (index3 > index2))
-                        safeFlip = true;
+                    dbSearch.nameStatLookup(potentialName, globals, nameStatsPotential, gender);
+                    if (!nameStatsPotential.isGivenName)
+                        potentialName.clear();
+                    else
+                        usedJIN = true;
+                }
+            }
+
+            OQpotentialName = potentialName;
+            OQword = firstWord;
+            if ((potentialName.compare(firstWord, Qt::CaseInsensitive) == 0) || OQpotentialName.isInformalVersionOf(firstWord, warningMessage) || OQword.isInformalVersionOf(potentialName, warningMessage))
+                valid = true;
+            else
+            {
+                OQword = secondWord;
+                if ((potentialName.compare(secondWord, Qt::CaseInsensitive) == 0) || OQpotentialName.isInformalVersionOf(secondWord, warningMessage) || OQword.isInformalVersionOf(potentialName, warningMessage))
+                {
+                    if (usedJIN)
+                    {
+                        if (!nameStats2.isLikelySurname)
+                        {
+                            reversed = true;
+                            flip = true;
+                        }
+                    }
+                    else
+                    {
+                        reversed = true;
+                        flip = true;
+                    }
                 }
             }
         }
 
-        if (!safeFlip)
-            flip = false;
-        if (flip)
+        // If still not determined, start taking educated guesses
+        if (!valid && !reversed)
         {
-            *this = prefix + secondWord + QString(" ") + firstWord;
-            globals->globalDr->wi.nameReversalFlag = 20;
+            // Err slightly to data being correct
+
+            // Case A - Brand new secondWord
+            if (!(secondIsGivenName || secondIsSurname))
+            {
+                valid = (firstRatio <= 12.5);
+                reversed = (firstRatio > 12.5);
+                if (reversed)
+                    flip = true;
+            }
+
+            // Case B - Brand new firstWord
+            if (!valid && !reversed && !(firstIsGivenName || firstIsSurname))
+            {
+                valid =  (secondRatio >= 0.08);
+                reversed = (secondRatio < 0.08);
+                if (reversed)
+                    flip = true;
+            }
+
+            // Case C - Both names can be either first name or last name
+            if (!valid && !reversed)
+                reversed = ((firstRatio > 3) && (secondRatio < 0.33)) ||
+                           ((((nameStats1.maleCount + nameStats1.femaleCount) == 0) && ((nameStats2.maleCount + nameStats2.femaleCount) > 0) && ((nameStats1.surnameCount + nameStats2.maleCount + nameStats2.femaleCount) >= 3)) && (nameStats2.credibility < veryHigh)) ||
+                           (((nameStats2.surnameCount == 0) && (nameStats1.surnameCount > 0) && ((nameStats1.surnameCount + nameStats2.maleCount + nameStats2.femaleCount) >= 3)) && (nameStats1.credibility < veryHigh));
+
+            // If the wording was reversed through this group of analysis, issue warning if same logic would reverse it back
+            if (reversed && initialCheck)
+            {
+                unstructuredContent checkLogicA, checkLogicB;
+                checkLogicA = secondWord + QString(" ") + firstWord;
+                checkLogicB = checkLogicA;
+                checkLogicA.validateNameOrder(false);
+                if (checkLogicA != checkLogicB)
+                {
+                    reversed = false;
+                    PQString errMsg;
+                    errMsg << "Check for potential reversing of names for: " << globals->globalDr->getURL();
+                    //globals->logMsg(ErrorRecord, errMsg);
+                    globals->globalDr->wi.nameReversalFlag = 10;
+                }
+                else
+                    flip = true;
+            }
         }
-        else
+
+        if (reversed)
         {
-            if (globals->globalDr->wi.nameReversalFlag == 0)
-                globals->globalDr->wi.nameReversalFlag = 10;
+            // Too many false positives - changed to simply a flag initially - some switching now included
+            if (!flip)
+            {
+                if ((globals->globalDr->getLastNameAlt1().getLength() == 0) && (globals->globalDr->getMiddleNames().getLength() == 0) && (globals->globalDr->getFirstNameAKA1().getLength() == 0))
+                {
+                    //if (((firstRatio > 17.5) && (exposures1 >= 10)) || ((secondRatio < 0.01) && (exposures2 >= 10)))
+                    if (((firstRatio > 175) && (exposures1 >= 10)) || ((secondRatio < 0.001) && (exposures2 >= 10)))
+                        flip = true;
+                    else
+                    {
+                        int index1, index2, index3;
+                        QString names = globals->justInitialNamesUC->getString();
+                        index1 = names.indexOf(",", Qt::CaseInsensitive);
+                        index2 = names.indexOf(nameStats1.name, Qt::CaseInsensitive);
+                        index3 = names.indexOf(nameStats2.name, Qt::CaseInsensitive);
+                        if ((index1 == -1) && (index2 >= 0) && (index3 > index2))
+                            flip = true;
+                    }
+                }
+            }
+
+            if (flip)
+            {
+                *this = prefix + secondWord + QString(" ") + firstWord;
+                globals->globalDr->wi.nameReversalFlag = 20;
+            }
             else
-                globals->globalDr->wi.nameReversalFlag += 1;
+            {
+                if (globals->globalDr->wi.nameReversalFlag == 0)
+                    globals->globalDr->wi.nameReversalFlag = 10;
+                else
+                    globals->globalDr->wi.nameReversalFlag += 1;
+            }
         }
+
+        return !flip;
     }
 }
 
@@ -7155,7 +7275,9 @@ bool unstructuredContent::validateNameOrder(QList<NAMESTATS> &nameStatsList, boo
     {
         OQString OQpotentialName, OQword;
         PQString warningMessage;
-        QString potentialName = globals->globalDr->getPotentialFirstName();
+        QString potentialName = globals->globalDr->getUsedFirstNameFromUnstructured();
+        if (potentialName.length() == 0)
+            potentialName = globals->globalDr->getUsedFirstNameFromStructured();
 
         OQpotentialName = potentialName;
         OQword = firstWord;
@@ -7235,6 +7357,33 @@ bool unstructuredContent::validateNameOrder(QList<NAMESTATS> &nameStatsList, boo
     return reversed;
 }
 
+void unstructuredContent::validateNameOrder2()
+{
+    // Currently coded to handle situations with a single bookended value
+    QRegularExpression target;
+    QRegularExpressionMatch match;
+    target.setPattern(" (\\(\\S+\\))");
+
+    match = target.match(itsString);
+    if (match.hasMatch())
+    {
+        OQString bookended = match.captured(1);
+        bookended.removeBookEnds(PARENTHESES);
+
+        NAMESTATS nameStats;
+        databaseSearches dbSearch;
+        dbSearch.nameStatLookup(bookended.getString(), globals, nameStats, globals->globalDr->getGender());
+        if (nameStats.isLikelySurname)
+        {
+            QString newString = itsString;
+            newString.replace(target, "");
+            unstructuredContent tempUC = OQString(newString);
+            if (!tempUC.validateNameOrder())
+                setItsString(tempUC.getString() + QString(" (") + bookended.getString() + QString(")"));
+        }
+    }
+}
+
 void unstructuredContent::extraNameProcessing()
 {
     QString tempString;
@@ -7243,7 +7392,7 @@ void unstructuredContent::extraNameProcessing()
     tempUC.removeHTMLtags(false);
     globals->globalObit->runStdProcessing(tempUC, false);
     tempUC.removeTrailingLocation();
-    tempUC.compressCompoundNames(globals->globalDr->getLanguage());
+    compressCompoundNames(tempUC, globals->globalDr->getLanguage());
     tempUC.removeLeading("-");
     tempUC.removeEnding("-");
     tempUC.cleanUpEnds();
@@ -7434,6 +7583,36 @@ bool unstructuredContent::listContainsLocationWords(QList<QString> &list)
     return matched;
 }
 
+bool unstructuredContent::areAllLocationWords()
+{
+    if (itsString.length() == 0)
+        return false;
+
+    if (globals->websiteLocationWords.size() == 0)
+        return false;
+
+    QList<QString> wordList;
+    OQStream tempStream(itsString);
+    OQString word;
+    while (!tempStream.isEOS())
+    {
+        word = tempStream.getWord();
+        word.removeEnding(PUNCTUATION);
+        wordList.append(word.getString());
+    }
+
+    int i = 0;
+    bool matched = true;
+    while (matched && (i < wordList.count()))
+    {
+        if (globals->websiteLocationWords.contains(wordList.at(i), Qt::CaseInsensitive))
+            i++;
+        else
+            matched = false;
+    }
+
+    return matched;
+}
 
 DATES unstructuredContent::readNumericDates(DATEORDER dateOrder)
 {
@@ -8542,18 +8721,23 @@ unsigned int unstructuredContent::contentReadAgeAtDeath(unsigned int maxSentence
     unstructuredContent sentence;
     QList<QString> firstNamesList = globals->globalDr->getFirstNameList();
     QStringList stopWords;
-    bool realSentenceEncountered = true;
+    //bool realSentenceEncountered = true;
+    bool restrictNamesToDR = false;
     unsigned int i = 1;
     unsigned int result = 0;
 
     while ((globals->globalDr->missingDOB() || globals->globalDr->missingDOD() || (globals->globalDr->getDOB() == globals->globalDr->getDOD())) && !isEOS() && (globals->globalDr->getAgeAtDeath() == 0) && (i <= maxSentences))
     {
-        sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, globals->globalDr->getLanguage());
+        sentence = getNextRealSentence(restrictNamesToDR, 1);
+        result = sentence.sentenceReadAgeAtDeath();
+        i++;
+
+        /*sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, globals->globalDr->getLanguage());
         if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true)))
         {
             result = sentence.sentenceReadAgeAtDeath();
             i++;
-        }
+        }*/
     }
 
     if ((result > 0) && (result != 999))
@@ -8567,18 +8751,23 @@ unsigned int unstructuredContent::contentReadAgeAtDeath(QList<QString> firstName
     beg();
     unstructuredContent sentence;
     QStringList stopWords;
-    bool realSentenceEncountered = false;
+    //bool realSentenceEncountered = false;
+    bool restrictNamesToDr = false;
     unsigned int i = 1;
     unsigned int result = 0;
 
     while (!isEOS() && (result == 0) && (i <= 2))
     {
-        sentence = getSentence(firstName, realSentenceEncountered, stopWords, language_unknown);
+        sentence = getNextRealSentence(restrictNamesToDr, 1);
+        result = sentence.sentenceReadAgeAtDeath(false, true);
+        i++;
+
+        /*sentence = getSentence(firstName, realSentenceEncountered, stopWords, language_unknown);
         if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates()))
         {
             result = sentence.sentenceReadAgeAtDeath(false, true);
             i++;
-        }
+        }*/
     }
 
     if ((result > 0) && (result != 999))
@@ -8802,6 +8991,11 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                             {
                                 if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))) || (word == OQString(QString("depuis"))))
                                     eventCheck = true;
+                                else
+                                {
+                                    if (((word == OQString("battle")) || (word == OQString("employed"))) && (nextWord == OQString("for")) && peekTwoAhead.isNumeric())
+                                        contextChanged = true;
+                                }
                             }
                         }
                     }
@@ -8848,8 +9042,26 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                             // Run error checking to catch errors such as "..at the age of 3 months"
                             bool endOfSentence = word.removeEnding(QString(".")) || cleanContent.isEOS();
                             if (!endOfSentence)
+                            {
                                 readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
-                            ageAtDeath = num;
+                                if ((contextError || eventCheck) && (num == 0))
+                                {
+                                    // Number read was excluded - Reset and continue
+                                    numFound = false;
+                                    contextError = false;
+                                    eventCheck = false;
+                                    word = cleanContent.getWord(true).lower();
+                                    word = cleanContent.getWord(true).lower();
+                                    word = cleanContent.getWord(true).lower();
+                                }
+                                else
+                                    ageAtDeath = num;
+                            }
+                            else
+                            {
+                                if (wordMatched)
+                                    ageAtDeath = num;
+                            }
 
                             // Check for special instances of "John Smith, 68, left us...."
                             if (lastHadComma && currentHasComma)
@@ -8909,13 +9121,164 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
 
 }
 
+unsigned int unstructuredContent::sentenceReadAgeNextBirthday()
+{
+    QDate DOD = globals->globalDr->getDOD();
+
+    if ((itsString.size() == 0) || !DOD.isValid())
+        return 999;
+
+    unsigned int newAgeAtDeath = 999;
+    int ageAtDeath;
+    int potentialAge, YOB;
+    int num;
+    QString periodType, number;
+    int monthOfBirth, dayOfBirth;
+    QDate nextBirthday, DOB;
+    bool valid = false;
+    bool validate = false;
+    QStringList numbers = QString("one|two|three|four|five|six|seven|eight|nine|ten").split("|");
+
+    QRegularExpression targetI;
+    QRegularExpressionMatch match;
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+
+    targetI.setPattern("would have (turned|attained) (\\d+) on (January|February|March|April|May|June|July|August|September|October|November|December) (\\d+)");
+    match = targetI.match(itsString);
+    if (match.hasMatch())
+    {
+        potentialAge = match.captured(2).toInt() - 1;
+        monthOfBirth = QDate::fromString("2023" + match.captured(3) + "01", "yyyyMMMMdd").month();
+        dayOfBirth = match.captured(4).toInt();
+
+        nextBirthday = QDate(DOD.year(), monthOfBirth, dayOfBirth);
+        if (!nextBirthday.isValid() || (nextBirthday <= DOD))
+            nextBirthday = QDate(DOD.year() + 1, monthOfBirth, dayOfBirth);
+
+        if (nextBirthday.isValid() && (potentialAge > 0) && (potentialAge < 120))
+        {
+            valid = true;
+            DOB = QDate(nextBirthday.year() - (potentialAge + 1), nextBirthday.month(), nextBirthday.day());
+
+            // Run tests where possible
+            YOB = globals->globalDr->getYOB();
+            if ((YOB > 0) && (YOB != DOB.year()))
+                valid = false;
+
+            ageAtDeath = globals->globalDr->getAgeAtDeath();
+            if ((ageAtDeath > 0) && (ageAtDeath != potentialAge))
+                valid = false;
+
+            if (valid)
+            {
+                globals->globalDr->setDOB(DOB);
+                newAgeAtDeath = potentialAge;
+            }
+        }
+    }
+    else
+    {
+        targetI.setPattern("would have (turned|attained) (\\d+) in (one|two|three|four|five|six|seven|eight|nine|ten) (\\S+)");
+        match = targetI.match(itsString);
+        if (match.hasMatch())
+        {
+            potentialAge = match.captured(2).toInt() - 1;
+            number = match.captured(3);
+            periodType = match.captured(4).toLower();
+            num = numbers.indexOf(number);
+            if (periodType.right(1) == "s")
+                periodType.chop(1);
+            validate = true;
+        }
+        else
+        {
+            targetI.setPattern("would have (turned|attained) (\\d+) in (\\d+) (\\S+)");
+            match = targetI.match(itsString);
+            if (match.hasMatch())
+            {
+                potentialAge = match.captured(2).toInt() - 1;
+                num = match.captured(3).toInt();
+                periodType = match.captured(4).toLower();
+                validate = true;
+            }
+        }
+
+        if (validate)
+        {
+            if (periodType == "day")
+            {
+                nextBirthday = DOD.addDays(num);
+
+                if (nextBirthday.isValid() && (potentialAge > 0) && (potentialAge < 120))
+                {
+                    valid = true;
+                    DOB = QDate(nextBirthday.year() - (potentialAge + 1), nextBirthday.month(), nextBirthday.day());
+
+                    // Run tests where possible
+                    YOB = globals->globalDr->getYOB();
+                    if ((YOB > 0) && (YOB != DOB.year()))
+                        valid = false;
+
+                    ageAtDeath = globals->globalDr->getAgeAtDeath();
+                    if ((ageAtDeath > 0) && (ageAtDeath != potentialAge))
+                        valid = false;
+
+                    if (valid)
+                    {
+                        globals->globalDr->setDOB(DOB);
+                        newAgeAtDeath = potentialAge;
+                    }
+                }
+            }
+            else
+            {
+                if (((periodType == "week") || (periodType == "month")) && (globals->globalDr->getAgeAtDeath() == 0))
+                    newAgeAtDeath = potentialAge;
+            }
+        }
+    }
+
+    return newAgeAtDeath;
+
+}
+
+unsigned int unstructuredContent::contentReadAgeNextBirthday(unsigned int maxSentences)
+{
+    // Validation and saving or results handled in sentenceReadAgeNextBirthday
+
+    beg();
+    unstructuredContent sentence;
+    unsigned int i = 1;
+    unsigned int result = 0;
+    bool restrictNamesToDR = false;
+
+    while (!isEOS() && ((result == 0) || (result == 999)) && (i <= maxSentences))
+    {
+        sentence = getNextRealSentence(restrictNamesToDR, 1);
+        result = sentence.sentenceReadAgeNextBirthday();
+        i++;
+
+        /*sentence = getSentence(globals->globalDr->getLanguage());
+        if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates()))
+        {
+            result = sentence.sentenceReadAgeNextBirthday();
+            i++;
+        }*/
+    }
+
+    return result;
+}
+
+
 unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectly)
 {
     if (itsString.size() == 0)
         return 999;
 
     // Designed to read through one single sentence
-    // Initially replicates the non-Naked function logic, so perhaps combine the two down the road if appropriate
+    // Two strategies are adopted
+    // 1. Mostly replicates non-naked readAgeAtDeath function, with less restrictive read
+    // 2. Look for .....passing of Loretta Smith, 82, in ......
 
     unsigned int numDates;
     int num;
@@ -9026,6 +9389,11 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
                 {
                     if ((word == OQString("after")) || (word == OQString("apres")) || (word == OQString(QString("après"))))
                         eventCheck = true;
+                    else
+                    {
+                        if ((word == OQString("battle") && (nextWord == OQString("for")) && peekTwoAhead.isNumeric()))
+                            contextChanged = true;
+                    }
                 }
             }
         }
@@ -9138,9 +9506,10 @@ void unstructuredContent::readAgeAtDeathPostNumChecks(bool &numFound, bool &cont
         if (peek2 == OQString("of"))
             peek2 = peek3;
         if ((peek2 == OQString("battle")) || (peek2 == OQString("illness")) || (peek2 == OQString("courageous")) || (peek2 == OQString("struggle")) ||
-            (peek2 == OQString("ago")) || (peek2 == OQString("since")) || (peek2 == OQString("have")) || (peek2 == OQString("health")))
+            (peek2 == OQString("ago")) || (peek2 == OQString("since")) || (peek2 == OQString("have")) || (peek2 == OQString("health")) || (peek2 == OQString("marriage")))
         {
             contextError = true;
+            num = 0;
             altNum = 0;
         }
     }
@@ -9150,20 +9519,25 @@ void unstructuredContent::contentReadSpouseName(LANGUAGE lang)
 {
     beg();
     unstructuredContent sentence;
-    QList<QString> firstNamesList = globals->globalDr->getFirstNameList();
-    QStringList stopWords;
-    bool realSentenceEncountered = true;
+    //QList<QString> firstNamesList = globals->globalDr->getFirstNameList();
+    //QStringList stopWords;
+    //bool realSentenceEncountered = true;
+    bool restrictNamesToDR = false;
     unsigned int maxSentences = 4;
     unsigned int i = 1;
 
     while ((globals->globalDr->getSpouseName().length() == 0) && !isEOS() && (i <= maxSentences))
     {
-        sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, globals->globalDr->getLanguage());
+        sentence = getNextRealSentence(restrictNamesToDR, 3);
+        sentence.sentenceReadSpouseName(lang);
+        i++;
+
+        /*sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, globals->globalDr->getLanguage());
         if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true)))
         {
             sentence.sentenceReadSpouseName(lang);
             i++;
-        }
+        }*/
     }
 }
 
@@ -9171,9 +9545,13 @@ bool unstructuredContent::sentenceReadSpouseName(LANGUAGE lang)
 {
     bool found = false;
     QStringList targetWords, targetWordsEnglish, targetWordsFrench, targetWordsSpanish;
+    QStringList excludedWords, excludedWordsEnglish, excludedWordsFrench, excludedWordsSpanish;
     targetWordsEnglish = QString("his wife|her husband|his spouse|her spouse|husband of|wife of|spouse of").split("|");
     targetWordsFrench = QString(QString("son mari|sa femme|son époux|mari de|femme de|époux de|épouse de|conjoint de|conjointe de|son conjoint")).split("|");
     targetWordsSpanish = QString("su esposa|su marido").split("|");
+    excludedWordsEnglish = QString("of|years|years,").split("|");
+    excludedWordsFrench = QString("de|ans|ans,").split("|");
+    excludedWordsSpanish = QString("de|años|años,").split("|");
 
     QString target, sentence;
     OQString nextWord;
@@ -9202,18 +9580,22 @@ bool unstructuredContent::sentenceReadSpouseName(LANGUAGE lang)
     {
     case english:
         targetWords = targetWordsEnglish;
+        excludedWords = excludedWordsEnglish;
         break;
 
     case french:
         targetWords = targetWordsFrench;
+        excludedWords = excludedWordsFrench;
         break;
 
     case spanish:
         targetWords = targetWordsSpanish;
+        excludedWords = excludedWordsSpanish;
         break;
 
     default:
         targetWords = targetWordsEnglish + targetWordsFrench + targetWordsSpanish;
+        excludedWords = excludedWordsEnglish + excludedWordsFrench + excludedWordsSpanish;
         break;
     }
 
@@ -9224,9 +9606,13 @@ bool unstructuredContent::sentenceReadSpouseName(LANGUAGE lang)
         if (index != -1)
         {
             position = index + target.size() + 1;
+            nextWord.clear();
             if (position < itsString.size())
             {
-                nextWord = getWord();
+                while (!isEOS() && ((nextWord.getLength() == 0) || excludedWords.contains(nextWord.getString()) || nextWord.isNumeric())){
+                    nextWord = getWord();
+                }
+                nextWord.removeEnding(PUNCTUATION);
                 if (nextWord.isCapitalized() && dbSearch.givenNameLookup(nextWord.getString(), globals, spouseGender))
                 {
                     found = true;
@@ -9357,6 +9743,42 @@ bool unstructuredContent::sentenceReadYearsMarried(LANGUAGE lang)
     return !updated;
 }
 
+unsigned int unstructuredContent::sentenceReadUnbalancedYOB()
+{
+    unsigned int result = 0;
+
+    QRegularExpression targetI;
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::UseUnicodePropertiesOption);
+    QRegularExpressionMatch match;
+
+    targetI.setPattern("([1-2][0|9][0-9][0-9]) - (January|February|March|April|May|June|July|August|September|October|November|December) (\\d+, \\d{4})");
+    match = targetI.match(itsString);
+    if (match.hasMatch())
+        result = match.captured(1).toUInt();
+    else
+    {
+        targetI.setPattern("([1-2][0|9][0-9][0-9]) - (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d+, \\d{4})");
+        match = targetI.match(itsString);
+        if (match.hasMatch())
+            result = match.captured(1).toUInt();
+        else
+        {
+            targetI.setPattern("([1-2][0|9][0-9][0-9]) - (\\d+) (janvier|fevrier|février|mars|avril|mai|juin|juillet|aout|août|septembre|octobre|novembre|decembre|décembre) (\\d{4})");
+            match = targetI.match(itsString);
+            if (match.hasMatch())
+                result = match.captured(1).toUInt();
+            else
+            {
+                targetI.setPattern("([1-2][0|9][0-9][0-9]) - (\\d+) (jan|janv|fév|févr|mars|avr|mai|juin|juil|août|sep|sept|oct|nov|déc) (\\d{4})");
+                match = targetI.match(itsString);
+                if (match.hasMatch())
+                    result = match.captured(1).toUInt();
+            }
+        }
+    }
+
+    return result;
+}
 
 void unstructuredContent::readDateOfService(QDate &DOSD, LANGUAGE lang)
 {
@@ -9364,13 +9786,17 @@ void unstructuredContent::readDateOfService(QDate &DOSD, LANGUAGE lang)
     unstructuredContent sentence;
     QList<QString> firstNamesList = globals->globalDr->getFirstNameList();
     QStringList stopWords;
-    bool realSentenceEncountered = true;
+    //bool realSentenceEncountered = true;
+    bool restrictNamesToDR = false;
 
     while (!DOSD.isValid() && !isEOS())
     {
-        sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, lang);
+        sentence = getNextRealSentence(restrictNamesToDR, 5);
+        sentence.sentenceReadDateOfService(DOSD, lang);
+
+        /*sentence = getSentence(firstNamesList, realSentenceEncountered, stopWords, lang);
         if (!sentence.isJustDates())
-            sentence.sentenceReadDateOfService(DOSD, lang);
+            sentence.sentenceReadDateOfService(DOSD, lang);*/
     }
 }
 
@@ -9481,6 +9907,7 @@ void unstructuredContent::removeAllKnownNames()
     OQString word, originalWord, lastChar, tempString, nextWord;
     QString space(" ");
     bool inParentheses, inQuotes, isAboriginal, hasComma;
+    LANGUAGE lang = globals->globalDr->getLanguage();
 
 	beg();      // go to beginning of content
     while (!EOS && (numWordsRead < 1000))
@@ -9489,7 +9916,7 @@ void unstructuredContent::removeAllKnownNames()
 		word = originalWord;
 		numWordsRead++;
         isAboriginal = originalWord.isAboriginalName(peekAtWord());
-        while ((originalWord.isCompoundName() || isAboriginal) && (originalWord.lower() != OQString("e.")) && !EOS)
+        while ((originalWord.isCompoundName(lang) || isAboriginal) && (originalWord.lower() != OQString("e.")) && !EOS)
         {
             word += space;
             originalWord = getWord(true);
@@ -10314,6 +10741,37 @@ bool unstructuredContent::truncateAfterChildReference(LANGUAGE lang, bool firstS
     return truncated;
 }
 
+bool unstructuredContent::truncateAfter(QList<QString> targetPhrases, bool firstSentence)
+{
+    QString targetText;
+    int index, lowestIndex, start;
+    bool truncated = false;
+
+    lowestIndex = itsString.size();
+
+    if (firstSentence)
+        start = 6;
+    else
+        start = 0;
+
+    beg();
+    while (targetPhrases.size() > 0)
+    {
+        targetText = targetPhrases.takeFirst();
+        index = itsString.indexOf(targetText, 0, Qt::CaseInsensitive);
+        if (index >= start)
+        {
+            if (index < lowestIndex)
+                lowestIndex = index;
+            truncated = true;
+        }
+    }
+
+    itsString = itsString.left(lowestIndex);
+
+    return truncated;
+}
+
 bool unstructuredContent::truncateAfter(QString cutOffText, Qt::CaseSensitivity cs)
 {
     bool removed = false;
@@ -10468,6 +10926,36 @@ bool unstructuredContent::removeSpouseForFiller(LANGUAGE lang)
     }
 
     return removed;
+}
+
+bool unstructuredContent::removeAtTheHospitalFiller(LANGUAGE lang)
+{
+    QRegularExpression targetI;
+    targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::InvertedGreedinessOption | QRegularExpression::UseUnicodePropertiesOption);
+    QRegularExpressionMatch match;
+
+    QList<QString> fillerLocations = QString("hospital|center|centre|pavillion").split("|");
+    QString location;
+    bool replaced = false;
+
+    if (lang != english)
+        return false;
+
+    while (fillerLocations.size() > 0)
+    {
+        location = fillerLocations.takeFirst();
+        targetI.setPattern("\\bat the (.{1,60})" + location + "\\b ?");
+        //targetI.setPattern("\\bat the (.{1,60})pavillion\\b ?");
+        match = targetI.match(this->itsString);
+        while (match.hasMatch())
+        {
+            itsString.replace(targetI, "");
+            replaced = true;
+            match = targetI.match(this->itsString);
+        }
+    }
+
+    return replaced;
 }
 
 bool unstructuredContent::removeDates(LANGUAGE lang)
@@ -10725,6 +11213,201 @@ void unstructuredContent::splitComponents(QString &datesRemoved, QString &justDa
     justDates = removedParts.getString();
 }
 
+void unstructuredContent::compressCompoundNames(QString &string, LANGUAGE lang)
+{
+    itsString = string;
+    if (itsString.length() == 0)
+        return;
+
+    databaseSearches dbSearch;
+    unstructuredContent tempUC;
+    OQString result, word, singleChar, nextChar, cleanWord, nextWord, endHyphenatedName;
+    QString space(" ");
+    bool isCompound, hasParentheses, hasQuotes, openEnded;
+    unsigned int charType;
+    int start = 0;
+    int end = 0;
+    int last = itsString.length();
+
+    //if ((last == 0) || (lang == french))
+    if (last == 0)
+        return;
+
+    while (end < last)
+    {
+        singleChar = itsString.mid(start, 1);
+        hasParentheses = ((singleChar.getCharType() & PARENTHESES) == PARENTHESES);
+        hasQuotes = ((singleChar.getCharType() & QUOTES) == QUOTES);
+        if (hasParentheses || hasQuotes)
+        {
+            if (hasParentheses)
+                end = itsString.indexOf(QString(")"), start + 1, Qt::CaseInsensitive);
+            else
+                end = itsString.indexOf(QString("\'"), start + 1, Qt::CaseInsensitive);
+
+            if (end == -1)
+            {
+                end = last;
+                openEnded = true;
+            }
+            else
+            {
+                end++;
+                openEnded = false;
+            }
+
+            word = itsString.mid(start, end - start);
+            cleanWord = word;
+            cleanWord.removeBookEnds(PARENTHESES | QUOTES, true);
+            if (!openEnded)
+                tempUC.compressCompoundNames(cleanWord, lang);
+
+            if (hasParentheses)
+            {
+                result += OQString("(") + cleanWord;
+                if (!openEnded)
+                    result += OQString(")");
+                if ((end < last) && space == itsString.at(end))
+                    result += space;
+            }
+            else
+            {
+                result += OQString("\'") + cleanWord;
+                if (!openEnded)
+                    result += OQString("\'");
+                if ((end < last) && space == itsString.at(end))
+                    result += space;
+            }
+
+            while ((end < last) && (space == itsString.at(end)))
+            {
+                end++;
+            }
+            start = end;
+        }
+        else
+        {
+            end = itsString.indexOf(space, start, Qt::CaseInsensitive);
+            if (end == -1)
+                end = last;
+            word = itsString.mid(start, end - start);
+            cleanWord = word;
+            if (word.isHyphenated())
+            {
+                int index = word.getString().indexOf(QString("-"));
+                endHyphenatedName = word.right(word.getLength() - index - 1);
+            }
+            else
+                endHyphenatedName.clear();
+            isCompound = cleanWord.isCompoundName(lang) || cleanWord.isSaint() || endHyphenatedName.isCompoundName(lang);
+
+            // Deal with special cases
+            // Error will occur with nicknames "Di" and "Von" if they are not in quotes or parentheses
+            // Assess if stand alone "e" is an initial or compound name
+            if (isCompound && ((cleanWord == OQString("E")) || (cleanWord == OQString("E."))))
+            {
+                OQString temp(itsString);
+                if (!temp.isAllCaps())
+                    isCompound = false;
+            }
+
+            if (isCompound && ((word.lower() == OQString("st")) || (word.lower() == OQString("ste"))))
+                word += OQString(".");
+
+            start = end + 1;
+
+            bool cancel = false;
+            nextWord.clear();
+            if (end < last)
+            {
+                // Need to obtain next word for aboriginal check and other exceptions
+                int tempEnd = itsString.indexOf(space, start, Qt::CaseInsensitive);
+                if (tempEnd == -1)
+                    tempEnd = last;
+                nextWord = itsString.mid(start, tempEnd - start);
+            }
+
+            isCompound = isCompound || (cleanWord.isAboriginalName(nextWord) && (dbSearch.surnameLookup(nextWord.getString(), globals) < 10));
+
+            if (isCompound)
+            {
+                cancel = nextWord.removeBookEnds(PARENTHESES | QUOTES, true);
+                cancel = cancel || nextWord.removeLeading(PARENTHESES | QUOTES);
+                cancel = cancel || (nextWord.lower() == PQString("obituary"));
+                cancel = cancel || (isCompound && word.isCapitalized() && !nextWord.isCapitalized());
+                cancel = cancel || ((word.lower() == PQString("van")) && nextWord.isSingleVan());
+            }
+
+            if (isCompound && !cancel)
+                result += word.proper();
+            else
+                result += word + space;
+        }
+    }
+
+    result.removeEnding(space);
+    itsString = result.getString();
+
+    // Second pass through to get consistent capitalizations
+    start = 0;
+    end = 0;
+    result.clear();
+    last = itsString.length();
+
+    while (end < last)
+    {
+        end = itsString.indexOf(space, start, Qt::CaseInsensitive);
+        if (end == -1)
+            end = last;
+        word = itsString.mid(start, end - start);
+
+        singleChar = word.left(1);
+        charType = singleChar.getCharType();
+        hasParentheses = ((charType & PARENTHESES) == PARENTHESES);
+        hasQuotes = ((charType & QUOTES) == QUOTES);
+        cleanWord = word;
+
+        if (hasParentheses || hasQuotes)
+        {
+            cleanWord.removeLeading(PARENTHESES | QUOTES);
+            cleanWord = cleanWord.proper();
+            word = singleChar + cleanWord;
+        }
+        else
+        {
+            if (cleanWord.isCapitalized())
+                word = cleanWord.proper();
+        }
+        result += word;
+        start = end + 1;
+        if (end < last)
+            result += space;
+    }
+
+    string = result.getString();
+}
+
+void unstructuredContent::compressCompoundNames(OQString &string, LANGUAGE lang)
+{
+    QString workingString = string.getString();
+    compressCompoundNames(workingString, lang);
+    string = workingString;
+}
+
+void unstructuredContent::compressCompoundNames(OQStream &string, LANGUAGE lang)
+{
+    QString workingString = string.getString();
+    compressCompoundNames(workingString, lang);
+    string = workingString;
+}
+
+void unstructuredContent::compressCompoundNames(unstructuredContent &string, LANGUAGE lang)
+{
+    QString workingString = string.getString();
+    compressCompoundNames(workingString, lang);
+    string.setItsString(workingString);
+}
+
 void unstructuredContent::addSentence(OQString &newSentence)
 {
     if (itsString.length() > 0)
@@ -10779,6 +11462,24 @@ void unstructuredContent::removeCelebration()
             setItsString(itsString.right(itsString.length() - index - 1));
             this->cleanUpEnds();
         }
+    }
+}
+
+void unstructuredContent::removeLeadingJunk()
+{
+    QList<QString> junkWords = QString("obituary of|obituary for|obituary").split("|");
+    int numJunk = junkWords.size();
+    int i = 0;
+
+    while (i < numJunk)
+    {
+        if (removeLeading(junkWords.at(i), Qt::CaseInsensitive))
+        {
+            i = 0;
+            cleanUpEnds();
+        }
+        else
+            i++;
     }
 }
 

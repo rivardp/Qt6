@@ -86,17 +86,17 @@ public:
     void removeIntroductions();
     void removeSuffixPrefix(const QList<QString> &list);
     void removeStrings(const QList<QString> &list);
-    void compressCompoundNames(const LANGUAGE lang);
     void conditionalBreaks();
     void fixBasicErrors(bool onlyContainsNames = false);
     void fixDateFormats();
     bool fixHyphenatedSaint();
     bool fixParentheses();
-    bool fixQuotes();
-    bool fixQuotes(QList<QString> &listOfFirstWords, GENDER gender = genderUnknown, LANGUAGE lang = language_unknown); // No longer in use
-    unsigned int standardizeQuotes();           // Returns number of quotes read in
-    unsigned int standardizeQuotes(QList<QString> &listOfFirstWords, GENDER gender = genderUnknown, LANGUAGE lang = language_unknown); // No longer in use
-    bool checkQuotes(unsigned int numQuotes);   // Looks for potential errors if uneven number of quotes exist
+    //bool fixQuotes();
+    //bool fixQuotes(QList<QString> &listOfFirstWords, GENDER gender = genderUnknown, LANGUAGE lang = language_unknown); // No longer in use
+    //unsigned int standardizeQuotes();           // Returns number of quotes read in
+    //unsigned int standardizeQuotes(QList<QString> &listOfFirstWords, GENDER gender = genderUnknown, LANGUAGE lang = language_unknown); // No longer in use
+    //bool checkQuotes(unsigned int numQuotes);   // Looks for potential errors if uneven number of quotes exist
+    void standardizeQuotes(); // Rewritten in this form March 26, 2023
     QList<OQString> createList() const;
     OQString& tidyUp();
 
@@ -118,7 +118,7 @@ public:
     bool isSpousalReference(const LANGUAGE lang = language_unknown) const;
     bool isAbbreviation() const;
     bool isProvAbbreviation() const;
-    bool isCompoundName() const;
+    bool isCompoundName(LANGUAGE lang = language_unknown) const;
     bool isUncapitalizedName() const;
     bool isSingleVan() const;
     bool isNoVowelName() const;
@@ -142,11 +142,14 @@ public:
     QList<QString> getChildReferences(const LANGUAGE lang = language_unknown, GENDER gender = genderUnknown) const;
     QList<QString> getRelativeReferences(const LANGUAGE lang = language_unknown) const;
     QList<QString> getRelationshipWords(const LANGUAGE lang = language_unknown, GENDER gender = genderUnknown) const;
+    QList<QString> getMiscWords(const LANGUAGE lang = language_unknown) const;
+    QList<QString> convertToQStringList(const QList<OQString> OQlist) const;
 
     bool isInformalVersionOf(const QString &formalname, PQString &errMsg) const;
     bool isFormalVersionOf(const QString &nickname, PQString &errMsg) const;
     bool isAGivenName(PQString &errMsg) const;
     bool isALastName(PQString &errMsg) const;
+    bool isNickNameRelativeToList(QList<QString> &listOfNames);
 
     unsigned int isWrittenMonth(const LANGUAGE &lang = language_unknown, const bool fullWordsOnly = false);
     unsigned int isWrittenMonthAbbreviation(const LANGUAGE &lang = language_unknown);
@@ -204,6 +207,7 @@ public:
 
 protected:
     friend class dataRecord;
+    friend class mostCommonName;
 
     static QList<monthInfo> monthsEnglishFull;
     static QList<monthInfo> monthsFrenchFull;
@@ -333,8 +337,14 @@ protected:
     static QList<QString> relationshipWordsSpanishF;
     static QList<QString> relationshipWordsSpanishU;
 
+    static QList<QString> miscWordsEnglish;
+    static QList<QString> miscWordsFrench;
+    static QList<QString> miscWordsSpanish;
+
     static QList<QString> problematicFirstNames;
     static QList<QString> problematicFemaleMiddleNames;
+    static QList<QString> problematicRoadReferences;
+    static QList<QString> problematicBookEndContents;
 
     static QList<QString> locations;
     static QList<QString> routes;

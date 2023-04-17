@@ -61,7 +61,8 @@ void readObit::read()
     UseFirstDateAsDOD = false;
     UndoBadSentence = false;
     DontInsertPeriods = false;
-    InsertPeriods = 2;
+    InsertPeriods = 2;     // insertPeriods == 2 inserts at all break tags while == 1 excludes <br> and some dates
+
 
     runTypes = readRunTypes(globals, globals->globalDr->getProvider(), globals->globalDr->getProviderKey());
     if ((runTypes & 1) == 1)
@@ -117,20 +118,25 @@ void readObit::read()
         readGender();
     if (ObitDates)
         readInObitDates();
-    if (ObitText)
-    {
-        readInObitText();
-        processObitText(UndoBadSentence, InsertPeriods);
-        determinePotentialFirstName();
-        addressMissingGender();
-        readServiceDate();
-    }
     if (ReadPublishDate)
         readPublishDate();
     if (ReadMessages)
         readMessages();
+    if (ObitText)
+    {
+        readInObitText();
+        processObitText(UndoBadSentence, InsertPeriods);
+    }
     if (ReadStructured)
-        readStructuredContent();
+        readAndPrepareStructuredContent();
+    if (ObitText)
+    {
+        addressMissingGender();
+        determinePotentialFirstName();
+        readServiceDate();
+    }
+    if (ReadStructured)
+        processStructuredNames();
     if (TitleInfo)
         readTitleInfo();
     if ((globals->globalDr->getGender() != Male) && !globals->globalDr->getNeeEtAlEncountered()
@@ -143,12 +149,13 @@ void readObit::read()
         readImageNameInfo();
         globals->globalDr->setMinMaxDOB();
         globals->globalDr->runDateValidations();
+        fixNameIssues();
+        globals->globalDr->wi.resetNonDateValidations();
         finalNameCleanup();
-        runNameValidations();
         treatmentNameCleanup();
+        runNameValidations();
         runGenderValidation();
         runRecordValidation();
-        fixNameIssues();
     }
 }
 
@@ -237,8 +244,21 @@ void readObit::readGender()
 
 void readObit::readInObitText()
 {
-    // Basic read specified for each provider, with standard processing for all coded at end
+    // Check if robots are directed to ignore
+    beg();
+    QString robotDirections;
+    if (consecutiveMovesTo(35, "<meta", "robots", "content="))
+    {
+        robotDirections = readQuotedMetaContent().getString();
+        if (robotDirections.contains("noindex"))
+            globals->globalDr->wi.futureUse += 1;
+        if (robotDirections.contains("nofollow"))
+            globals->globalDr->wi.futureUse += 2;
+        if (robotDirections.contains("none"))
+            globals->globalDr->wi.futureUse += 4;
+    }
 
+    // Basic read specified for each provider, with standard processing for all coded at end
     beg();
     unstructuredContent checkContent;
 
@@ -300,7 +320,10 @@ void readObit::readInObitText()
 
     case DomainFuneraire:
         if (consecutiveMovesTo(50, "mt-10 text-sm wysiwyg", ">"))
+        {
             uc = getUntil("</div>");
+            uc.replace("magnus poirier inc.", "", Qt::CaseInsensitive);
+        }
         break;
 
     case GreatWest:
@@ -520,35 +543,21 @@ void readObit::readInObitText()
                 beg();
                 if (moveTo(">OBITUARY<"))
                 {
-                    conditionalMoveTo("class=\"fixed-container mt-30", "short-bio text", 0);
-                    conditionalMoveTo("short-bio text", "<h2", 2);
-                    moveTo(">");
-                    uc = getUntil("</div>");
-                }
-
-                /*if (consecutiveMovesTo(500, "short-bio text", ">"))
-                {
-                    backward(1000);
-                    if (conditionalMoveTo(">OBITUARY<", "short-bio text", 0))
-                        moveTo(">");
-                    else
+                    //conditionalMoveTo("class=\"fixed-container mt-30", "short-bio text", 0);
+                    moveToEarliestOf("<a", "<h2", "short-bio text");
+                    backward(1);
+                    QString temp = get().getString();
+                    if (temp == QString("a"))
+                        moveTo("short-bio text");
+                    if (temp == QString("2"))
                     {
-                        if (conditionalMoveTo("<h1", "short-bio text", 0))
-                            moveTo(">");
-                        else
-                        {
-                            conditionalMoveTo("short-bio text", "<h2", 2);
-                            moveTo(">");
-                        }
+                        moveTo(">");
+                        uc = getUntil("</div>");
+                        moveTo("short-bio text");
                     }
-                    uc = getUntil("</div>");                    
-                }*/
-            }
-
-            if (moveTo("short-bio text", 5000))
-            {
-                moveTo(">", 100);
-                uc = uc.getString() + getUntil("</div>").getString();
+                    moveTo(">");
+                    uc = uc.getString() + getUntil("</div>").getString();
+                }
             }
         }
         break;
@@ -1213,9 +1222,10 @@ void readObit::readInObitText()
                     moveTo("/* Style Definitions */");
                     moveTo("<![endif]-->");
                 }
-                if (conditionalMoveTo("<p>&nbsp;</p>", "</div>", 0, 100))
-                    conditionalMoveTo("<p>&nbsp;</p>", "</div>", 0, 100);
-                uc = getUntil("</div>");
+                //if (conditionalMoveTo("<p>&nbsp;</p>", "</div>", 0, 100))
+                //    conditionalMoveTo("<p>&nbsp;</p>", "</div>", 0, 100);
+                //uc = getUntil("</div>");
+                uc = getUntil("<a id=\"guestbooks\"");
             }
 
             if (uc.getLength() == 0)
@@ -1977,10 +1987,8 @@ void readObit::readInObitText()
 
     case NMedia:
     {
-        if (moveTo("<>"))
-        {
-            uc = readNextBetween(BRACKETS);
-        }
+        if (consecutiveMovesTo(1000, "InventoryProductBroker_CF_da94c4f1-d139-4d6b-4b92-f2ccf25eb8e2", ">"))
+            uc = getUntil("</div>");
     }
         break;
 
@@ -2772,6 +2780,16 @@ void readObit::readInObitText()
                 uc = getUntil("ETHICAL DEATH CARE");
             }
         }
+        if (uc.getLength() == 0)
+        {
+            beg();
+            if (moveTo("<span style=\"font-family:playfair display,serif\""))
+            {
+                moveToEarliestOf("</p", "<span style=\"font-family:playfair display,serif\"");
+                moveTo(">");
+                uc = getUntil("ETHICAL DEATH CARE");
+            }
+        }
         break;
 
     case Direct:
@@ -2877,8 +2895,8 @@ void readObit::readInObitText()
         break;
 
     case Brenneman:
-        if (moveTo("</h3>"))
-            uc = getUntil("<footer>");
+        if (consecutiveMovesTo(1000, "id=\"viewer-c65df\"", "class=\"_2PHJq public-DraftStyleDefault-ltr\"", "<span"))
+            uc = readNextBetween(BRACKETS);
         break;
 
     case Cardinal:
@@ -3219,6 +3237,7 @@ void readObit::readInObitText()
             if(conditionalMoveTo("Date de Décès :", "</div>", 0))
                 moveTo(">");
             uc = getUntil("</div>");
+            uc.replace(" -", "");
         }
         break;
 
@@ -3282,9 +3301,8 @@ void readObit::readInObitText()
 
     case Richelieu:
     {
-        if (consecutiveMovesTo(2000, "class=\"necrologie_fiche_right\"", "</h6>"))
-            uc = getUntil("<div class=");
-
+        if (consecutiveMovesTo(250, "class=\"info font-ASAP\"", "<h4", ">"))
+            uc = getUntil("<!-- testing -->");
     }
         break;
 
@@ -3629,7 +3647,18 @@ void readObit::readInObitText()
     }
 }
 
-void readObit::processObitText(bool UndoBadSentence, bool insertPeriods)
+void readObit::processStructuredNames()
+{
+    unstructuredContent uc = globals->globalObit->getStructuredNamesProcessed();
+    bool ignoreBookendedLetters = true;
+
+    if (uc.contains(",", ignoreBookendedLetters))
+        uc.readLastNameFirst(nameStatsList);
+    else
+        uc.readFirstNameFirst(nameStatsList);
+}
+
+void readObit::processObitText(bool UndoBadSentence, int insertPeriods)
 {
     runStdProcessing(uc, insertPeriods);
     if (UndoBadSentence)
@@ -3643,7 +3672,7 @@ void readObit::processObitText(bool UndoBadSentence, bool insertPeriods)
     uc.splitIntoSentences(mcn.listOfFirstWords, stopWords);
 
     // Setup cleaned content
-    unstructuredContent sentence;
+    unstructuredContent sentence, tempUC;
     OQString newSentence;
     bool firstSentence;
     unsigned int numSentences = 0;
@@ -3668,6 +3697,7 @@ void readObit::processObitText(bool UndoBadSentence, bool insertPeriods)
             sentence.removeDates(lang);
             sentence.removeSpouseForFiller(lang);
             sentence.removeBornToFiller(lang);
+            sentence.removeAtTheHospitalFiller(lang);
             newSentence = sentence.getString() + QString(". ");
             ucFillerRemoved.addSentence(newSentence);
 
@@ -3680,13 +3710,15 @@ void readObit::processObitText(bool UndoBadSentence, bool insertPeriods)
 
                 sentence = OQString(" ") + sentence;
                 sentence.truncateAfter(":");
-                sentence.truncateAfterParentReference(lang, firstSentence);
-                sentence.truncateAfterSiblingReference(lang, firstSentence);
-                sentence.truncateAfterChildReference(lang, firstSentence);
-                sentence.truncateAfterRelativeReference(lang, firstSentence);
-                sentence.truncateAfterRelationshipWords(lang, firstSentence);
+                sentence.truncateAfter(OQString::getParentReferences(lang), firstSentence);
+                sentence.truncateAfter(OQString::getSiblingReferences(lang), firstSentence);
+                sentence.truncateAfter(OQString::getChildReferences(lang), firstSentence);
+                sentence.truncateAfter(OQString::getRelativeReferences(lang), firstSentence);
+                sentence.truncateAfter(OQString::getRelationshipWords(lang), firstSentence);
+                sentence.truncateAfter(OQString::getMiscWords(lang), firstSentence);
                 sentence.removeSpousalReference(lang, firstSentence);
-                sentence.compressCompoundNames(lang);
+                sentence.removeEnding(PUNCTUATION);
+                tempUC.compressCompoundNames(sentence, lang);
                 if ((sentence.getLength() == 0) || (sentence.getString() == QString(" ")))
                     sentence = OQString("VoidedOutSentence");
                 newSentence = sentence.getString() + QString(". ");
@@ -3704,6 +3736,7 @@ void readObit::readInObitTitle()
     OQString titleText;
     QString targetText;
     databaseSearches dbSearch;
+    unstructuredContent tempUC;
 
     beg();
 
@@ -3783,6 +3816,8 @@ void readObit::readInObitTitle()
     case Ouellet:
     case HommageNB:
     case DragonFly:
+    case NMedia:
+    case Brenneman:
         if (moveTo("<title>"))
             titleStream = getUntil("</title>");
         break;
@@ -3915,6 +3950,7 @@ void readObit::readInObitTitle()
     case Kane:
     case Carve:
     case Sproing:
+    case Richelieu:
         if (moveTo("<title>"))
             titleStream = getUntilEarliestOf(" - ", "<");
         break;
@@ -4496,15 +4532,6 @@ void readObit::readInObitTitle()
     }
         break;
 
-    case NMedia:
-    {
-        if (moveTo("<>"))
-        {
-            titleStream = getUntil("<>");
-        }
-    }
-        break;
-
     case Tonik:
     {
         if (moveTo("class=\"page-title\""))
@@ -4606,7 +4633,7 @@ void readObit::readInObitTitle()
         {
             titleStream = getUntilEarliestOf("</title>", " - ");
             titleStream.fixBasicErrors(true);
-            titleStream.compressCompoundNames(globals->globalDr->getLanguage());
+            tempUC.compressCompoundNames(titleStream, globals->globalDr->getLanguage());
             titleStream.removeRepeatedLastName();
         }
     }
@@ -4822,11 +4849,6 @@ void readObit::readInObitTitle()
             titleStream = getUntil("</title>");
         break;
 
-    case Brenneman:
-        if (moveTo("<h2"))
-            titleStream = readNextBetween(BRACKETS);
-        break;
-
     case Carson:
         if (consecutiveMovesTo(50, "<title>", "Remembering "))
             titleStream = readNextBetween(BRACKETS);
@@ -4984,11 +5006,6 @@ void readObit::readInObitTitle()
     }
         break;
 
-    case Richelieu:
-        if (consecutiveMovesTo(50, "class=\"necrologie_fiche_right\"", "<h"))
-            titleStream = readNextBetween(BRACKETS);
-        break;
-
     case CharleVoix:
         if (consecutiveMovesTo(250, "id=\"middle\"", "<br>"))
             titleStream = getUntil("<");
@@ -5082,12 +5099,13 @@ void readObit::readInObitTitle()
         cleanStream = titleStream.convertFromID();
         cleanStream.simplify();
         cleanStream.replaceHTMLentities();
-        if (cleanStream.fixQuotes())
+        cleanStream.standardizeQuotes();
+        /*if (cleanStream.fixQuotes())
         {
             PQString errMsg;
             errMsg << "Potential issue with mismatched quotes for: " << globals->globalDr->getURL();
             globals->logMsg(ErrorRecord, errMsg);
-        }
+        }*/
         cleanStream.fixBasicErrors();
         cleanStream.cleanUpEnds();
         globals->globalDr->setTitle(cleanStream.getString());
@@ -5206,7 +5224,7 @@ void readObit::validateJustInitialNames()
 
     databaseSearches dbSearch;
     NAMETYPE nameType;
-    unstructuredContent firstTwoSentences, tempSentence;
+    unstructuredContent firstTwoSentences, tempSentence, tempUC;
     OQString checkWord, tempWord, nextWord;
     bool hasBookEnds, isAboriginal, hasComma, started, hadComma;
     bool potentialGenderMarker = false;
@@ -5234,7 +5252,7 @@ void readObit::validateJustInitialNames()
         if (cutOff < 2)
             cutOff = 0; // Skip any attempt to match
 
-        justInitialNamesUC.compressCompoundNames(lang);
+        tempUC.compressCompoundNames(justInitialNamesUC, lang);
         OQStream checkStream(justInitialNamesUC);
 
         while (noMatch && (i < cutOff))
@@ -5285,7 +5303,7 @@ void readObit::validateJustInitialNames()
             QString firstName = globals->globalDr->getFirstName().lower().getString();
             bool isNickName = dbSearch.nicknameLookup(firstName, globals);
             if (isNickName)
-                matched = dbSearch.nickNameInList(firstName, nameList, globals);
+                matched = OQString(firstName).isNickNameRelativeToList(nameList);
             if (matched)
                 noMatch = false;
         }
@@ -5304,16 +5322,20 @@ void readObit::validateJustInitialNames()
         OQString originalWord, lastWord, doubleWord;
         unsigned int numWords;
         bool unrecognizedWordEncountered, invalidated;
+        bool restrictNamesToDR = false;
 
         ucFillerRemovedAndTruncated.beg();
         int i = 1;
         while (!ucFillerRemovedAndTruncated.isEOS() && (i <= 2))
         {
-            tempSentence.clear();
+            tempSentence = ucFillerRemovedAndTruncated.getNextRealSentence(restrictNamesToDR, 3);
+
+            /*tempSentence.clear();
             while (!ucFillerRemovedAndTruncated.isEOS() && ((tempSentence.getLength() == 0) || tempSentence.isJustDates() || tempSentence.startsWithClick()))
             {
                 tempSentence = ucFillerRemovedAndTruncated.getSentence();
-            }
+            }*/
+
             firstTwoSentences.addSentence(tempSentence);
             i++;
         }
@@ -5491,7 +5513,7 @@ void readObit::validateJustInitialNames()
         bool started = false;
         OQStream tempStream(globals->globalDr->getTitle());
         tempStream.fixBasicErrors();
-        tempStream.compressCompoundNames(lang);
+        tempUC.compressCompoundNames(tempStream, lang);
         tempStream.beg();
 
         while (!tempStream.isEOS() && keepGoing)
@@ -5510,6 +5532,7 @@ void readObit::validateJustInitialNames()
         justInitialNamesUC.pickOffNames();  // From title stream
     }
 
+    justInitialNamesUC.removeCelebrations();
     justInitialNamesUC.removeEnding(".");
     justInitialNamesUC.removeAllSuffixPrefix();
     justInitialNamesUC.fixBasicErrors();
@@ -5532,6 +5555,7 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
     genericLocations += QString("arm|bay|branch|brook|cove|creek|falls|fort|grove|harbour|hill|house|lake|meadows|mountain|park|pier|point|port|ridge|river|shore|sound|valley").split("|");
     genericLocations += QString("care|chapel|home").split("|");
     genericLocations += provAbbreviations;
+    genericLocations += provLong;
 
     switch(provider)
     {
@@ -5657,6 +5681,10 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
             locations = QString("halifax").split(QString("|"));
             break;
 
+        case 3190:
+            locations = QString("cape|breton|london").split(QString("|"));
+            break;
+
         case 3198:
         case 3842:
             locations = QString("campbellton|charlo|dalhousie|decampbellton|decharlo|dedalhousie|dedundee|dundee").split(QString("|"));
@@ -5724,8 +5752,8 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
     {
         switch(providerKey)
         {
-        case 76:
-            //locations = QString("new").split(QString("|"));
+        case 18:
+            locations = QString("three|brooks").split(QString("|"));
             break;
 
         case 82:
@@ -5764,8 +5792,20 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
             locations = QString("birch|house|loch|lomond").split(QString("|"));
             break;
 
+        case 154:
+            locations = QString("toronto").split(QString("|"));
+            break;
+
         case 156:
             locations = QString("banwell").split(QString("|"));
+            break;
+
+        case 179:
+            locations = QString("ottawa").split(QString("|"));
+            break;
+
+        case 194:
+            locations = QString("ottawa").split(QString("|"));
             break;
 
         default:
@@ -5791,12 +5831,20 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
             locations = QString("lock|down").split(QString("|"));
             break;
 
+        case 63:
+            locations = QString("aurora").split(QString("|"));
+            break;
+
         case 132:
             locations = QString("sydney|mines").split(QString("|"));
             break;
 
         case 2836:
-            locations = QString("thunder|bay").split(QString("|"));
+            locations = QString("thunder|bay|thunderbay").split(QString("|"));
+            break;
+
+        case 255100:
+            locations = QString("toronto").split(QString("|"));
             break;
 
         default:
@@ -5849,6 +5897,10 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
     {
         switch(providerKey)
         {
+        case 1:
+            locations = QString("brierly|johnstown|antigonish").split(QString("|"));
+            break;
+
         case 34:
             locations = QString("grand|falls").split(QString("|"));
             break;
@@ -5879,7 +5931,7 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
 
     case 2003:
     {
-        locations = QString("ab").split(QString("|"));
+        locations = QString("ab|alberta").split(QString("|"));
         break;
     }   // end 2003
         break;
@@ -6005,6 +6057,10 @@ void readObit::readUnstructuredContent(bool UseFirstDateAsDOD)
 
     // STEP 1 - Fill in names
 
+    // Look for most common name used within the obituary
+    globals->globalDr->setAlternates(mcn.readMostCommonName(globals, globals->structuredNamesProcessed->getString()));
+
+    // Turn to initial unstructured text
     validateJustInitialNames();
     removeProblematicWordsFromJIN();
 
@@ -6034,9 +6090,6 @@ void readObit::readUnstructuredContent(bool UseFirstDateAsDOD)
     // Look for middle name(s), if any, as a single string and sets other names along the way if they are encountered
     globals->globalDr->setMiddleNames(justInitialNamesUC.processAllNames());
 
-    // Look for most common name used within the obituary
-    globals->globalDr->setAlternates(mcn.readMostCommonName(globals));
-
     // Where middlename is used as a first name, add it as an AKA as well
     PQString tempName;
     tempName = globals->globalDr->getMiddleNameUsedAsFirstName();
@@ -6060,7 +6113,9 @@ void readObit::readUnstructuredContent(bool UseFirstDateAsDOD)
     // Sixth pass is to look for age at death (in first two sentences only)
     // Seventh pass is to look for the first word in the cleanedUpUC to be a number OR other short sentence with a number.
     // Eighth pass looks for any two dates in first three sentences, but only keeps if DODs available and match
+    // 8.5 pass looks for age next birthday
     // Ninth pass includes final attempts to pull incomplete information together
+    // Tenth pass looks at naked age at death
     // Eleventh pass looks at years married to impute maximum YOB
     // Use date published or funeral service date as proxy if still missing DOD
     // Finally, set min and max DOB if DOD is known and age at death is known
@@ -6079,12 +6134,16 @@ void readObit::readUnstructuredContent(bool UseFirstDateAsDOD)
         fillInDatesSeventhPass();
     if (globals->globalDr->missingDOB() && !globals->globalDr->missingDOD())
         fillInDatesEighthPass();
+    if (globals->globalDr->missingDOB() && !globals->globalDr->missingDOD())
+        fillInDates85Pass();  // New style using regex
     if (globals->globalDr->missingDOB() || globals->globalDr->missingDOD() || (globals->globalDr->getDOB() == globals->globalDr->getDOD()))
         fillInDatesNinthPass();
     if ((globals->globalDr->missingDOB() || globals->globalDr->missingDOD()) && (globals->globalDr->getAgeAtDeath() == 0))
         fillInDatesTenthPass();
     if (globals->globalDr->missingDOB() && (globals->globalDr->getYOD() > 0) && (globals->globalDr->getAgeAtDeath() == 0))
         fillInDatesEleventhPass();
+    if (globals->globalDr->getYOB() == 0)
+        fillInDatesTwelfthPass();
     if ((globals->globalDr->getYOD() == 0) && (globals->globalDr->getDeemedYOD() > 0))
         globals->globalDr->setYOD(globals->globalDr->getDeemedYOD());
 
@@ -6092,14 +6151,14 @@ void readObit::readUnstructuredContent(bool UseFirstDateAsDOD)
     if (globals->globalDr->missingDOD())
     {
         if (useFirstSentenceSingleDate())
-            fillInDatesThirdPass(uc);
+            fillInDatesThirdPass(ucCleaned);
     }
 
     // Make higher risk assumptions for specific groups where pattern of historical obits is problematic but where issues are reliably consistent
     if (globals->globalDr->missingDOD() && UseFirstDateAsDOD)
     {
         assignFirstDateToDOD();
-        fillInDatesThirdPass(uc);
+        fillInDatesThirdPass(ucCleaned);
     }
 
     // Fill in missing info if possible
@@ -6971,6 +7030,8 @@ bool readObit::fillInDatesStructured(unstructuredContent &uc, bool reliable)
     uc.unQuoteHTML();
     uc.simplify();
     uc.fixBasicErrors();
+    uc.cleanUpEnds();
+    uc.removeBookEnds(PARENTHESES);
     uc.fixDateFormats();
     uc.beg();
 
@@ -7130,16 +7191,18 @@ void readObit::fillInDatesSeventhPass()
     PQString word;
     bool keepGoing = true;
     bool ageFound = false;
+    bool restrictNamesToDR = true;
 
     // Look for the first "new word" in the first unrecognized sentence to be a number
 
     if (globals->globalDr->missingDOB() && !globals->globalDr->missingDOD() && (globals->globalDr->getAgeAtDeath() == 0))
     {
         ucCleaned.beg();
-        while (!ucCleaned.isEOS() && ((sentence.getLength() == 0) || sentence.isJustDates() || sentence.isJustSavedNames() || sentence.startsWithClick(true)))
+        sentence = ucCleaned.getNextRealSentence(restrictNamesToDR);
+        /*while (!ucCleaned.isEOS() && ((sentence.getLength() == 0) || sentence.isJustDates() || sentence.isJustSavedNames() || sentence.startsWithClick(true)))
         {
             sentence = ucCleaned.getSentence();
-        }
+        }*/
 
         sentence.beg();
         while (keepGoing && !sentence.isEOS())
@@ -7200,6 +7263,7 @@ void readObit::fillInDatesSeventhPassFollowUp()
     GENDER gender;
     bool missingGender, potentialMatch, potentialMismatch;
     bool keepGoing = true;
+    bool restrictNamesToDR = true;
     bool precedingFlag;
 
     QRegularExpression targetS;
@@ -7218,9 +7282,10 @@ void readObit::fillInDatesSeventhPassFollowUp()
 
         while (!ucCleaned.isEOS() && (sentenceCount < 5) && keepGoing)
         {
-            sentence = ucCleaned.getSentence();
+            sentence = ucCleaned.getNextRealSentence(restrictNamesToDR, 4);
+            /*sentence = ucCleaned.getSentence();
             while (!ucCleaned.isEOS() && ((sentence.getLength() == 0) || sentence.isJustDates() || sentence.isJustSavedNames() || sentence.startsWithClick(true))){
-                sentence = ucCleaned.getSentence();}
+                sentence = ucCleaned.getSentence();}*/
 
             if (sentence.getLength() > 0)
             {
@@ -7338,6 +7403,14 @@ void readObit::fillInDatesEighthPass()
     processNewDateInfo(dates, 8);
 }
 
+void readObit::fillInDates85Pass()
+{
+    // Look for age at next birthday (in first four sentences only)
+    // DOB is also updated if valid age at death found
+    unsigned int maxSentences = 4;
+    ucCleaned.contentReadAgeNextBirthday(maxSentences);
+}
+
 void readObit::fillInDatesNinthPass()
 {
     unstructuredContent sentence;
@@ -7357,6 +7430,8 @@ void readObit::fillInDatesNinthPass()
 
         unsigned int providerID = globals->globalDr->getProvider();
         unsigned int providerKey = globals->globalDr->getProviderKey();
+
+        bool restrictNamesToDR = false;
 
         success = query.prepare("SELECT fhFirstObit FROM death_audits.funeralhomedata WHERE providerID = :fhProviderID AND providerKey = :fhProviderKey AND "
                                 "(fhRunStatus = 1 OR fhRunstatus = 2 OR fhRunStatus = 100)");
@@ -7395,11 +7470,13 @@ void readObit::fillInDatesNinthPass()
             // Assume we have correct DOD, update record and rerun limited readAgeAtDeath
             globals->globalDr->setYOD(singleYear);
             ucCleaned.beg();
-            sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
+            sentence = ucCleaned.getNextRealSentence(restrictNamesToDR, 1);
+
+            /*sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
             while (sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true))
             {
                 sentence = ucCleaned.getSentence();
-            }
+            }*/
 
             sentence.sentenceReadAgeAtDeath(true);
         }
@@ -7411,14 +7488,17 @@ void readObit::fillInDatesTenthPass()
     if (globals->globalDr->getAgeAtDeath() != 0)
         return;
 
+    bool restrictNamesToDR = false;
     unstructuredContent sentence;
 
     ucCleaned.beg();
-    sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
+    sentence = ucCleaned.getNextRealSentence(restrictNamesToDR, 1);
+
+    /*sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
     while (!ucCleaned.isEOS() && (sentence.hasBookEnds(PARENTHESES | QUOTES) || sentence.hasAllWordsCapitalized() || sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true)))
     {
         sentence = ucCleaned.getSentence();
-    }
+    }*/
 
     sentence.sentenceReadNakedAgeAtDeath();
 
@@ -7433,15 +7513,18 @@ void readObit::fillInDatesTenthPass()
 void readObit::fillInDatesEleventhPass()
 {
     bool keepLooking = !((globals->globalDr->getAgeAtDeath() != 0) || globals->globalDr->getDOB().isValid());
+    bool restrictNamesToDR = false;
 
     unstructuredContent sentence;
 
     ucCleaned.beg();
-    sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
+    sentence = ucCleaned.getNextRealSentence(restrictNamesToDR, 5);
+
+    /*sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
     while (keepLooking && !ucCleaned.isEOS() && (sentence.hasAllWordsCapitalized() || sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true)))
     {
         sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
-    }
+    }*/
 
     while (keepLooking)
     {
@@ -7451,6 +7534,34 @@ void readObit::fillInDatesEleventhPass()
         else
             keepLooking = false;
     }
+}
+
+void readObit::fillInDatesTwelfthPass()
+{
+    if (globals->globalDr->getYOB() != 0)
+        return;
+
+    unstructuredContent sentence;
+    unsigned int YOB = 0;
+
+    ucCleaned.beg();
+    sentence = ucCleaned.getSentence(globals->globalDr->getLanguage());
+    while (!ucCleaned.isEOS() && (sentence.hasBookEnds(PARENTHESES | QUOTES) || sentence.hasAllWordsCapitalized() || sentence.isJustNames() || sentence.startsWithClick(true)))
+    {
+        sentence = ucCleaned.getSentence();
+    }
+
+    YOB = sentence.sentenceReadUnbalancedYOB();
+
+    // Try on second sentence
+    if ((YOB == 0) && !ucCleaned.isEOS())
+    {
+        sentence = ucCleaned.getSentence();
+        YOB = sentence.sentenceReadUnbalancedYOB();
+    }
+
+    if ((YOB > 1900) && (YOB < static_cast<unsigned int>(globals->today.year())))
+        globals->globalDr->setYOB(YOB);
 }
 
 void readObit::assignFirstDateToDOD()
@@ -7550,10 +7661,10 @@ QDate readObit::getFirstSentenceSingleDate()
     return resultDate;
 }
 
-void readObit::readStructuredContent()
+void readObit::readAndPrepareStructuredContent()
 {
     beg();
-    bool fixHyphens, DOBfound, DODfound, primarySourceProcessed;
+    bool DOBfound, DODfound, primarySourceProcessed;
     unsigned int position;
     databaseSearches dbSearch;
     QDate qdate;
@@ -7570,7 +7681,6 @@ void readObit::readStructuredContent()
 
     DOBfound = false;
     DODfound = false;
-    fixHyphens = true;      // Must be confident content contains only names
 
     switch(globals->globalDr->getProvider())
     {
@@ -7608,7 +7718,7 @@ void readObit::readStructuredContent()
                     word += readNextBetween(BRACKETS);
                 }
                 tempUC = word;
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // In some cases, can find (YYYY - YYYY)
                 if (moveTo(" (", 20))
@@ -7650,7 +7760,7 @@ void readObit::readStructuredContent()
                     tempUC += PQString(" ") + tempTempUC;
             }
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"year-born-year-died\""))
             {
@@ -7691,7 +7801,7 @@ void readObit::readStructuredContent()
         if (moveTo("h1 class=\"details\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (conditionalMoveTo("Born:", "obituary_body", 0))
@@ -7722,7 +7832,7 @@ void readObit::readStructuredContent()
             tempUC = readNextBetween(BRACKETS);
             tempUC.cleanUpEnds();
             tempUC.removeEnding(",");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"obituary-years\""))
             {
@@ -7742,7 +7852,7 @@ void readObit::readStructuredContent()
         if (moveTo("<h1 class=\"text"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<span", 50))
             {
@@ -7760,7 +7870,7 @@ void readObit::readStructuredContent()
             if (moveTo("title text-noleading mb-2"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -7832,7 +7942,7 @@ void readObit::readStructuredContent()
                     tempUC = newString;
                 }
 
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 bool eitherFound = conditionalMoveTo("class=\"mt-0\"", "class=\"cp-obit-age\">", 0, 500);
                 if (eitherFound)
@@ -7910,7 +8020,7 @@ void readObit::readStructuredContent()
         if (moveTo("mobile-title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, "fa-calendar-day", "</i>"))
             {
@@ -7958,7 +8068,7 @@ void readObit::readStructuredContent()
                     tempUC = getUntil("<");
             }
             tempUC.SaltWireCleanUp();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -7966,7 +8076,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"entry-content", "<p><b>"))
             {
@@ -7980,7 +8090,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"post-title\"", ">"))
             {
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(200, "class=\"post-published", "datetime=", ">On "))
                 {
@@ -7995,7 +8105,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"obit-name\"", "obit-h1"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"obit-dates\"", 100))
             {
@@ -8034,7 +8144,7 @@ void readObit::readStructuredContent()
             {
                 // Read names (First Name first expected)
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // Read DOB and DOD in form (mmm dd, yyyy - mmm dd, yyyy)
                 if (moveTo("lifespan"))
@@ -8057,7 +8167,7 @@ void readObit::readStructuredContent()
             {
                 // Read names (First Name first expected)
                 tempUC = getUntil("</h1>", 100);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // Read DOB and DOD in form (mmm dd, yyyy - mmm dd, yyyy)
                 if (moveTo("<h5>"))
@@ -8073,7 +8183,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "keywords", "Obituary, "))
             {
                 tempUC = getUntil(",");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             // No dates to be read as they would be in the JSON data if known
@@ -8084,7 +8194,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"obitHD\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -8092,7 +8202,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(400, "class\"obithead\"", "class=\"title\"","<h1"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<h", 25))
                 {
@@ -8106,7 +8216,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(50, "class=\"obit-name-text\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<p", 25))
                 {
@@ -8120,7 +8230,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(300, "class=\"obitbar-name\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<small", 25))
                 {
@@ -8134,7 +8244,7 @@ void readObit::readStructuredContent()
                 if (consecutiveMovesTo(300, ">View Obituaries<", "<h", "swatch-"))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (consecutiveMovesTo(50, "swatch-", "small"))
                     {
@@ -8156,7 +8266,7 @@ void readObit::readStructuredContent()
         {
             // Read names (First Name first expected)
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read DOB and DOD in form (mmm dd, yyyy - mmm dd, yyyy)
             if (moveTo("obitlink\">"))
@@ -8171,7 +8281,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, ">OBITUARY<", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         else
         {
@@ -8184,7 +8294,7 @@ void readObit::readStructuredContent()
                 indexA++;
                 tempString.replace("-", " ");
                 tempUC = tempString.mid(indexA, indexB - indexA);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
         }
 
@@ -8248,7 +8358,7 @@ void readObit::readStructuredContent()
                 newString.remove(0, 1);
             tempUC = newString;
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         break;
@@ -8261,7 +8371,7 @@ void readObit::readStructuredContent()
             {
                 // Read name first
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // Move on to DOB and DOD
                 if (consecutiveMovesTo(25, "Born:", ","))
@@ -8292,7 +8402,7 @@ void readObit::readStructuredContent()
                 if (moveTo("<h1 class=\"hidden-xs\""))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (consecutiveMovesTo(200, "class=\"dates hidden-xs\"", "<p"))
                     {
@@ -8327,7 +8437,7 @@ void readObit::readStructuredContent()
                 if (moveTo(target))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
                 }
 
                 // Get dates and age
@@ -8420,7 +8530,7 @@ void readObit::readStructuredContent()
                     if (tempUC.getString().right(1) == space)
                         tempUC.dropRight(1);
                 }
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // Read dates if provided
                 position = getPosition();
@@ -8447,7 +8557,7 @@ void readObit::readStructuredContent()
                 tempUC = getUntil("avatar:");
                 tempUC.dropRight(tempUC.getLength() - static_cast<unsigned int>(tempUC.findPosition(PQString("\',"), -1)));
                 tempUC.purge(purgeList);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             // Read dates if provided
@@ -8475,7 +8585,7 @@ void readObit::readStructuredContent()
             tempUC = getUntil("avatar:");
             tempUC.dropRight(tempUC.getLength() - static_cast<unsigned int>(tempUC.findPosition(PQString("\',"), -1)));
             tempUC.purge(purgeList);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Read dates if provided
@@ -8503,7 +8613,7 @@ void readObit::readStructuredContent()
         {
             // Get name
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read DOD only
             if (moveTo("class=\"obit-dod\""))
@@ -8535,7 +8645,7 @@ void readObit::readStructuredContent()
                 if (index >= 0)
                     tempUC = tempUC.left(index);
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             beg();
             if (consecutiveMovesTo(100, "In loving memory of", "<h3"))
@@ -8657,7 +8767,7 @@ void readObit::readStructuredContent()
                             if (newStructuredName.countWords() >= 2)
                             {
                                 unstructuredContent tempUC(newStructuredName);
-                                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                                tempUC.prepareStructuredNames();
                                 replaced = true;
                             }
                         }
@@ -8665,7 +8775,7 @@ void readObit::readStructuredContent()
                 }
 
                 if (!originalProblematic || !replaced)
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                 // Read DOB and DOD in form (mmm dd, yyyy - mmm dd, yyyy)
                 if (moveTo("<h3"))
@@ -8693,7 +8803,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(2000, "class=\"flipbook-container\"", "class=\"bottom-text\"", "<div"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -8701,7 +8811,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(75, "class=\"top-full-name\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<div class=\"top-dates\">"))
                 {
@@ -8718,7 +8828,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"deceased-info\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<h3", 50))
                 {
@@ -8759,7 +8869,7 @@ void readObit::readStructuredContent()
             endString.removeEnding(SPACE);
 
             tempUC = unstructuredContent(begString);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read YOB and YOD in form (yyyy - yyyy)
             tempUC = unstructuredContent(endString);
@@ -8814,7 +8924,7 @@ void readObit::readStructuredContent()
                 tempString += OQString(" ") + maidenName;
 
             tempUC = tempString;
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         else
         {
@@ -8835,7 +8945,7 @@ void readObit::readStructuredContent()
                     tempUC = getUntil("</div>");
                     tempUC.extraNameProcessing();
                     tempUC.enhanceWith(tempTempUC);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     // Read YOB and YOD (YYYY - YYYY)
                     if (moveTo("bom-in-memory-date\">"))
@@ -8853,7 +8963,7 @@ void readObit::readStructuredContent()
                     tempUC = getUntil("</a>");
                     tempUC.extraNameProcessing();
                     tempUC.enhanceWith(tempTempUC);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     // Read DOB and DOD
                     if (moveTo("<p>"))
@@ -8873,7 +8983,7 @@ void readObit::readStructuredContent()
                     tempUC = readNextBetween(BRACKETS);
                     tempUC.extraNameProcessing();
                     tempUC.enhanceWith(tempTempUC);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     // Read DOB and DOD
                     if (moveTo("<!-- obit date -->"))
@@ -8908,7 +9018,7 @@ void readObit::readStructuredContent()
                 {
                     consecutiveMovesTo(10, "<h", ">");
                     tempUC = getUntil("<");
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (conditionalMoveTo("<h", "</div>", 0))
                     {
@@ -8924,7 +9034,7 @@ void readObit::readStructuredContent()
                 {
                     tempUC = getUntil("</span>");
                     tempUC.removeHTMLtags();
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (consecutiveMovesTo(200, "id=\"bom-tunnel-dod\"", "<span>"))
                     {
@@ -8938,7 +9048,7 @@ void readObit::readStructuredContent()
                 if (consecutiveMovesTo(75, "class=\"top-full-name\"", "<h"))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (moveTo("<div class=\"top-dates\">"))
                     {
@@ -8954,7 +9064,7 @@ void readObit::readStructuredContent()
                 if (moveTo("\"entry-title\""))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (moveTo("<p>"))
                     {
@@ -9096,7 +9206,7 @@ void readObit::readStructuredContent()
                 moveTo("\"");
                 tempUC = getUntil("\",");
                 tempUC = tempUC.getString().replace("\\\"", "\"");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             else
                 beg();
@@ -9145,7 +9255,7 @@ void readObit::readStructuredContent()
                     }
                     word = fullWord;
                     word.removeEnding(PUNCTUATION);
-                    word.compressCompoundNames(language_unknown);
+                    tempUC.compressCompoundNames(word, language_unknown);
                     name = word.getString();
                     globals->globalDr->setFamilyName(name);
                 }
@@ -9170,7 +9280,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(50, "<div class=\"obit-heading-wrapper\">", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"obit-dates-wrapper\">"))
                 {
@@ -9191,7 +9301,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"fancy\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             // Read DOB - DOD
@@ -9207,7 +9317,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"obit_name\"", "\"name\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             // Read DOB - DOD
@@ -9223,7 +9333,7 @@ void readObit::readStructuredContent()
             {
                 moveTo("<h");
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 moveTo("<h");
                 tempUC = readNextBetween(BRACKETS);
@@ -9246,7 +9356,7 @@ void readObit::readStructuredContent()
             tempString.replace(QString("-"), QString(" "), Qt::CaseInsensitive);
             tempUC = tempString;
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read YOB and YOD (YYYY - YYYY)
             if (moveTo("class=\"years\""))
@@ -9262,7 +9372,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"ct-name\">"))
         {
             tempUC = getUntil("</h2>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Read DOB - DOD
@@ -9281,7 +9391,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "entry-title", "itemprop=\"name\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -9292,7 +9402,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(200, "id=\"personInfoContainer\"", "id=\"displayName\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             if (conditionalMoveTo("birthDate", "siteCredits", 0))
@@ -9354,7 +9464,7 @@ void readObit::readStructuredContent()
 
                 if ((tempUC.getLength() > 0) && (tempUC.countWords() >= 2))
                 {
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
                     primarySourceProcessed = true;
 
                     // Process secondary source now
@@ -9381,7 +9491,7 @@ void readObit::readStructuredContent()
                     tempUC = readNextBetween(BRACKETS);
 
                 if (tempUC.getLength() > 0)
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
             }
             break;
 
@@ -9391,7 +9501,7 @@ void readObit::readStructuredContent()
                 if (moveTo("<strong", 50))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (conditionalMoveTo("itemprop=\"birthDate\"", "</h"))
                     {
@@ -9412,7 +9522,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"hero__name\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"hero__lifetime\""))
                 {
@@ -9428,7 +9538,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(2000, "post-content", "<h2"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -9450,7 +9560,7 @@ void readObit::readStructuredContent()
             if(moveBackwardTo("<strong"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
         }
         break;
@@ -9468,7 +9578,7 @@ void readObit::readStructuredContent()
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             // Read DOD
@@ -9485,7 +9595,7 @@ void readObit::readStructuredContent()
             if (moveTo("post_title entry-title"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -9496,7 +9606,7 @@ void readObit::readStructuredContent()
                 if (moveBackwardTo("elementor-heading-title elementor-size-default"))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
                 }
 
                 if (consecutiveMovesTo(200, "<span", ">"))
@@ -9516,7 +9626,7 @@ void readObit::readStructuredContent()
     {
         if (consecutiveMovesTo(200, "page-header", "headline", ">"))
             tempUC = getUntil("<");
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
         break;
     }
 
@@ -9537,7 +9647,7 @@ void readObit::readStructuredContent()
                 tempUC = cleanString;
             }
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Some obits will have dates BUT they will always be english, even if text is french
             if (moveTo("date-story hidden-xs", 250))
@@ -9564,7 +9674,7 @@ void readObit::readStructuredContent()
                 moveTo(">");
                 tempUC = getUntil("</div>");
                 tempUC.removeHTMLtags();
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"obit-dates\""))
                 {
@@ -9585,7 +9695,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"post-header\">"))
         {
            tempUC = getUntil("</header>");
-           tempUC.processStructuredNames(nameStatsList, fixHyphens);
+           tempUC.prepareStructuredNames();
         }
         break;
     }
@@ -9596,7 +9706,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(500, "persondetails-area", "personName", "personFirst", ">"))
         {
             tempUC = getUntil("</div>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Dates
@@ -9624,7 +9734,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(150, "class=\"obit_name_and_date", "<h2"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             // Dates
@@ -9640,7 +9750,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(5000, "obit-container", ">Obituary For "))
             {
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -9652,7 +9762,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(2500, ">We Remember<", "<h4"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (moveTo("<h5", 100))
@@ -9672,7 +9782,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"text-center  custom  font-family-h1", "\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (consecutiveMovesTo(50, "class=\"text-center  custom  font-family-text", "\""))
@@ -9688,7 +9798,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, ">Home <", "<li"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Dates
@@ -9717,7 +9827,7 @@ void readObit::readStructuredContent()
         if (moveTo("post_title entry-title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Dates
@@ -9739,7 +9849,7 @@ void readObit::readStructuredContent()
             backward(100);
             moveTo("lastname");
             tempUC += readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("class=\"ct-dates\"", "</div>", 0))
             {
@@ -9757,7 +9867,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<span", "entry-content", 0))
             {
@@ -9774,7 +9884,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(2000, "id=\"main-content\"", "entry-title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -9785,7 +9895,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         else
         {
@@ -9794,7 +9904,7 @@ void readObit::readStructuredContent()
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
         }
 
@@ -9812,7 +9922,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(200, "class=\"ae-element-post-date\"", "ae-element-post-date", "date");
             tempUC = readNextBetween(BRACKETS);
@@ -9826,7 +9936,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(500, "id=\"main-content\"", "entry-title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Dates
@@ -9851,7 +9961,7 @@ void readObit::readStructuredContent()
                 if (moveTo("class=\"name\""))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (moveTo("class=\"dates\""))
                     {
@@ -9865,7 +9975,7 @@ void readObit::readStructuredContent()
                 if (consecutiveMovesTo(50, "class=\"contentPanel\"", "<h"))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (moveTo("<h2", 50))
                     {
@@ -9876,7 +9986,7 @@ void readObit::readStructuredContent()
                 else
                 {
                     tempUC = globals->globalDr->getTitle();
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
                 }
                 break;
             }
@@ -9886,7 +9996,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"name\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"dates\""))
                 {
@@ -9904,7 +10014,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(200, "class=\"post_title entry-title\"", "</span"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"post_info_date\"");
             tempUC = readNextBetween(BRACKETS);
@@ -9919,7 +10029,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(250, "<body>", "<span", ">"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -9934,7 +10044,7 @@ void readObit::readStructuredContent()
             consecutiveMovesTo(25, "<span", ">");
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<span", "<img", 0, 100))
             {
@@ -9953,7 +10063,7 @@ void readObit::readStructuredContent()
         {
             moveTo(">");
             tempUC = getUntilEarliestOf(" &#8211; ", "</a>", 100);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -9969,7 +10079,7 @@ void readObit::readStructuredContent()
             tempUC = getUntilEarliestOf("</strong>", "</p>");
             tempUC.removeHTMLtags();
             tempUC.cleanUpEnds();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -9979,7 +10089,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -9989,7 +10099,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, ">In memory of<", "<strong"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (conditionalMoveTo("itemprop=\"birthDate\"", "<div", 0))
@@ -10013,7 +10123,7 @@ void readObit::readStructuredContent()
             moveTo(">");
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10023,7 +10133,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "id=\"Obituarytitle\"", "</div>", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<p", 50))
             {
@@ -10040,7 +10150,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(250, "<!--", "<!--", ", "))
             {
@@ -10056,7 +10166,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"obituary-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (moveTo("class=\"obituary-years\""))
@@ -10072,7 +10182,7 @@ void readObit::readStructuredContent()
     {
         if (moveTo("<title>Memorial - "))
             tempUC = getUntil("</title>");
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
     }
         break;
 
@@ -10085,7 +10195,7 @@ void readObit::readStructuredContent()
             moveBackwardTo("<header>", 500);
             moveTo("<h");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("class=\"lifetime\"", "Service Date:", 0))
             {
@@ -10111,7 +10221,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(1000, "id=\"cwp_funerals_details\"", "class=\"details\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(100, "Passing Date:", ", "))
                 {
@@ -10131,7 +10241,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(175, ">Name:<", "class=\"detail_info_funerals\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
 
             if (consecutiveMovesTo(175, ">Passing Date:<", "class=\"detail_info_funerals\""))
@@ -10149,7 +10259,7 @@ void readObit::readStructuredContent()
         if (moveTo("<>"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10159,7 +10269,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"card-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("class=\"float-right\"", "class=\"list-group-item\"", 1))
             {
@@ -10182,7 +10292,7 @@ void readObit::readStructuredContent()
         if (moveTo("jet-listing-dynamic-field__content"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("jet-listing-dynamic-field__content");
             tempUC = readNextBetween(BRACKETS);
@@ -10196,7 +10306,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"avis_page", "class=\"text-center\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"button button-date\"");
             tempUC = getUntil("</div>");
@@ -10212,7 +10322,7 @@ void readObit::readStructuredContent()
         {
             moveBackwardTo("<h");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("small>"))
             {
@@ -10229,7 +10339,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "meta name=\"title\"", "content="))
         {
             tempUC = readQuotedMetaContent();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10240,7 +10350,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(200, ">Death<", "datetime="))
             {
@@ -10262,7 +10372,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"post_title entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, "</noscript>", "</p>", "<p", ">"))
             {
@@ -10278,7 +10388,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(20, "<header>", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"post-date\""))
             {
@@ -10294,7 +10404,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"uk-panel\"", "class=\"uk-panel-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10304,7 +10414,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"contentheading\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10315,7 +10425,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<span class", "<div class", 0))
             {
@@ -10333,7 +10443,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"details\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10346,7 +10456,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(500, "<div id=\"container\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -10354,7 +10464,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(2500, "id=\"main-content\"", "<h1", ">"))
             {
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(150, "<h3", ">"))
                 {
@@ -10372,7 +10482,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"BlogItem-title\"", "field=\"title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10384,7 +10494,7 @@ void readObit::readStructuredContent()
         {
             moveTo("<h", 100);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10394,7 +10504,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"deceased-info\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 50))
             {
@@ -10414,7 +10524,7 @@ void readObit::readStructuredContent()
             tempUC.splitComponents(datesRemoved, justDates);
 
             tempUC = datesRemoved;
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10428,7 +10538,7 @@ void readObit::readStructuredContent()
             moveTo("class=\"app.tbl.last_name\"");
             tempUC = tempUC + PQString(" ") + readNextBetween(BRACKETS);
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10440,7 +10550,7 @@ void readObit::readStructuredContent()
         else
             tempUC = globals->globalDr->getTitle();
 
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
     }
         break;
 
@@ -10449,7 +10559,7 @@ void readObit::readStructuredContent()
         if (moveTo("<>"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10470,7 +10580,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(50, "name=\"referer_title\"", "value="))
             {
                 tempUC = readNextBetween(QUOTES);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
             }
         }
@@ -10480,7 +10590,7 @@ void readObit::readStructuredContent()
             if (moveTo("h1 class=\"elementor-heading-title elementor-size-default"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(100, "Date of Death:", "</strong"))
                 {
@@ -10497,7 +10607,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "<div class=\"fltlft content50\">", "<h3"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             int position = getPosition();
 
@@ -10534,7 +10644,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"single-nom\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"single-date\""))
             {
@@ -10553,7 +10663,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"h2 disparu-titre\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"disparu-date\"", 100))
                 {
@@ -10564,7 +10674,7 @@ void readObit::readStructuredContent()
             /*if (moveTo("class=\"tlt-ficheDeces\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<h2", 100))
                 {
@@ -10579,7 +10689,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(250, "class=\"divDroite\"", "class=\"h3\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"h3 dateNaissance\""))
                 {
@@ -10594,7 +10704,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"entry-title\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"single-header-year\""))
                 {
@@ -10615,7 +10725,7 @@ void readObit::readStructuredContent()
             tempTempUC = tempUC.right(9);
             if ((tempTempUC.getString().at(4) == QString("-")) && tempUC.getString().at(tempUC.getLength() - 10) == QString(" "))
                 tempUC.dropRight(10);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             tempTempUC.processStructuredYears();
         }
@@ -10632,7 +10742,7 @@ void readObit::readStructuredContent()
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<span", 100))
                 {
@@ -10665,7 +10775,7 @@ void readObit::readStructuredContent()
                 tempUC.removeEnding("-");
                 tempUC.removeEnding(QChar(8212));
                 tempUC.removeLeading("- ");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -10677,7 +10787,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"blog-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<p", "</div>", 0))
             {
@@ -10694,7 +10804,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"unit-75 conteneur-avis\"", "class=\"titre-deces\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<p><strong", 100))
             {
@@ -10716,7 +10826,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"entry-title", "fusion-post-title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(30, "fusion-text fusion-text-1", "<p"))
             {
@@ -10744,7 +10854,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"avis-titre\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (moveTo("class=\"deces-date\">"))
@@ -10766,7 +10876,7 @@ void readObit::readStructuredContent()
         if (moveTo("<>"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10779,7 +10889,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"margB_3 for_638\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"deces_annees for_638\""))
                 {
@@ -10794,7 +10904,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(50, "class=\"avis_main_infos\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(5, "Né", "le "))
                 {
@@ -10828,7 +10938,7 @@ void readObit::readStructuredContent()
         if (moveTo("<>"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10839,7 +10949,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(25, "<h2", ">"))
             {
@@ -10859,7 +10969,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(50, "class=\"obituary-details-right\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -10867,7 +10977,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(400, "<!-- Fiche de l'avis -->", "<h2", ">"))
             {
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("Décédé(e) le  "))
                 {
@@ -10885,7 +10995,7 @@ void readObit::readStructuredContent()
         if (moveTo("<>"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10903,7 +11013,7 @@ void readObit::readStructuredContent()
                 if (moveTo("class=\"f-title\""))
                 {
                     tempUC = readNextBetween(BRACKETS);
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
                 }
             }
             break;
@@ -10912,7 +11022,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(4000, "<!--Avis (1 par page) -->", "class=\"blanc18pt\"><b"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -10934,7 +11044,7 @@ void readObit::readStructuredContent()
 
             moveTo("<h", 50);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -10944,7 +11054,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"vsel-image-info\"", "<p"))
             {
@@ -10963,7 +11073,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"avis-deces-title\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveToEarliestOf("<span class=\"date\"", "class=\"body\""))
                 {
@@ -10977,7 +11087,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"avis-deces-title\"", "<h"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<span class=\"date\""))
                 {
@@ -10991,7 +11101,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"vy_deces_details_nom uk-h3"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"vy_deces_details_date", 200))
                 {
@@ -11023,8 +11133,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"TGO06__header--title", ">"))
             {
                 tempUC = getUntil("</div>");
-                tempUC.replace("&nbsp", " ");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(100, "class=\"TGO06__header--date", ">"))
                 {
@@ -11038,7 +11147,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(1000, "class=\"obituaries-details\"", "<span"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if(moveTo("<br", 20))
                 {
@@ -11069,7 +11178,7 @@ void readObit::readStructuredContent()
                     tempUC = tempString;
                 }
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11079,7 +11188,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(2000, "class=\"content-page\"", "<h2"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h5", 100))
             {
@@ -11098,7 +11207,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"details\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<span", 100))
             {
@@ -11119,7 +11228,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(50, "class=\"nom\"", "<p"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
         }
     }
@@ -11134,7 +11243,7 @@ void readObit::readStructuredContent()
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if ((globals->globalDr->getYOB() == 0) || (globals->globalDr->getYOD() == 0))
                 {
@@ -11164,11 +11273,11 @@ void readObit::readStructuredContent()
             break;
 
         case 1:
-            if (consecutiveMovesTo(500, target, "href=", ">"))
+            if (consecutiveMovesTo(500, "<h1", "href=", ">"))
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if ((globals->globalDr->getYOB() == 0) || (globals->globalDr->getYOD() == 0))
                 {
@@ -11211,7 +11320,7 @@ void readObit::readStructuredContent()
                 tempUC.dropRight(10);
                 tempTempUC.processStructuredYears();
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"post_info_date\""))
             {
@@ -11227,7 +11336,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("id=\"dob-dod\""))
             {
@@ -11243,7 +11352,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"entry-title-wrap\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"entry-date\""))
             {
@@ -11259,7 +11368,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"obituary-viewer__container", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"obtiuary-viewer__date\"", 100))
             {
@@ -11275,7 +11384,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"page-banner-text\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             forward(4);
             tempUC = readNextBetween(BRACKETS);
@@ -11289,7 +11398,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"avis-titre\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"deces-date\"");
             tempUC = readNextBetween(BRACKETS);
@@ -11321,7 +11430,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(500, "id=\"avisdeces\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(500, "class=\"row deces\"", "<h", ">"))
             {
@@ -11345,7 +11454,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"name-avis\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"infos-carte\"");
             tempUC = readNextBetween(QUOTES);
@@ -11360,10 +11469,26 @@ void readObit::readStructuredContent()
 
     case NMedia:
     {
-        if (moveTo("<>"))
+        if (consecutiveMovesTo(1000, "InventoryProductBroker_CF_407b7048-899b-2a2e-e230-7ae2d781f3f9", ">"))
         {
-            tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC = getUntil("<") + OQString(", ");
+            if (consecutiveMovesTo(1000, "InventoryProductBroker_CF_e165c184-157a-1bae-454b-208ff2d84047", ">"))
+                tempUC += getUntil("<");
+            if (consecutiveMovesTo(1000, "InventoryProductBroker_CF_e1e5eebc-a3dc-9c0f-845f-6dadc41c353e", ">"))
+                tempUC += OQString(" (") + getUntil("<") + OQString(")");
+            tempUC.prepareStructuredNames();
+
+            if (consecutiveMovesTo(1000, "InventoryProductBroker_CF_f2fec77b-53a8-484f-1526-0b7638c241a8", ">"))
+            {
+                tempUC = getUntil("<");
+                tempUC.processYearField(dfDOB);
+            }
+
+            if (consecutiveMovesTo(1000, "InventoryProductBroker_CF_17d538cf-a248-d961-d652-4a1db6d995a4", ">"))
+            {
+                tempUC = getUntil("<");
+                tempUC.processYearField(dfDOD);
+            }
         }
     }
         break;
@@ -11405,7 +11530,7 @@ void readObit::readStructuredContent()
                     tempUC = readNextBetween(BRACKETS);
             }
             if (tempUC.getLength() > 0)
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11415,7 +11540,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"post_title entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("itemprop=\"datePublished\"", "class=\"post_content\"", 0))
             {
@@ -11439,7 +11564,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"page-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"date text-center\"");
             tempUC = readNextBetween(BRACKETS);
@@ -11453,7 +11578,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"description-fiche tab-content\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"date-avis\""))
             {
@@ -11476,7 +11601,7 @@ void readObit::readStructuredContent()
                 tempTempUC.processStructuredYears();
             }
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11486,7 +11611,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"printonly\"><em"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11496,7 +11621,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"detail_nom\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"detail_date\""))
             {
@@ -11512,7 +11637,7 @@ void readObit::readStructuredContent()
         if (moveTo("<>"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11525,7 +11650,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(150, "class=\"project-content\"", "class=\"entry-title rich-snippet-hidden\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class=\"updated rich-snippet-hidden\">"))
                 {
@@ -11546,7 +11671,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"entry-title\"", "itemprop=\"name\"", ">"))
             {
                 tempUC = getUntilEarliestOf(" of ", "<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -11559,7 +11684,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"h1 title margin-none\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11569,7 +11694,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"article-title\"", "itemprop=\"name\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveToEarliestOf("Naissance:", "Birth:"))
             {
@@ -11607,7 +11732,7 @@ void readObit::readStructuredContent()
             index2 = tempString.lastIndexOf(",");
             if (index1 != index2)
                 tempUC = tempString.left(index1) + tempString.right(tempString.length() - index1 - 1);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"elementor-heading-title elementor-size-default\"");
             tempUC = readNextBetween(BRACKETS);
@@ -11625,7 +11750,7 @@ void readObit::readStructuredContent()
         if (moveTo("id=\"page-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11641,7 +11766,7 @@ void readObit::readStructuredContent()
                 tempUC.dropRight(10);
                 tempTempUC.processStructuredYears();
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11651,7 +11776,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(500, "class=\"wpfh-print-output-box\"", "href="))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"wpfh_obit_date\""))
             {
@@ -11667,7 +11792,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"col-txt fcomplete\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<span", 25))
             {
@@ -11686,7 +11811,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"title text-center\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("class='text-center'><strong>", 50))
                 {
@@ -11706,7 +11831,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(300, "class=\"deces\"", "<h2", ">"))
             {
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<h3"))
                 {
@@ -11730,7 +11855,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(150, "id=\"article-title\"", "<strong" ))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<p", "</div>", 0))
             {
@@ -11751,7 +11876,7 @@ void readObit::readStructuredContent()
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
                 tempUC.removeTrailingLocation();
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -11760,7 +11885,7 @@ void readObit::readStructuredContent()
             {
                 tempUC = readNextBetween(BRACKETS);
                 tempUC.removeTrailingLocation();
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (conditionalMoveTo("class=\"has-text-align-center\"", "<p>", 0))
                 {
@@ -11776,7 +11901,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"entry-title\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -11788,7 +11913,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(200, "Loving Memory Of<", "<b"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("<span");
             tempUC = readNextBetween(BRACKETS);
@@ -11807,7 +11932,7 @@ void readObit::readStructuredContent()
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 moveTo("<h");
                 tempUC = readNextBetween(BRACKETS);
@@ -11821,7 +11946,7 @@ void readObit::readStructuredContent()
                 tempUC = readNextBetween(BRACKETS);
                 if (conditionalMoveTo("class=\"nom\"", "<p>", 0))
                     tempUC += PQString(" ") + readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("<p", 200))
                 {
@@ -11839,7 +11964,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11851,7 +11976,7 @@ void readObit::readStructuredContent()
         {
             moveBackwardTo("<h");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -11861,7 +11986,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"title\" id=\"page-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(100, "class=\"title\"", "<li>");
             if (conditionalMoveTo("content=\"", "</li>"))
@@ -11892,7 +12017,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"entry-title\"", "itemprop=\"headline\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         moveTo("class=\"the_content_wrapper\"");
@@ -11911,14 +12036,15 @@ void readObit::readStructuredContent()
     {
         if (moveTo("itemprop=\"headline\""))
         {
+            unstructuredContent ucTemp;
             tempUC = readNextBetween(BRACKETS);
             tempUC.fixBasicErrors(true);
-            tempUC.compressCompoundNames(globals->globalDr->getLanguage());
+            ucTemp.compressCompoundNames(tempUC, globals->globalDr->getLanguage());
             tempUC.removeRepeatedLastName();
         }
         else
             tempUC = globals->globalDr->getTitle();
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
     }
         break;
 
@@ -11927,7 +12053,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "<h4>In Celebration of</h4>", "<strong"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("itemprop=\"birthDate\"", "</h2>", 0))
             {
@@ -11947,7 +12073,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "og:title", "content=\""))
             {
                 tempUC = getUntilEarliestOf(" | ", "<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
         }
     }
@@ -11958,7 +12084,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(250, "src=\"images/name.png\"", "<TD", ">"))
         {
             tempUC = getUntil("</TD>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(250, "src=\"images/dob.png\"", "<TD", ">"))
             {
@@ -11978,7 +12104,7 @@ void readObit::readStructuredContent()
     case Ministry:
     {
         tempUC = globals->globalDr->getTitle();
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
     }
         break;
 
@@ -11987,7 +12113,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"h3\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<p", 20))
             {
@@ -12001,7 +12127,7 @@ void readObit::readStructuredContent()
         if (moveTo(target))
         {
             tempUC = globals->globalDr->getTitle();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("<br");
             tempUC = readNextBetween(BRACKETS);
@@ -12015,7 +12141,7 @@ void readObit::readStructuredContent()
         if (moveTo("class='_name'"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class='_years'", 100))
             {
@@ -12031,7 +12157,7 @@ void readObit::readStructuredContent()
         if (moveTo("id=\"avis-deces-nom\">"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("id=\"avis-deces-dates\""))
             {
@@ -12050,7 +12176,7 @@ void readObit::readStructuredContent()
                 moveTo(">");
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"wpfh-obit-alternate-dates\"", 200))
             {
@@ -12066,7 +12192,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(400, "class=\"avis-deces-informations\"", "class=\"titre\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"annee\""))
             {
@@ -12082,7 +12208,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"content\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"date\"", 25))
             {
@@ -12101,7 +12227,7 @@ void readObit::readStructuredContent()
         if (moveTo("class='name'"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("lass='yspan'", 100))
             {
@@ -12118,7 +12244,7 @@ void readObit::readStructuredContent()
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.removeLeading("Madame ");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<span", 100))
             {
@@ -12157,7 +12283,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"pageTitle\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"date\"", 100))
             {
@@ -12173,7 +12299,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(4000, "<div class=\"post-content\">", "<h2"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h2", 50))
             {
@@ -12189,7 +12315,7 @@ void readObit::readStructuredContent()
         if (moveTo("style=\"font-size:24px\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(200, "<p class", "<span", ">"))
             {
@@ -12204,7 +12330,7 @@ void readObit::readStructuredContent()
             {
                 moveBackwardTo("\">", 200);
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("</h2>"))
                 {
@@ -12221,7 +12347,7 @@ void readObit::readStructuredContent()
                 {
                     moveTo(">");
                     tempUC = getUntil("</p>");
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
                 }
             }
         }
@@ -12233,7 +12359,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"fl-heading-text\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -12243,7 +12369,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(1000, "class=\"site-main\"", "class=\"elementor-heading-title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -12261,11 +12387,11 @@ void readObit::readStructuredContent()
                 if(tempTempUC.removeLeading("Age "))
                     tempTempUC.processAgeAtDeath();
                 tempUC.dropRight(tempUC.getLength() - index);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             else
             {
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
                 if (conditionalMoveTo(" - ", "/strong>"))
                 {
                     tempUC = getUntil("<");
@@ -12288,7 +12414,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"article__title"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"article__date\"", "datetime=\""))
             {
@@ -12304,7 +12430,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"obituaries-sub-heading\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"obituaries-heading-content\"", ">"))
             {
@@ -12327,7 +12453,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(125, "<div class=\"x_\">", "<span"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<span", "<div class=\"x_\">", 0))
             {
@@ -12349,7 +12475,7 @@ void readObit::readStructuredContent()
             moveBackwardTo("<h");
             consecutiveMovesTo(150, "href", ">");
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
     }
         break;
@@ -12359,7 +12485,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"d-avis-detail-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("Date de naissance", "Date de décès", 0))
             {
@@ -12384,7 +12510,7 @@ void readObit::readStructuredContent()
         {
             moveTo("<h");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("<h");
             tempUC = readNextBetween(BRACKETS);
@@ -12396,7 +12522,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(200, "class=\"decedent_info\"", "itemprop=\"name\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (conditionalMoveTo("itemprop=\"birthDate\"", "itemprop=\"deathDate\"", 0))
                 {
@@ -12416,7 +12542,7 @@ void readObit::readStructuredContent()
                 if (consecutiveMovesTo(200, "class=", "obituary-text", "<h", ">"))
                 {
                     tempUC = getUntil("<");
-                    tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                    tempUC.prepareStructuredNames();
 
                     if (moveTo("<h2", 100))
                     {
@@ -12434,7 +12560,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "id=\"basic-details\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("id=\"birth-date\""))
             {
@@ -12461,7 +12587,7 @@ void readObit::readStructuredContent()
                 tempUC = tempUC.left(index);
             if (tempUC.left(20) == PQString("MESSE ANNIVERSAIRE, "))
                 tempUC.dropLeft(20);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<p", "</div>", 0))
             {
@@ -12488,7 +12614,7 @@ void readObit::readStructuredContent()
     case ObitAssistant:
     {
         tempUC = globals->globalDr->getTitle();
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
     }
         break;
 
@@ -12501,7 +12627,7 @@ void readObit::readStructuredContent()
         {
             // Read names
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -12510,7 +12636,7 @@ void readObit::readStructuredContent()
         {
             // Read names
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read DOB and DOD
             if (moveTo("h2", 50))
@@ -12526,7 +12652,7 @@ void readObit::readStructuredContent()
         {
             // Read names
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read DOB and DOD
             // Nothing coded for now as it appears to be exact duplicate of original listing
@@ -12541,7 +12667,7 @@ void readObit::readStructuredContent()
             {
                 // Read names
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // Read DOB and DOD
                 // Hit and miss here both in terms of content and structure (eg. might get YYYY for DOB and mmm dd, yyyy for DOD)
@@ -12695,7 +12821,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"deceased-info\"", "<h2>"))
             {
                 tempUC = getUntil("</h2>");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 // Look for possible date info
                 if (moveTo("<h3>", 100))
@@ -12714,7 +12840,7 @@ void readObit::readStructuredContent()
             // Read names
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read DOB and DOD
             // Nothing else available
@@ -12732,7 +12858,7 @@ void readObit::readStructuredContent()
                 tempUC = readNextBetween(BRACKETS);
         }
         if (tempUC.getLength() > 3)
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
         // Read DOB and DOD
         // Coding is duplicate of original listing, but look for "YYYY - YYYY", which would have been dropped
@@ -12776,7 +12902,7 @@ void readObit::readStructuredContent()
                 word += readNextBetween(BRACKETS);
             }
             tempUC = word;
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read dates
             if (conditionalMoveTo("birthDate", "deathDate", 0))
@@ -12800,7 +12926,7 @@ void readObit::readStructuredContent()
             // Read Name
             if (consecutiveMovesTo(100, "ObituaryFullName", "\'"))
                 tempUC = getUntil("\',");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read dates
             if (conditionalMoveTo("birthDate\":", "deathDate", 0))
@@ -12833,7 +12959,7 @@ void readObit::readStructuredContent()
                 word += readNextBetween(QUOTES);
             }
             tempUC = word;
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             // Read dates
             if (conditionalMoveTo("birthDate", "deathDate", 0))
@@ -12860,7 +12986,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"obituary-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if(conditionalMoveTo("class=\"birth-date\"", "class=\"obituary-date\"", 0))
             {
@@ -12886,8 +13012,7 @@ void readObit::readStructuredContent()
             tempUC = getUntil("<");
         tempUC.simplify();
         tempUC.removeLeading(SPACE);
-        fixHyphens = true;      // Must be confident content contains only names
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
         break;
 
     case Funks:
@@ -12895,7 +13020,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "og:title", "content="))
         {
             tempUC = readQuotedMetaContent();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -12904,7 +13029,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(3000, "id=\"main-content\"", "<h3", ">"))
         {
             tempUC = getUntil("</h3>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -12915,7 +13040,7 @@ void readObit::readStructuredContent()
             {
                 backward(1);
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
 
                 if (consecutiveMovesTo(150, "<p class", "<span", ">"))
@@ -12947,7 +13072,7 @@ void readObit::readStructuredContent()
         if (moveTo("post post-obituary current-item"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -12962,7 +13087,7 @@ void readObit::readStructuredContent()
             moveTo(">");
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -12971,7 +13096,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"vc_custom_heading\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Dates
@@ -12988,7 +13113,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(200, "<!--/nav .navigation-->", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         // Pub Date
@@ -13032,7 +13157,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"head-title\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 100))
             {
@@ -13052,7 +13177,7 @@ void readObit::readStructuredContent()
             backward(5);
             moveBackwardTo(">");
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13061,7 +13186,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13069,7 +13194,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(350, "id=\"mainContent\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(15, "</h", "<p",0))
             {
@@ -13084,7 +13209,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"eltdf-page-subtitle\"", ">"))
             {
@@ -13099,7 +13224,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"page-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             tempUC = globals->globalDr->getURL();
             tempUC.removeEnding("/");
@@ -13113,7 +13238,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13121,7 +13246,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"content\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"dod\"", "Passed on ", 0))
             {
@@ -13136,7 +13261,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13147,7 +13272,7 @@ void readObit::readStructuredContent()
             tempUC = getUntil("</p>");
             tempUC.removeHTMLtags();
             //tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo(" - "), 4000)
             {
@@ -13164,7 +13289,7 @@ void readObit::readStructuredContent()
                 //tempUC = readNextBetween(BRACKETS);
                 tempUC = getUntil("</p>");
                 tempUC.removeHTMLtags();
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo(" - "), 4000)
                 {
@@ -13173,6 +13298,11 @@ void readObit::readStructuredContent()
                     fillInDatesStructured(tempUC);
                 }
             }
+            else
+            {
+                beg();
+
+            }
         }
         break;
 
@@ -13180,7 +13310,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"et_pb_text_inner\""))
             {
@@ -13194,7 +13324,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"name-of-person\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"life-span\""))
             {
@@ -13207,7 +13337,7 @@ void readObit::readStructuredContent()
     case Belvedere:
         {
             tempUC = globals->globalDr->getTitle();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13215,7 +13345,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"details\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "Passing Date:", ", "))
             {
@@ -13235,7 +13365,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(1000, "class=\"container obituary-container\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 100))
             {
@@ -13249,7 +13379,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"page-banner-text\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("mall", 10))
             {
@@ -13263,7 +13393,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"nxs-title nxs-align-left"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"nxs-blog-meta nxs-applylinkvarcolor\"", 100))
             {
@@ -13278,7 +13408,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13286,7 +13416,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"title\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("ContentPlaceHolder1_lblDateOfDeath");
             moveTo("Died: ", 5);
@@ -13300,7 +13430,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"wpfh_obit_date\"");
             tempUC = readNextBetween(BRACKETS);
@@ -13318,7 +13448,7 @@ void readObit::readStructuredContent()
             // Name
             moveTo("class=\"news_main_story_title\"");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13329,7 +13459,7 @@ void readObit::readStructuredContent()
             moveTo(">");
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             forward(5);
             if (moveTo("</span></span>"))
@@ -13347,7 +13477,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(30, "class=\"right\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13355,7 +13485,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(200, "class=\"service-name-date\"", "<span"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("block-birthdate", "block-deathdate", 1))
             {
@@ -13390,7 +13520,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(1000, "<!-----upper part start ----------->", "class=\"heading_for_mob\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(250, ">Death Date", "ContentPlaceHolder1_lblDeathDate", ", ");
             tempUC = getUntil("<");
@@ -13406,7 +13536,7 @@ void readObit::readStructuredContent()
         if (moveTo("<div class=\"topflag\">"))
         {
             tempUC = getUntil("<span>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo(" ", 20))
             {
@@ -13420,17 +13550,17 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"entry-title single-title\"", ">"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
     case Brenneman:
-        if (moveTo("<h2"))
+        if (moveTo("class=\"blog-post-title-font blog-post-title-color\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
-            if (moveTo("<h3"))
+            if (consecutiveMovesTo(500, "type=\"first\"", "class=\"_2PHJq public-DraftStyleDefault-ltr\"", "<span"))
             {
                 tempUC = readNextBetween(BRACKETS);
                 fillInDatesStructured(tempUC);
@@ -13442,7 +13572,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"entry-birth-death-date\""))
             {
@@ -13457,7 +13587,7 @@ void readObit::readStructuredContent()
         {
             conditionalMoveTo("Remembering ", "<");
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13465,7 +13595,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"published\""))
             {
@@ -13479,7 +13609,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title clearfix banner-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13491,13 +13621,13 @@ void readObit::readStructuredContent()
 
             moveTo("<li><h");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
     case Haine:
         tempUC = OQString(globals->globalDr->getID()).convertFromID();
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
         break;
 
     case RHB:
@@ -13505,7 +13635,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13513,7 +13643,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13526,7 +13656,7 @@ void readObit::readStructuredContent()
 
             moveTo("<p");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13534,7 +13664,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(20, "class=\"inner-page-ttl\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(20, "class=\"single_ttl_btm\"", "<h");
             tempUC = readNextBetween(BRACKETS);
@@ -13546,7 +13676,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(600, ">Contact Us<", "class=\"item-title section-title\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, ">Date of Death:<", ", "))
             {
@@ -13562,7 +13692,7 @@ void readObit::readStructuredContent()
         if (moveTo("itemprop=\"headline\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("datetime=\"", 1000))
             {
@@ -13578,7 +13708,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(125, "name=\"twitter:description\"", "remembrance book for the late "))
         {
             tempUC = getUntil("\"/>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         if (consecutiveMovesTo(500, ">Born<", "<span", "</span>"))
@@ -13606,7 +13736,7 @@ void readObit::readStructuredContent()
         /*if (consecutiveMovesTo(25, ">Obituary Announcement<", ">"))
         {
             tempUC = getUntil("</p>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         end();
@@ -13653,7 +13783,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"page__title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
 
         beg();
@@ -13699,7 +13829,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"page__title\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (conditionalMoveTo("Birth date", "</span>", 0))
                 {
@@ -13723,7 +13853,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13731,7 +13861,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"entry-title\"", "itemprop=\"headline\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13739,7 +13869,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(750, "id=\"main\" class=\"main\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 100))
             {
@@ -13757,7 +13887,7 @@ void readObit::readStructuredContent()
             moveTo("<b");
             tempUC = readNextBetween(BRACKETS);
             tempUC.fixBasicErrors();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("<b>", 100);
             backward(1);
@@ -13772,7 +13902,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"subtitle\"", 100))
             {
@@ -13786,7 +13916,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"single-nom\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"single-date\""))
             {
@@ -13807,7 +13937,7 @@ void readObit::readStructuredContent()
                 tempUC.dropRight(12);
                 tempTempUC.processStructuredYears();
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13815,7 +13945,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"obituaries-sub-heading\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"obituaries-heading-content\""))
             {
@@ -13836,7 +13966,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(10, "<p>", "le "))
             {
@@ -13856,7 +13986,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title fusion-post-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, "class=\"post-content\"", "<br"))
             {
@@ -13883,7 +14013,7 @@ void readObit::readStructuredContent()
         {
             moveTo("Avis de décès - ");
             tempUC = getUntil(" - ");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             tempUC = getUntil("\"");
             tempUC.processStructuredYears();
@@ -13894,7 +14024,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"necrologie_fiche_right\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<pre", 100))
             {
@@ -13912,7 +14042,7 @@ void readObit::readStructuredContent()
 
             moveTo("class=\"detailsdeces-fiche\"");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13920,7 +14050,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "type=\"application/ld+json\"", "\"name\":"))
         {
             tempUC = readNextBetween(QUOTES);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("\"birthDate\":", "deathDate", 0))
             {
@@ -13960,7 +14090,7 @@ void readObit::readStructuredContent()
                 if (tempString.mid(index1 + 2, 3) == QString("NÉE"))
                     tempUC = tempString.left(index1) + QString(" (") + tempString.mid(index1 + 2, index2 - index1 - 2) +  QString("),") + tempString.right(tempString.length() - index2 - 1);
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, "class=\"entry-date\"", "</i"))
             {
@@ -13984,7 +14114,7 @@ void readObit::readStructuredContent()
             }
             else
                 tempUC = tempString;
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -13992,7 +14122,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(250, "<div class=\"ds-1col node node-avis-de-deces view-mode-full clearfix", "property=\"dc:title\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(200, "<div class=\"field field-name-dates-nessance-et-deces", "class=\"field-item even\""))
             {
@@ -14006,7 +14136,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "<h1", "class=\"def_title\"", ">"))
         {
             tempUC = getUntil("</h1>");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"date_obs\""))
             {
@@ -14021,7 +14151,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14029,7 +14159,7 @@ void readObit::readStructuredContent()
         if (moveTo(">In Memory Of<"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14038,7 +14168,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, "<h2", ">"))
             {
@@ -14054,7 +14184,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class=\"dates\"");
             tempUC = readNextBetween(BRACKETS);
@@ -14066,7 +14196,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"post_title entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             beg();
             if (consecutiveMovesTo(50, "<title>", "s : "))
@@ -14090,7 +14220,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(50, "<span>", " ");
             tempUC = getUntil("<");
@@ -14102,7 +14232,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"column mcb-column three-fourth column_column", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<span>, ", 20))
             {
@@ -14120,7 +14250,7 @@ void readObit::readStructuredContent()
 
             moveTo("/small");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14128,7 +14258,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=m-obituary-single-intro>", "class=text-uppercase>"))
         {
             tempUC = getUntil("</h");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(25, "class=birth-death", "<p");
             tempUC = readNextBetween(BRACKETS);
@@ -14163,7 +14293,7 @@ void readObit::readStructuredContent()
                     }
                 }
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14171,7 +14301,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "<div id='content'>", "<header>", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(100, ">Funeral Service:<", "<td>", ", "))
             {
@@ -14185,7 +14315,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "deces-liste-nom", "href", ">"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h3", 100))
             {
@@ -14199,7 +14329,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "id=\"txtDefunt\"", "<span", ">"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(25, "class=\"bodyDefunt\"", "<p"))
             {
@@ -14213,7 +14343,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"et_pb_module_header\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"et_pb_member_position\"", 25))
             {
@@ -14241,7 +14371,7 @@ void readObit::readStructuredContent()
                 tempUC.dropRight(12);
                 tempTempUC.processStructuredYears();
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         else
         {
@@ -14257,7 +14387,7 @@ void readObit::readStructuredContent()
                     tempUC.dropRight(12);
                     tempTempUC.processStructuredYears();
                 }
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
         }
         break;
@@ -14266,7 +14396,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "", ""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14274,7 +14404,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"passing\""))
             {
@@ -14294,7 +14424,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"obituaries-announcement-detail\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 25))
             {
@@ -14309,7 +14439,7 @@ void readObit::readStructuredContent()
         {
             backward(1);
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14317,7 +14447,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(1000, "class=\"fiche\"", "<h", "<span"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("</h"))
             {
@@ -14331,7 +14461,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"belwe\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 20))
             {
@@ -14345,7 +14475,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"titreAvis\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"annee_nais_deces_avis\"", 200))
             {
@@ -14359,7 +14489,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(75, "class=\"entry-title\"", "itemprop=\"name\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14367,7 +14497,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"about-inner-content single_annoucement_content\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("<p", "</div>", 0))
             {
@@ -14388,7 +14518,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "<!-- obit name -->", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<!-- obit date -->"))
             {
@@ -14411,7 +14541,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "id=\"headerwrap\"", "<h1"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14419,7 +14549,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"h3 text-blue\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"text-muted\"", 100))
             {
@@ -14433,7 +14563,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(75, "class=\"pure-g container\"", "class=\"pure-u-1\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14441,7 +14571,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"obituary-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"obituary-years\""))
             {
@@ -14455,7 +14585,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"nxs-title nxs-align-left"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14463,7 +14593,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, ">Back to List<", "<strong"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<br /", 15))
             {
@@ -14482,17 +14612,17 @@ void readObit::readStructuredContent()
             tempTempUC.processStructuredYears();
         }
 
-        tempUC.processStructuredNames(nameStatsList, fixHyphens);
+        tempUC.prepareStructuredNames();
 
         break;
 
     case Richelieu:
-        if (consecutiveMovesTo(50, "class=\"necrologie_fiche_right\"", "<h"))
+        if (consecutiveMovesTo(75, "class=\"info font-ASAP\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
-            if (moveTo("pre", 25))
+            if (moveTo("/h", 25))
             {
                 tempUC = readNextBetween(BRACKETS);
                 tempUC.processStructuredYears();
@@ -14504,7 +14634,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"post-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14515,7 +14645,7 @@ void readObit::readStructuredContent()
             tempUC = getUntil("<") + PQString(", ");
             moveTo("br", 5);
             tempUC += readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("<br");
             tempUC = readNextBetween(BRACKETS);
@@ -14529,7 +14659,7 @@ void readObit::readStructuredContent()
             tempUC = getUntil("</div>") + PQString(", ");
             moveTo(">");
             tempUC += getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("p-city-date", 100))
             {
@@ -14563,7 +14693,7 @@ void readObit::readStructuredContent()
                 tempUC.dropRight(11);
                 tempTempUC.processStructuredYears();
             }
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14571,7 +14701,7 @@ void readObit::readStructuredContent()
         if (moveTo(""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14579,7 +14709,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"details\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("Décédé(e) le ", "<hr/>"))
             {
@@ -14593,7 +14723,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(750, "id=\"avisdeces-fiche\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<span", 100))
             {
@@ -14624,7 +14754,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(200, "class=\"wsite-menu-subitem-wrap wsite-nav-current\"", "class=\"wsite-menu-title\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -14633,7 +14763,7 @@ void readObit::readStructuredContent()
             if (moveTo(target))
             {
                 tempUC = target;
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -14643,7 +14773,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(250, "wpfh-single-header-right", "href", ">"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("wpfh-obit-alternate-dates"))
             {
@@ -14659,7 +14789,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(175, "class=\"blog-title-link blog-link\"", ">"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"date-text\"", 150))
             {                
@@ -14673,7 +14803,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "id=\"text_area\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14681,7 +14811,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"page-banner-text\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<small"))
             {
@@ -14695,7 +14825,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14703,7 +14833,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(125, "class=\"entry-title", ">"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14711,7 +14841,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"obituary-name\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("<h", 50))
             {
@@ -14726,7 +14856,7 @@ void readObit::readStructuredContent()
         {
             conditionalMoveTo("<strong", "</h");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14734,7 +14864,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(50, "class=\"entry-content\"", "Date of Death: "))
             {
@@ -14748,7 +14878,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(300, "id=\"text1\"", "<I>"))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (consecutiveMovesTo(300, "id=\"text2\"", "<I>"))
             {
@@ -14762,7 +14892,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(300, "id=\"text1\"", "<i>"))
             {
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (consecutiveMovesTo(300, "id=\"text2\"", "<I>"))
                 {
@@ -14777,7 +14907,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "og:title", "content="))
         {
             tempUC = readQuotedMetaContent();
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14786,7 +14916,7 @@ void readObit::readStructuredContent()
         if (moveTo("<h2 itemprop=\"headline\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         /*rxTarget.setPattern("\\d{4} (-|~) \\d{4}");
         int index = itsString.indexOf(rxTarget);
@@ -14805,7 +14935,7 @@ void readObit::readStructuredContent()
             if (conditionalMoveTo("<frame", "</", 0))
                 moveTo(">");
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("style=\"text-align: center;", 100))
             {
@@ -14826,7 +14956,7 @@ void readObit::readStructuredContent()
                 conditionalMoveTo("<span", "</", 0);
                 moveTo(">");
                 tempUC = getUntil("<");
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
 
                 if (moveTo("style=\"text-align: center;", 100))
                 {
@@ -14848,7 +14978,7 @@ void readObit::readStructuredContent()
 
             consecutiveMovesTo(200, "href=", "rel=");
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14857,7 +14987,7 @@ void readObit::readStructuredContent()
         {
             moveTo("\"name\": \"");
             tempUC = getUntil("\",");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("\"birthDate\": \"", "</script>", 0))
             {
@@ -14883,7 +15013,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(35, "<div class=\"right\">", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("span", 10))
             {
@@ -14898,7 +15028,7 @@ void readObit::readStructuredContent()
         if (moveTo(target))
         {
             tempUC = target;
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             consecutiveMovesTo(100, "<p", ">");
             tempUC = getUntil("<");
@@ -14910,7 +15040,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(50, "class=\"entry-title\"", "In Memory of "))
         {
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (conditionalMoveTo("class=\"h3\"", "</div>"))
             {
@@ -14930,7 +15060,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(30, "font-size:26px;", ">"))
         {
             tempUC = getUntil("&nbsp;");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             conditionalMoveTo("&nbsp;", "<", 0);
             tempUC = getUntil("<");
@@ -14962,7 +15092,7 @@ void readObit::readStructuredContent()
                 tempUC = tempUC.left(indexA);
             }
 
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("class=\"obituary-details\""))
             {
@@ -14987,7 +15117,7 @@ void readObit::readStructuredContent()
         if (moveTo("class=\"entry-title\""))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
         }
         break;
 
@@ -14995,7 +15125,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(350, "class='tributecontent-tributepost", "class='posts_head'", "<h1"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("class='tributepostdata'");
             tempUC = readNextBetween(BRACKETS);
@@ -15007,7 +15137,7 @@ void readObit::readStructuredContent()
         if (consecutiveMovesTo(100, "class=\"obituary-ttl-info\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             moveTo("<span", 100);
             tempUC = readNextBetween(BRACKETS);
@@ -15022,7 +15152,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(100, "class=\"post-title\"", "headline"))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
 
@@ -15030,7 +15160,7 @@ void readObit::readStructuredContent()
             if (moveTo("class=\"tdb-title-text\""))
             {
                 tempUC = readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             break;
         }
@@ -15043,7 +15173,7 @@ void readObit::readStructuredContent()
             if (consecutiveMovesTo(250, "ea90534", "<h2"))
             {
                 tempUC += readNextBetween(BRACKETS);
-                tempUC.processStructuredNames(nameStatsList, fixHyphens);
+                tempUC.prepareStructuredNames();
             }
             else
                 beg();
@@ -15068,7 +15198,7 @@ void readObit::readStructuredContent()
             conditionalMoveTo("strong", "</", 0);
             moveTo(">");
             tempUC = getUntil("<");
-            tempUC.processStructuredNames(nameStatsList, fixHyphens);
+            tempUC.prepareStructuredNames();
 
             if (moveTo("dod fs-5", 100))
             {
@@ -15802,6 +15932,16 @@ unstructuredContent* readObit::getJustInitialNamesAddress()
     return &justInitialNamesUC;
 }
 
+unstructuredContent* readObit::getStructuredNamesAddress()
+{
+    return &structuredNamesProcessed;
+}
+
+mostCommonName* readObit::getMCNaddress()
+{
+    return &mcn;
+}
+
 void readObit::readParentsLastName()
 {
     if ((uc.getLength() == 0) || (globals->globalDr->getNeeEtAlEncountered() == true))
@@ -15838,6 +15978,7 @@ void readObit::readParentsLastName()
     PQString tempName;
     NAMESTATS savedNameStats, nextWordNameStats;
     databaseSearches dbSearch;
+    unstructuredContent tempUC;
 
     allContent = ucFillerRemoved.getString();
     allContent = allContent.simplified();
@@ -15913,7 +16054,7 @@ void readObit::readParentsLastName()
                         valid = true;
                     }
                     word = tempWord.proper();
-                    word.compressCompoundNames(language_unknown);
+                    tempUC.compressCompoundNames(word, language_unknown);
                     if (!valid)
                         keepGoing = false;
                     isGivenName = isSurname = false;
@@ -15922,6 +16063,7 @@ void readObit::readParentsLastName()
                     {
                         nextWord = content.peekAtWord(true, 1);
                         nextWord.removeEnding(PUNCTUATION);
+                        nextWord.removePossessive();
                         getAnotherWord = word.isAnd() && !content.isEOS();
                         if (!getAnotherWord)
                         {
@@ -15959,7 +16101,10 @@ void readObit::readParentsLastName()
 
                 if (step2complete)
                 {
-                    if (word.left(6).lower() != PQString("sister"))
+                    QList<QString> badWords = QString("sister|parent|outlaw").split("|");
+                    QString first6 = word.left(6).lower().getString();
+
+                    if (!badWords.contains(first6))
                     {
                         brotherLastNames.append(word.getString());
                         found = true;
@@ -16037,7 +16182,7 @@ void readObit::readParentsLastName()
             content.cleanUpEnds();
             sentenceWithMaiden.cleanUpEnds();
 
-            // Beging processing
+            // Begin processing
             while (keepGoing && !found && !highConfidence && !content.isEOS())
             {
                 // Initialize variables
@@ -16120,6 +16265,7 @@ void readObit::readParentsLastName()
                     nextWordIsInitial = (nextWord.getLength() == 1) && !nextWord.isAnd();
                 }
                 nextWordIsAnd = nextWord.isAnd();
+                nextWord.removePossessive();
 
                 dbSearch.nameStatLookup(nextWord.getString(), globals, nextWordNameStats, genderUnknown);
                 nextWordIsSurname = nextCompoundName || (nextWord.isCapitalized() && (nextWord.getLength() >= 2) &&
@@ -16518,13 +16664,16 @@ void readObit::readParentsLastName()
                 tempName = name;
         }
 
-        if (globals->globalDr->isALastName(tempName))
-            highConfidence = true;
+        if ((tempName.left(6).lower() != PQString("sister")) && (tempName != PQString("Teresa")))
+        {
+            if (globals->globalDr->isALastName(tempName))
+                highConfidence = true;
 
-        globals->globalDr->setParentsLastName(tempName);
-        globals->globalDr->removeFromMiddleNames(tempName);
-        if (globals->globalDr->getGender() != Male)
-            globals->globalDr->setFamilyName(tempName);
+            globals->globalDr->setParentsLastName(tempName);
+            globals->globalDr->removeFromMiddleNames(tempName);
+            if (globals->globalDr->getGender() != Male)
+                globals->globalDr->setFamilyName(tempName);
+        }
     }
 
     if (found && (wordCount >= 4) && !highConfidence)
@@ -16969,19 +17118,87 @@ void readObit::treatmentNameCleanup()
     if (globals->globalDr->wi.confirmTreatmentName.length() == 0)
         return;
 
-    OQStream tempStream(globals->globalDr->wi.confirmTreatmentName);
-    OQString word;
-    bool matched = true;
+    unstructuredContent tempUC;
+    tempUC.compressCompoundNames(globals->globalDr->wi.confirmTreatmentName, globals->globalDr->getLanguage());
+    OQStream tempStream(tempUC.getString());
 
-    while (matched && !tempStream.isEOS())
+    OQString word;
+    bool partialMatch = false;
+    bool allNames = true;
+    bool allLastNames = true;
+    bool allSaved = true;
+    NAMESTATS nameStats;
+    databaseSearches dbSearch;
+
+    QList<QString> nameList;
+
+    while (!tempStream.isEOS())
     {
         word = tempStream.getWord();
-        if (!globals->globalDr->isASavedName(word))
-            matched = false;
+        word.removeEnding("COMMA", Qt::CaseSensitive);
+        if (!word.isNeeEtAl())
+        {
+            if (globals->globalDr->isASavedName(word))
+            {
+                nameList.append(word.getString());
+                partialMatch = true;
+                if (!globals->globalDr->isALastName(word))
+                    allLastNames = false;
+            }
+            else
+            {
+                allSaved = false;
+                dbSearch.nameStatLookup(word.getString(), globals, nameStats, globals->globalDr->getGender());
+                if (nameStats.isSurname || nameStats.isGivenName)
+                    nameList.append(word.getString());
+                if (!nameStats.isSurname)
+                    allLastNames = false;
+                else
+                {
+                    if (!nameStats.isGivenName)
+                        allNames = false;
+                }
+            }
+        }
     }
 
-    if (matched)
+    if (allSaved)
         globals->globalDr->wi.confirmTreatmentName.clear();
+    else
+    {
+        if (allLastNames)
+        {
+            NAMEINFO nameInfo;
+            nameInfo.type = ntLast;
+            OQString name;
+            while (nameList.size() > 0)
+            {
+                name = nameList.takeFirst();
+                nameInfo.name = name.proper();
+                nameInfo.numWords = nameInfo.name.countWords();
+                globals->globalDr->setAlternates(nameInfo);
+            }
+            globals->globalDr->wi.confirmTreatmentName.clear();
+        }
+        else
+        {
+            if (partialMatch && allNames)
+            {
+                QList<NAMESTATS> nameStatsList;
+                unstructuredContent names;
+                OQString name;
+                while (nameList.size() > 0)
+                {
+                    name = nameList.takeFirst();
+                    names +=  name + OQString(" ");
+                    dbSearch.nameStatLookup(name.getString(), globals, nameStats, globals->globalDr->getGender());
+                }
+
+                names.readFirstNameFirst(nameStatsList);
+                globals->globalDr->wi.confirmTreatmentName.clear();
+            }
+        }
+    }
 }
 
 void readObit::finalNameCleanup()
@@ -17122,6 +17339,21 @@ void readObit::finalNameCleanup()
         }
     }
 
+    // Fix last name Senior for female
+    if ((globals->globalDr->getSuffix() == PQString("Senior")) && (globals->globalDr->getGender() == Female) && (globals->globalDr->getLastNameAlt1().getLength() == 0))
+    {
+        QString name = globals->globalDr->getLastName().getString();
+        NAMESTATS nameStats;
+        databaseSearches dbSearch;
+        dbSearch.nameStatLookup(name, globals, nameStats, Female);
+        if (nameStats.isLikelyGivenName)
+        {
+            globals->globalDr->clearLastNames();
+            globals->globalDr->setMiddleNames(name);
+            globals->globalDr->setFamilyName("Senior");
+        }
+    }
+
     // Move a last name over if no first names
     if ((globals->globalDr->getFirstName().getLength() == 0) && (globals->globalDr->getLastNameAlt1().getLength() > 0))
     {
@@ -17180,13 +17412,16 @@ int readObit::runNameValidations()
 {
     NAMESTATS nameStats;
     databaseSearches dbSearch;
-    OQString name;
+    OQString name, firstChar;
     unsigned int count, size;
     int warningScore = 0;
 
     GENDER gender = globals->globalDr->getGender();
     QList<OQString> nameList;
     OQStream tempStream;
+
+    QList<QString> recognizedExclusions = QString("bishop|deacon|french|good|husband|major|wall|way").split("|");
+    QList<QString> badWords = QString("of|and").split("|");
 
     globals->globalDr->reorderLee();
 
@@ -17240,8 +17475,12 @@ int readObit::runNameValidations()
             warningScore += 10;
 
         // Add points for "formerly of.." error
-        if (name.lower() == OQString("of"))
+        if (name.isProblematicFirstName())
+        {
             warningScore += 10;
+            if (badWords.contains(name.lower().getString()))
+                warningScore += 10;
+        }
 
         // Add points for Males with more than one last name
         if ((gender == Male) && (nameList.size() > 1) && !globals->globalDr->getMaleHyphenated())
@@ -17255,12 +17494,17 @@ int readObit::runNameValidations()
         if (name.isNeeEtAl())
             warningScore += 15;
 
+        // Add points if surnames include sister
+        if ((name.left(6) == PQString("sister")) || (name.left(5) == PQString("soeur")))
+            warningScore += 20;
+
         // Add points if it is an initial
         if (size == 1)
             warningScore += 10;
 
         // Add points for unexpected abbreviations
-        if ((size <= 4) && !name.containsVowel() && (name != PQString("Cyr")))
+        QList goodLastNames = QString("Cyr|Fry|Ng|Dyck").split("|");
+        if ((size <= 4) && !name.containsVowel() && !goodLastNames.contains(name.getString()))
             warningScore += 10;
 
         // Add points for characters that must be errors
@@ -17268,7 +17512,7 @@ int readObit::runNameValidations()
             warningScore += 10;
 
         // Add points if word is recognized
-        if (name.isRecognized())
+        if (name.isRecognized() && !recognizedExclusions.contains(name.lower().getString()))
             warningScore += 15;
 
         // Add points if ending in possessive
@@ -17363,6 +17607,18 @@ int readObit::runNameValidations()
             if ((name.findPosition(PQString("(")) != -1) || (name.findPosition(PQString(")")) != -1))
                 warningScore += 10;
 
+            firstChar = name.left(1);
+            if (!name.isAlpha())
+                warningScore += 10;
+
+            // Add points for "formerly of.." error
+            if (name.isProblematicFirstName())
+            {
+                warningScore += 10;
+                if (badWords.contains(name.lower().getString()))
+                    warningScore += 10;
+            }
+
             if (name.isWrittenMonth(globals->globalDr->getLanguage()))
             {
                 warningScore += 10;
@@ -17395,8 +17651,8 @@ int readObit::runNameValidations()
                 if (nameStats.isLikelySurname)
                     warningScore += 5;
 
-                if (name.isHyphenated() && (globals->globalDr->getLanguage() == english))
-                    warningScore += 10;
+                //if (name.isHyphenated() && (globals->globalDr->getLanguage() == english))
+                //    warningScore += 10;
 
                 if (name.isRecognized() && (name.lower() != OQString("ella")))
                     warningScore += 15;
@@ -17427,6 +17683,10 @@ int readObit::runNameValidations()
                 default:
                     count = nameStats.maleCount + nameStats.femaleCount;
                 }
+
+                // Add points if it is a location
+                if (name.isLocation() || name.isFoundIn(routes, 1))
+                    warningScore += 10;
 
                 if (count < 10)
                     warningScore += 1;
@@ -17579,13 +17839,21 @@ int readObit::runGenderValidation()
         }
     }
 
-    if (((unisex >= 0.9) && (gender == Female)) || ((unisex <= 0.1) && (gender == Male)))
+    if (((unisex >= 0.95) && (gender == Female)) || ((unisex <= 0.05) && (gender == Male)))
     {
         globals->globalDr->wi.genderFlag = static_cast<int>(gender) + 10;
         return 0;
     }
     else
-        return 1;
+    {
+        if (((unisex >= 0.875) && (gender == Female)) || ((unisex <= 0.125) && (gender == Male)))
+        {
+            globals->globalDr->wi.genderFlag = static_cast<int>(gender);
+            return 0;
+        }
+        else
+            return 1;
+    }
 }
 
 void readObit::fixNameIssues()
@@ -17599,7 +17867,7 @@ void readObit::fixNameIssues()
         bool revised = false;
         revised = reorderNames();
 
-        if (revised)
+        if (revised && false)
         {
             globals->globalDr->wi.resetNonDateValidations();
             runNameValidations();
@@ -17647,76 +17915,149 @@ void readObit::fixNameIssues()
             globals->globalDr->removeFromLastNames(lastName1);
         }
     }
+
+    if ((globals->globalDr->getMiddleNames().getLength() == 0) && (globals->globalDr->getLastNameAlt3().getLength() > 0))
+    {
+        databaseSearches dbSearch;
+        QList<NAMESTATS> nameStats;
+        QList<OQString> lastNames;
+        NAMESTATS nameStat;
+
+        unsigned int minSurnameCount = 999999;
+        unsigned int maxGivenCount = 0;
+        unsigned int count;
+        int iMin = 0;
+        int iMax = 0;
+
+        lastNames.append(globals->globalDr->getLastName());
+        lastNames.append(globals->globalDr->getLastNameAlt1());
+        lastNames.append(globals->globalDr->getLastNameAlt2());
+        lastNames.append(globals->globalDr->getLastNameAlt3());
+
+        for (int i = 0; i < 4; i++)
+        {
+            nameStats.append(nameStat);
+            dbSearch.nameStatLookup(lastNames.at(i).getString(), globals, nameStats[i]);
+            if (nameStats[i].surnameCount <= minSurnameCount)
+            {
+                minSurnameCount = nameStats[i].surnameCount;
+                iMin = i;
+            }
+
+            switch(globals->globalDr->getGender())
+            {
+            case Male:
+                count = nameStats[i].maleCount;
+                break;
+
+            case Female:
+                count = nameStats[i].femaleCount;
+                break;
+
+            default:
+                count = nameStats[i].femaleCount + nameStats[i].maleCount;
+                break;
+            }
+
+            if (count >= maxGivenCount)
+            {
+                maxGivenCount = count;
+                iMax = i;
+            }
+        }
+
+        if (minSurnameCount == 0)
+        {
+            globals->globalDr->clearLastNames();
+            lastNames.removeAt(iMin);
+            globals->globalDr->setFamilyNames(lastNames);
+        }
+        else
+        {
+            if (maxGivenCount > 10)
+            {
+                globals->globalDr->setMiddleNames(lastNames.at(iMax));
+
+                globals->globalDr->clearLastNames();
+                lastNames.removeAt(iMax);
+                globals->globalDr->setFamilyNames(lastNames);
+            }
+        }
+    }
 }
 
 void readObit::determinePotentialFirstName()
 {
-    // First step is to check if unstructured content starts with "LASTNAME, FIRSTNAME", otherwise second step may erroneously return the lastname as a potential first name if
-    // the real first name does not appear in the obit at least twice
+    // Strategy is to identify the first given name used in a real sentence (not in first two words)
 
-    OQString firstWord, secondWord, thirdWord;
-    bool firstWordHadComma, secondWordHadComma, secondWordInParentheses, secondWordWasHyphen;
-    NAMESTATS firstWordStats, secondWordStats, thirdWordStats;
+    QString word, firstNameBackup;
+    OQString Oword, nextWord;
+    unstructuredContent sentence;
+    bool isGivenName = false;
     databaseSearches dbSearch;
+    NAMESTATS nameStats;
+    GENDER gender = globals->globalDr->getGender();
+    PQString errMsg;
+    int wordCount = 0;
 
-    unstructuredContent tempUC = uc;
+    ucFillerRemovedAndTruncated.beg();
+    sentence = ucFillerRemovedAndTruncated.getNextRealSentence();
 
-    firstWord = tempUC.getWord();
-    firstWordHadComma = firstWord.removeEnding(QString(","));
-    if (!firstWordHadComma)
-        firstWordHadComma = firstWord.removeEnding(QString(";"));
-    if (!firstWordHadComma)
-        firstWordHadComma = firstWord.removeEnding(QString(":"));
-    secondWord = tempUC.getWord();
-    if (secondWord.isHyphen())
+    if (sentence.getLength() > 0)
     {
-        secondWordWasHyphen = true;
-        secondWord = tempUC.getWord();
-    }
-    else
-        secondWordWasHyphen = false;
-    secondWordHadComma = secondWord.removeEnding(QString(","));
-    secondWordInParentheses = secondWord.removeBookEnds(PARENTHESES);
+        sentence.beg();
+        Oword = sentence.getWord();
+        nextWord = sentence.peekAtWord();
+        wordCount++;
 
-    // Deal with rate  "Smith (Johnson), Michelle"
-    if (secondWordHadComma && secondWordInParentheses)
-    {
-        thirdWord = tempUC.getWord();
-        thirdWord.removeEnding(PUNCTUATION);
-        if ((thirdWord.lower() != firstWord.lower() && (thirdWord.lower() != secondWord.lower())))
+        dbSearch.nameStatLookup(Oword.getString(), globals, nameStats, gender);
+        if (nameStats.isLikelyGivenName && !Oword.isFoundIn(problematicFirstNames))
+            firstNameBackup = Oword.getString();
+
+        while (!sentence.isEOS() && (nextWord.isAGivenName(errMsg) || nextWord.isALastName(errMsg)))
         {
-            dbSearch.nameStatLookup(thirdWord.getString(), globals, thirdWordStats, globals->globalDr->getGender());
-            if (thirdWordStats.isLikelyGivenName)
-            {
-                globals->globalDr->setPotentialFirstName(thirdWord.getString());
-                return;
-            }
+           Oword = sentence.getWord();
+           nextWord = sentence.peekAtWord();
+           wordCount++;
+        }
+
+        while (!sentence.isEOS() && !isGivenName)
+        {
+            Oword = sentence.getWord();
+            word = Oword.getString();
+            nextWord = sentence.peekAtWord();
+            wordCount++;
+            isGivenName = Oword.isCapitalized() && !Oword.isProblematicFirstName() && !nextWord.isHyphen() &&
+                            (dbSearch.givenNameLookup(word, globals, gender) || (word == globals->globalDr->getUsedFirstNameFromStructured()) || (word == globals->globalDr->getUsedFirstNameFromUnstructured()));
+        }
+
+        if (isGivenName)
+            globals->globalDr->setFirstGivenNameUsedInSentence(word);
+        else
+        {
+            if ((wordCount > 6) && (firstNameBackup.length() > 0))
+                globals->globalDr->setFirstGivenNameUsedInSentence(firstNameBackup);
         }
     }
-
-    dbSearch.nameStatLookup(firstWord.getString(), globals, firstWordStats, globals->globalDr->getGender());
-    dbSearch.nameStatLookup(secondWord.getString(), globals, secondWordStats, globals->globalDr->getGender());
-
-    if ((firstWordHadComma || secondWordWasHyphen) && (firstWordStats.isLikelySurname || secondWordStats.isLikelyGivenName || (!secondWordStats.isSurname && secondWordStats.isGivenName)))
-        globals->globalDr->setPotentialFirstName(secondWord.getString());
-    else
-        globals->globalDr->setPotentialFirstName(mcn.readPotentialFirstName(globals));
 }
 
-void readObit::runStdProcessing(unstructuredContent &uc, bool insertPeriods)
+void readObit::runStdProcessing(unstructuredContent &uc, int insertPeriods)
 {
-    uc.fixOneLargeQuoteBlock();
-    uc.simplify(true);
     uc.unQuoteHTML();
     uc.replaceHTMLentities();
+    uc.fixOneLargeQuoteBlock();
+    uc.insertBreaks();
+    uc.simplify(true);
     uc.removeLinks();
     uc.removeHTMLtags(insertPeriods);
     uc.removeBlankSentences();
     uc.conditionalBreaks();
-    uc.fixQuotes();
+    uc.standardizeQuotes();
     uc.fixBasicErrors();
     uc.simplify(false);
     uc.removeBlankSentences();
+    uc.cleanUpEnds();
+    uc.removeLeadingJunk();
     uc.cleanUpEnds();
 }
 
@@ -17803,6 +18144,7 @@ void readObit::genderByRelationshipWords()
     unsigned int femaleCount = ucCleaned.getNumFemaleWords();
     unsigned int startingCount = maleCount + femaleCount;
     unsigned int maxSentences = 3;  // information pulled from fourth or later sentence could be anything, so stop reading after three sentences
+    bool restrictNamesToDR = false;
     if (hasGodReference())
         maleCount = 0;
     unstructuredContent sentence;
@@ -17810,13 +18152,18 @@ void readObit::genderByRelationshipWords()
 
     while (!ucCleaned.isEOS() && (numChecked < maxSentences))
     {
-        sentence = ucCleaned.getSentence();
+        sentence = ucCleaned.getNextRealSentence(restrictNamesToDR, 3);
+        sentence = OQString(" ") + sentence;
+        sentence.genderRelationalReferences(maleCount, femaleCount);
+        numChecked++;
+
+        /*sentence = ucCleaned.getSentence();
         if (!(sentence.hasBookEnds(PARENTHESES) || sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick()))
         {
             sentence = OQString(" ") + sentence;
             sentence.genderRelationalReferences(maleCount, femaleCount);
             numChecked++;
-        }
+        }*/
     }
 
     if ((maleCount + femaleCount) > startingCount)
@@ -17852,6 +18199,7 @@ void readObit::genderByTitle()
     bool unknownGender = (globals->globalDr->getGender() == genderUnknown);
     LANGUAGE lang = globals->globalDr->getLanguage();
     unstructuredContent sentence;
+    bool restrictNamesToDR = false;
 
     if (unknownGender)
     {
@@ -17860,9 +18208,10 @@ void readObit::genderByTitle()
         OQString word;
         GENDER potentialGender = genderUnknown;
 
-        sentence = ucCleaned.getSentence();
+        sentence = ucCleaned.getNextRealSentence(restrictNamesToDR, 3);
+        /*sentence = ucCleaned.getSentence();
         while (sentence.isJustDates() || sentence.isJustNames() || sentence.startsWithClick(true))
-            sentence = ucCleaned.getSentence();
+            sentence = ucCleaned.getSentence();*/
 
         sentence.beg();
         word = sentence.getWord();

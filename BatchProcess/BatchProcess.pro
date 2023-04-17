@@ -1,12 +1,14 @@
 TEMPLATE = app
 
-QT += sql core network widgets
+QT += sql core network widgets gui
 
 DEFINES += \
     UNICODE \
     _UNICODE \
 
 #LIBS += user32.lib
+
+CONFIG += console gui
 
 TARGET = BatchProcess
 

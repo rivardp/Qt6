@@ -22,14 +22,33 @@ bool createConnection(QString user)
     db.setHostName("localhost");
     db.setDatabaseName("death_audits");
     db.setUserName(user);
-    db.setPassword(user);
+    if (user == "deceasedUpdater")
+        db.setPassword("c'9;>:)Kq`=U{T}n");
+    else
+    {
+        if (user == "deceasedLegacyUpdater")
+            db.setPassword("zGZc.Bf/U9aT2@C%");
+        else
+        {
+            if (user == "BatchMySQL")
+                db.setPassword("zx7<urVS'K+m(q[5");
+            else
+            {
+                if (user == "Phil")
+                    db.setPassword("c_XW}bfPCBV53<es");
+                else
+                    db.setPassword(user);
+            }
+        }
+    }
+
     if (!db.open())
     {
         qDebug() << "Database error occurred";
         qDebug() << db.lastError();
         return false;
     }
-    return true;
+    return true;   
 }
 
 bool createConnection(QString user, QString pswd)

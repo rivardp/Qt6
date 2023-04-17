@@ -3,8 +3,6 @@
 #ifndef OQSTREAM_H
 #define OQSTREAM_H
 
-//#include <QTextCodec>
-//#include <QDate>
 #include <QDateTime>
 #include "OQString.h"
 
@@ -45,7 +43,6 @@ public:
     OQStream getSentence(bool &realSentenceEncounteredFlag, const LANGUAGE &lang = language_unknown);
     OQStream getSentence(const QList<QString> &firstNames, bool &realSentenceEncounteredFlag, const LANGUAGE &lang = language_unknown);
     OQStream getSentence(const QList<QString> &firstNames, bool &realSentenceEncounteredFlag, const LANGUAGE &lang, const QStringList &conditionalStopWords);
-    //OQStream getSentence(QList<QString> &listOfInitials);
     OQString getNext(unsigned int numChars);
     OQString getUntil(QString qchar, unsigned int maxNumChars = 10000, bool dropLast = true);
     OQString getUntilEarliestOf(QString stop1, QString stop2, unsigned int maxNumChars = 10000, bool dropLast = true);
@@ -83,18 +80,18 @@ public:
     void replace(const QString target, const QString newString, const Qt::CaseSensitivity caseSensitive = Qt::CaseSensitive);    // Replace parts of string with new string
     void replace(const int start, const int numChars, const QString newString);    // Replace parts of string with new string
     void replaceHTMLentities();   // Replaces &nbsp; and other entities with real character
-    void removeLinks();           // Remove links and the tag wording
+    void removeLinks(bool removeAnyLink = false);     // Remove links and the tag wording
     void removeSpecialChar();     // Remove escape character (\), ampersand (&) and double quote (") since they will interfere with streams
     bool removeHyphens();
     void removeBlankSentences();  // Replaces all ". ." with "."
     bool removeBookEnds(unsigned int bookends = PARENTHESES | QUOTES);
     bool removeLeading(const unsigned int charCode);
-    bool removeLeading(const std::wstring target);
-    bool removeLeading(const QString target);
+    bool removeLeading(const std::wstring target, Qt::CaseSensitivity cs = Qt::CaseSensitive);
+    bool removeLeading(const QString target, Qt::CaseSensitivity cs = Qt::CaseSensitive);
     bool removeEnding(const unsigned int charCode);
-    bool removeEnding(const std::wstring target);
-    bool removeEnding(const QString target);
-    bool removeAll(const QString target);
+    bool removeEnding(const std::wstring target, Qt::CaseSensitivity cs = Qt::CaseSensitive);
+    bool removeEnding(const QString target, Qt::CaseSensitivity cs = Qt::CaseSensitive);
+    bool removeAll(const QString target, Qt::CaseSensitivity cs = Qt::CaseSensitive);
     bool removePossessive();
     bool removeRepeatedLastName();
     bool cleanUpEnds();
@@ -104,6 +101,10 @@ public:
     bool removeLeadingNeeEtAl(LANGUAGE language = language_unknown);
     bool removeLeadingAKA();
     bool removeInternalPeriods();
+
+    // Misc
+    bool adjustInsertsCheck(int &insertPeriods);
+    void insertBreaks();
 
 protected:
     int position;

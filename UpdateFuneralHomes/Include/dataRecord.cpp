@@ -759,6 +759,8 @@ void dataRecord::setDOD(const QDate &dod, const bool forceOverride, const bool f
 {
 	bool error = false;
     bool overrideOverride = false;
+    bool memorialObit = false;
+    bool priorError = false;
     PQString errMsg;
 
 	if (dod.isValid())
@@ -767,11 +769,16 @@ void dataRecord::setDOD(const QDate &dod, const bool forceOverride, const bool f
         error = DOD.isValid() && ((DOD != dod) || (dod > globals.today));
         if (error && (DOD != dod))
         {
-            if ((DOD > globals.today) || ((DOD.year() == globals.today.year()) && (dod.year() < globals.today.year()) && (dod.year() >= (globals.today.year() - 25))))
+            memorialObit = (DOD.year() == globals.today.year()) && (dod.year() < globals.today.year()) && (dod.year() >= (globals.today.year() - 25));
+            if ((globals.today.toJulianDay() - DOD.toJulianDay()) < 350)
+                memorialObit = false;
+            priorError = (DOD.year() < (globals.today.year() - 25)) && (dod < globals.today);
+
+            if (dod > globals.today)
                 overrideOverride = true;
         }
 
-        if (!error || (forceOverride && !overrideOverride))
+        if (!error || (forceOverride && !overrideOverride & memorialObit) || priorError)
         {
 			DOD = dod;
             YOD = static_cast<unsigned int>(dod.year());
@@ -782,18 +789,8 @@ void dataRecord::setDOD(const QDate &dod, const bool forceOverride, const bool f
                 setAgeAtDeath(static_cast<int>(elapse(DOB, DOD)));
         }
 
-        if (error && !forceOverride)
-        {
-            if (dod > globals.today)
-                wi.dateFlag = 13;
-            else
-            {
-                if (dod < DOD)
-                    wi.dateFlag = 13;
-                else
-                    wi.dateFlag = 3;
-            }
-        }
+        if (error || priorError)
+            wi.dateFlag = 3;  // Warning only as outcome should be correct in most cases
 	}
     else
     {
@@ -916,6 +913,38 @@ void dataRecord::setTypoDOB(const QDate &dob)
 void dataRecord::setTypoDOD(const QDate &dod)
 {
     typoDOD = dod;
+}
+
+void dataRecord::setMonthYearOfBirth(const unsigned int mob, const unsigned int yob)
+{
+    bool problem = false;
+
+    if (datesLocked || DOB.isValid()){
+        return;}
+
+    if ((YOB > 0) && (yob != YOB))
+        problem = true;
+    else
+    {
+        if ((mob < 1) || (mob > 12))
+            problem = true;
+        else
+        {
+            if ((yob < 1900) || (yob > static_cast<unsigned int>(globals.today.year())))
+                problem = true;
+        }
+    }
+
+    if (!problem)
+    {
+        YOB = yob;
+        QDate lowDate(yob, mob, 1);
+        QDate highDate = lowDate.addMonths(1).addDays(-1);
+        if (lowDate > minDOB)
+            minDOB = lowDate;
+        if (highDate < maxDOB)
+            maxDOB = highDate;
+    }
 }
 
 void dataRecord::setAgeAtDeath(const unsigned int num, const bool fullyCredible, const bool override)
@@ -1180,7 +1209,7 @@ void dataRecord::setAlternates(const NAMEINFO &nameInfo, bool bestOf)
     name = nameInfo.name;
     type = nameInfo.type;
 
-    if ((name.getLength() == 0) || (name == PQString("Retired")) || (name == PQString("Ret'd")) || (name == PQString("Retd")) || (name == PQString("\"\"")) || (name == PQString(",")))
+    if ((name.getLength() == 0) || (name == PQString("Retired")) || (name == PQString("Ret'd")) || (name == PQString("Retd")) || (name == PQString("\"\"")) || (name == PQString(",")) || (name == PQString("St.")))
 		return;
 
     LANGUAGE lang = getLanguage();
@@ -1212,7 +1241,15 @@ void dataRecord::setAlternates(const NAMEINFO &nameInfo, bool bestOf)
                 tempNameB.removeInternalPeriods();
 
                 if (tempNameA.isNeeEtAl())
+                {
                     name = tempNameB;
+                    neeEtAlEncountered = true;
+                    if (gender == Male)
+                    {
+                        gender = Female;
+                        wi.genderFlag = 21;
+                    }
+                }
                 else
                 {
                     if (tempNameA == tempNameB)
@@ -1674,9 +1711,24 @@ void dataRecord::setSingleYear(const unsigned int year)
     singleYear = year;
 }
 
-void dataRecord::setPotentialFirstName(const QString name)
+/*void dataRecord::setPotentialFirstName(const QString name)
 {
     potentialGivenName = name;
+}*/
+
+void dataRecord::setUsedFirstNameFromStructured(const QString name)
+{
+    usedFirstNameFromStructured = name;
+}
+
+void dataRecord::setUsedFirstNameFromUnstructured(const QString name)
+{
+    usedFirstNameFromUnstructured = name;
+}
+
+void dataRecord::setFirstGivenNameUsedInSentence(const QString name)
+{
+    firstGivenNameUsedInSentence = name;
 }
 
 void dataRecord::setSpouseName(const QString name)
@@ -2140,9 +2192,24 @@ unsigned int dataRecord::getSingleYear() const
     return singleYear;
 }
 
-QString dataRecord::getPotentialFirstName() const
+/*QString dataRecord::getPotentialFirstName() const
 {
     return potentialGivenName;
+}*/
+
+QString dataRecord::getUsedFirstNameFromStructured() const
+{
+    return usedFirstNameFromStructured;
+}
+
+QString dataRecord::getUsedFirstNameFromUnstructured() const
+{
+    return usedFirstNameFromUnstructured;
+}
+
+QString dataRecord::getFirstGivenNameUsedInSentence() const
+{
+    return firstGivenNameUsedInSentence;
 }
 
 QString dataRecord::getSpouseName() const
@@ -2232,11 +2299,13 @@ void dataRecord::xport(QString filename, int extraOptParam)
             outputStream << "1" << comma;
         else
             outputStream << "0" << comma;
-        outputStream << wi.memorialFlag << comma;
+        //outputStream << wi.memorialFlag << comma;
+        outputStream << wi.futureUse << comma;
         outputStream << wi.validated << comma ;
         outputStream << wi.confirmTreatmentName << comma;
         outputStream << postalCodeInfo.getPostalCode() << comma << priorUnmatched << comma << previouslyLoaded << comma;
-        outputStream << extraOptParam << comma;
+        //outputStream << extraOptParam << comma;
+        outputStream << firstGivenNameUsedInSentence << comma;
         outputStream << Qt::endl;
 
         globals.output->close();
@@ -2909,7 +2978,9 @@ void dataRecord::clear()
  ageNextReference = false;
  maleHyphenated = false;
  singleYear = 0;
- potentialGivenName.clear();
+ usedFirstNameFromUnstructured.clear();
+ usedFirstNameFromStructured.clear();
+ firstGivenNameUsedInSentence.clear();
  spouseName.clear();
  wi.clear();
  postalCodeInfo.clear();

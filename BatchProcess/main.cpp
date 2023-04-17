@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QTimer>
 #include <QLibrary>
+#include <iostream>
 
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 #include "Include/dataMiningBP.h"
@@ -60,6 +61,18 @@ int main(int argc, char *argv[])
 
         delete outputStream;
         file->close();
+
+        globals.forceYearFlag = true;
+    }
+    else
+    {
+        int choice;
+        std::cout << "Do you want to suppress forced year on partial dates for historical runs?  (1 = Yes) " ;
+        std::cin >> choice;
+        if (choice == 1)
+            globals.forceYearFlag = false;
+        else
+            globals.forceYearFlag = true;
     }
 
     /****************************************************/

@@ -102,6 +102,7 @@ public:
 	bool isAlpha() const;
 	bool isNumeric() const;
 	bool isAlphaNumeric() const;
+    bool isDeemedSpace() const;
 	bool isCapitalized() const;
     bool isAllCaps(bool mustAllBeAlpha = true) const;
     bool isHyphenated() const;
@@ -120,20 +121,21 @@ public:
     void removeSpecialChar();     // Remove escape character (\), ampersand (&) and double quote (") since they will interfere with streams
     void removeQuotes();          // Removes all instances of double quotes - QChar(34)
     bool removeHyphens();
-    void removeBlankSentences();  // Replaces all ". ." with "."
+    void removeBlankSentences(bool firstPass = true);  // Replaces all ". ." with "."
     void convertToQStringList(QStringList &nameList);
     QString unQuoteHTML();
     bool hasBookEnds(const unsigned int bookends);
     bool removeBookEnds(unsigned int bookends = PARENTHESES | QUOTES, bool runRecursive = false);
     bool removeLeading(const unsigned int charCode);
-    bool removeLeading(const std::wstring target);
-    bool removeLeading(const QString target);
+    bool removeLeading(const std::wstring target, const Qt::CaseSensitivity cs = Qt::CaseSensitive);
+    bool removeLeading(const QString target, const Qt::CaseSensitivity cs = Qt::CaseSensitive);
     bool removeEnding(const unsigned int charCode);
-	bool removeEnding(const std::wstring target);
-    bool removeEnding(const QString target);
-    bool removeAll(const QString target);
+    bool removeEnding(const std::wstring target, const Qt::CaseSensitivity cs = Qt::CaseSensitive);
+    bool removeEnding(const QString target, const Qt::CaseSensitivity cs = Qt::CaseSensitive);
+    bool removeAll(const QString target, const Qt::CaseSensitivity cs = Qt::CaseSensitive);
     bool removeLineFormatting();
     bool removePossessive();
+    bool removeCelebrations();
     bool cleanUpEnds();
 
     unsigned int countWords(unsigned int delimiter = SPACE, unsigned int WORDTYPE = ALPHA) const;

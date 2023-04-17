@@ -70,6 +70,7 @@ public:
     void setDOBandDOD(const DATES &dates, const bool forceOverride = false);
     void setTypoDOB(const QDate &dob);
     void setTypoDOD(const QDate &dod);
+    void setMonthYearOfBirth(const unsigned int mob, const unsigned int yob);
     void setLanguage(const LANGUAGE lang);
     void setAlternates(const QList<NAMEINFO> &nameInfoList, bool bestOf = false);
     void setAlternates(const NAMEINFO &nameInfo, bool bestOf = false);
@@ -88,7 +89,9 @@ public:
     void setAgeNextReference(const bool flag);
     void setMaleHypentated(const bool flag);
     void setSingleYear(const unsigned int year);
-    void setPotentialFirstName(const QString name);
+    void setUsedFirstNameFromStructured(const QString name);
+    void setUsedFirstNameFromUnstructured(const QString name);
+    void setFirstGivenNameUsedInSentence(const QString name);
     void setSpouseName(const QString name);
     void storeContent(PQString *content, unsigned int fieldType);
     void setDOS(const QDate &date);
@@ -177,7 +180,9 @@ public:
     bool getAgeNextReference() const;
     bool getMaleHyphenated() const;
     unsigned int getSingleYear() const;
-    QString getPotentialFirstName() const;
+    QString getUsedFirstNameFromStructured() const;
+    QString getUsedFirstNameFromUnstructured() const;
+    QString getFirstGivenNameUsedInSentence() const;
     QString getSpouseName() const;
     POSTALCODE_INFO getPostalCodeInfo() const;
     bool getDatesLocked() const;
@@ -271,7 +276,7 @@ private:
     unsigned int cycle;             // Only used to update existing records
     unsigned int numUnmatched;      // Only used to export zeros as final column
     unsigned int priorUnmatched;    // Only used for reconciliation checking
-    unsigned int previouslyLoaded;  // 0 =  no, 1 = Yes, 999 = Skip
+    unsigned int previouslyLoaded;  // 0 =  no, 1 = Yes, 900 = Load junk, 999 = Skip
 
     PQString title;
     PQString titleKey;
@@ -280,7 +285,9 @@ private:
     bool ageNextReference;
     bool maleHyphenated;
     unsigned int singleYear;
-    QString potentialGivenName;
+    QString usedFirstNameFromStructured;
+    QString usedFirstNameFromUnstructured;
+    QString firstGivenNameUsedInSentence;
     QString spouseName;
     POSTALCODE_INFO postalCodeInfo;
 };

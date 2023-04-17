@@ -104,9 +104,9 @@ void WARNINGINFO::clear()
 void WARNINGINFO::resetNonDateValidations()
 {
     genderFlag = 0;
-    nameReversalFlag = 0;
+    //nameReversalFlag = 0;
     nameFlagGeneral = 0;
-    doubleMemorialFlag = 0;
+    //doubleMemorialFlag = 0;
     bilingualFlag = 0;
     futureUse = 0;
     outstandingErrMsg = 0;
@@ -119,7 +119,7 @@ void WARNINGINFO::resetNonDateValidations()
     checkParentsName.clear();
     checkInclName.clear();
     checkExclName.clear();
-    confirmTreatmentName.clear();
+    //confirmTreatmentName.clear();
     confirmMiddleName.clear();
 }
 

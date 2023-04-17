@@ -56,6 +56,7 @@ public:
     int totalDownloads;
     bool noMajorIssues;
     bool batchRunFlag;
+    bool forceYearFlag;
     QString batchRunFileName;
 
     QSqlDatabase *db;
@@ -85,6 +86,7 @@ public:
     readObit *globalObit;
     unstructuredContent *uc;
     unstructuredContent *justInitialNamesUC;
+    unstructuredContent *structuredNamesProcessed;
     QStringList websiteLocationWords;
 
     QList<DEFDERRORMESSAGES> defdErrorMessages;

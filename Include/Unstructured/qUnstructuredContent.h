@@ -46,11 +46,14 @@ public:
     DATES contentReadBornYear(LANGUAGE lang);
     unsigned int sentenceReadAgeAtDeath(bool updateDirectly = true, bool preRead = false);
     unsigned int sentenceReadNakedAgeAtDeath(bool updateDirectly = true);
+    unsigned int sentenceReadAgeNextBirthday();
+    unsigned int sentenceReadUnbalancedYOB();
     unsigned int contentReadAgeAtDeath(unsigned int maxSentences);
     unsigned int contentReadAgeAtDeath(QList<QString> firstName);
+    unsigned int contentReadAgeNextBirthday(unsigned int maxSentences);
     void readAgeAtDeathPostNumChecks(bool &numFound, bool &contextError, bool eventCheck, int &num, int &altNum, OQString peek1, OQString peek2, OQString peek3, LANGUAGE lang);
-    void  readDateOfService(QDate &DOSD, LANGUAGE lang);
-    void  sentenceReadDateOfService(QDate &DOSD, LANGUAGE lang);
+    void readDateOfService(QDate &DOSD, LANGUAGE lang);
+    void sentenceReadDateOfService(QDate &DOSD, LANGUAGE lang);
     void contentReadSpouseName(LANGUAGE lang = language_unknown);
     bool sentenceReadSpouseName(LANGUAGE lang);
     bool sentenceReadYearsMarried(LANGUAGE lang);
@@ -60,9 +63,12 @@ public:
     bool truncateAfterSiblingReference(LANGUAGE lang = language_unknown, bool firstSentence = false);
     bool truncateAfterRelativeReference(LANGUAGE lang = language_unknown, bool firstSentence = false);
     bool truncateAfterRelationshipWords(LANGUAGE lang = language_unknown, bool firstSentence = false);
+    bool truncateAfterMiscWords(LANGUAGE lang = language_unknown, bool firstSentence = false);
+    bool truncateAfter(QList<QString> targetPhrases, bool firstSentence = false);
     bool truncateAfter(QString cutOffText, Qt::CaseSensitivity cs = Qt::CaseSensitive);
     bool removeBornToFiller(LANGUAGE lang = language_unknown);
     bool removeSpouseForFiller(LANGUAGE lang = language_unknown);
+    bool removeAtTheHospitalFiller(LANGUAGE lang = language_unknown);
     bool removeDates(LANGUAGE lang = language_unknown);
     bool removeYears();
     bool removeTrailingLocation();
@@ -70,9 +76,15 @@ public:
     bool extractLocationIfFirst(GLOBALVARS &gv);
     bool stripOutAndProcessDates();
     void removeCelebration();
+    void removeLeadingJunk();
 
     void enhanceWith(unstructuredContent uc);
     void splitComponents(QString &datesRemoved, QString &justDates);
+
+    void compressCompoundNames(QString &string, LANGUAGE lang = language_unknown);
+    void compressCompoundNames(OQString &string, LANGUAGE lang = language_unknown);
+    void compressCompoundNames(OQStream &string, LANGUAGE lang = language_unknown);
+    void compressCompoundNames(unstructuredContent &string, LANGUAGE lang = language_unknown);
 
     QDate readDateField(DATEORDER dateOrder = doNULL);
     PQString processAllNames();
@@ -81,21 +93,19 @@ public:
     bool isJustDates();
     bool isJustNames(bool justSavedNames = false);
     bool isJustSavedNames();
-    void splitIntoBlocks(CONTENTREAD &cr);
-    void splitIntoBlocks(CONTENTREAD &cr, QList<QString> &firstWordList); // No longer in use
     void splitIntoSentences();
     void splitIntoSentences(QList<QString> &firstWordList, QStringList &stopWords);
     void addSentence(OQString &newSentence);
     OQStream getSentence(const LANGUAGE &language = language_unknown, const int sentenceNum = 0);                                                                                               // Overrides OQStream class method
     OQStream getSentence(bool &realSentenceEncountered, const QStringList &stopWords, const LANGUAGE &lang = language_unknown, const int sentenceNum = 0);                                      // Overrides OQStream class method
     OQStream getSentence(const QList<QString> &firstNames, bool &realSentenceEncountered, const QStringList &stopWords, const LANGUAGE &lang = language_unknown, const int sentenceNum = 0);    // Overrides OQStream class method
+    OQStream getNextRealSentence(bool restrictNamesToDR = false, unsigned int minWordCount = 6);
     void prepareNamesToBeRead(bool removeRecognized = true);
     void pickOffNames();
     void checkForDates();
     void fixHyphenatedNames();
     void fixOneLargeQuoteBlock();
-    //void runStdProcessing(CONTENTREAD &bc, QList<QString> &firstWordList);
-    void processStructuredNames(QList<NAMESTATS> &nameStatsList, bool fixHyphens = true);
+    void prepareStructuredNames();
     void processStructuredYears();
     void processDateField(DATEFIELD dateField, DATEORDER dateOrder = doNULL);
     void processYearField(DATEFIELD dateField);
@@ -108,12 +118,14 @@ public:
     void insertRequiredComma();
     void readFirstNameFirst(QList<NAMESTATS> &nameStatsList);
     void readLastNameFirst(QList<NAMESTATS> &nameStatsList);
-    void validateNameOrder(bool initialCheck = true);
+    bool validateNameOrder(bool initialCheck = true);
     bool validateNameOrder(QList<NAMESTATS> &nameStatsList, bool initialCheck = true);
+    void validateNameOrder2();
     void extraNameProcessing();
 
     bool lookupUncapitalizedNames(OQString name);
     bool listContainsLocationWords(QList<QString> &list);
+    bool areAllLocationWords();
     void parseDateFromAndTo(const OQString &word, MAKEDATE &md, DATEORDER dateOrder = doNULL);
 
     DATES sentencePullOutDates(const LANGUAGE lang, const unsigned int maxSentences);
