@@ -8,15 +8,17 @@
 #include <QSqlError>
 #include <QMapIterator>
 #include <QDebug>
-#include "../UpdateFuneralHomes/Include/globalVars.h"
+//#include "../UpdateFuneralHomes/Include/globalVars.h"
 
 bool createConnection();
 bool createConnection(QString user);
 bool createConnection(QString user, QString pswd);
 QString getLastExecutedQuery(const QSqlQuery& query);
 
-bool createTestConnection(QSqlDatabase &db, GLOBALVARS &globals);
-bool createDemoConnection(QSqlDatabase &db);
+bool createEnterpriseConnection(QString user);
+
+//bool createTestConnection(QSqlDatabase &db, GLOBALVARS &globals);
+//bool createDemoConnection(QSqlDatabase &db);
 
 #endif // PMYSQL_H
 

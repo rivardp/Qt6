@@ -90,7 +90,7 @@ void MINER::mineData()
 
     // Start with actual funeral homes
     //success = query.prepare("SELECT providerID, providerKey, fhURLforUpdate FROM funeralhomedata WHERE providerID = 1008 and providerKey = 67" );
-    success = query.prepare("SELECT providerID, providerKey, fhURLforUpdate FROM funeralhomedata WHERE fhRunStatus = 1 or fhRunStatus = 100" );
+    success = query.prepare("SELECT providerID, providerKey, fhURLforUpdate FROM funeralhomedata WHERE (fhRunStatus = 1 OR fhRunStatus = 100) AND fhLastChecked IS NULL" );
     query.bindValue(":fhRunStatus", QVariant(argValue));
     success = query.exec();
 

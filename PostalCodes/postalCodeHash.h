@@ -12,7 +12,7 @@ inline bool operator==(const POSTALCODE_INFO &pc1, const POSTALCODE_INFO &pc2)
 
 inline uint qHash(const POSTALCODE_INFO &key, uint seed)
 {
-    return qHash(key.getPostalCode(), seed);
+    return static_cast<unsigned int>(qHash(key.getPostalCode(), seed));
 }
 
 static const QHash<QString, POSTALCODE_INFO> pcHash {

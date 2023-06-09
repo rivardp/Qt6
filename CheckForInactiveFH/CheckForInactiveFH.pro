@@ -30,7 +30,6 @@ HEADERS += \
     ../Include/PMySQL/pMySQL.h \
     ../Include/Penser/QtUtilities.h \
     ../PostalCodes/postalCodeInfo.h \
-    ../PostalCodes/postalcodes.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
     Include/dataMiningCFIFH.h \
     ../Include/Unstructured/qUnstructuredContent.h \
@@ -57,7 +56,6 @@ SOURCES += main.cpp \
     ../Include/PMySQL/pMySQL.cpp \
     ../Include/Penser/QtUtilities.cpp \
     ../PostalCodes/postalCodeInfo.cpp \
-    ../PostalCodes/postalcodes.cpp \
     Include/globalVarsUD.cpp \
     Include/dataMiningCFIFH.cpp \
     ../Include/Unstructured/qUnstructuredContent.cpp \

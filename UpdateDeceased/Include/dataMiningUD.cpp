@@ -1179,8 +1179,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         {
             // This is old approach applicable to 99% of sites
             // https://ogden.funeraltechweb.com/tribute/current-services/index.html?page=0
-            daysOfOverlap = 61;
-            flowParameters.initialSetup = false;
+            daysOfOverlap = 161;
+            flowParameters.initialSetup = true;
             flowParameters.flowType = startToEnd;
             flowParameters.indexOffset = 1;
             flowParameters.flowIncrement = 1;
@@ -2232,10 +2232,11 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         // https://voyagefuneralhomes.com/wp-admin/admin-ajax.php
         // pid=5314+elementor&wid=3fab224&cpid=&page_num=2&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=075f69e0a3
+        // pid=5314+elementor&wid=3fab224&cpid=&page_num=2&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=b8f349b4ab
 
         URLbase = baseURL;
         URLaddressTemplate  = URLbase + PQString("/wp-admin/admin-ajax.php?pid=5314+elementor&wid=3fab224&cpid=&page_num=") + paramPlaceholder;
-        URLaddressTemplate += PQString("&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=075f69e0a3");
+        URLaddressTemplate += PQString("&curr_url=https%253A%252F%252Fvoyagefuneralhomes.com%252Fcategory%252Fobituaries%252F&action=ae_post_data&fetch_mode=paged&nonce=b8f349b4ab");
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -4260,33 +4261,32 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         flowParameters.flowIncrement = 100;
         QByteArray payload;
 
-        URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/Service/InventoryService.asmx/GetProductsByFacets?fr-CAc00cfbe6-2a56-4d03-bdab-d7e0746b1968");
+        URLbase = baseURL; //
+        URLaddressTemplate  = URLbase + PQString("/Service/InventoryService.asmx/GetProductsByFacets?_Facets&Search=&OrderBy_PropertyName0&IdentifierGuid=17d538cf-a248-d961-d652-4a1db6d995a4&IsDescOrdertrue&Index10&Count10fr-CAc00cfbe6-2a56-4d03-bdab-d7e0746b1968");
 
-        payload  = QString("{\"args\":{\"FacetsConfiguration\":{\"Facets\":[{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,").toUtf8();
-        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,").toUtf8();
-        payload += QString("\"DropDownWaterMark\":\"Tous les complexes\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,").toUtf8();
-        payload += QString("\"OrderedCustomFieldValueGuids\":[\"c6fcf35d-54f6-2ca5-842e-fa5e97afad11\",\"39a7b55c-2463-1b60-90d0-77651b90cd99\",\"d4e34184-98cb-1384-0e90-9ce36ff8bba0\",\"fa1dff5e-16c0-24f1-646f-f61d9be797f6\"],").toUtf8();
-        payload += QString("\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,").toUtf8();
-        payload += QString("\"IdentifierGuid\":\"3a04e611-8d55-a133-2737-a71c3a3b83dc\"},{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,").toUtf8();
-        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,").toUtf8();
-        payload += QString("\"DropDownWaterMark\":\"Année\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,").toUtf8();
-        payload += QString("\"OrderedCustomFieldValueGuids\":[\"31437352-d792-eacd-9912-924856406ec0\",\"f0a83c9b-729a-09c5-4d16-030d62440de6\",\"c2f91fdf-e176-2d78-9797-7964aaac7f4d\",\"c7cf8744-ee30-9dd6-977b-e44663c09b4d\",").toUtf8();
-        payload += QString("\"e48746bb-c539-67f3-52ac-aa81a02c09d0\",\"4371e341-7e7b-395f-c39e-51ac55b981f6\",\"3349231f-9f6e-9eed-43b2-ee35eb6504ee\",\"0deb842b-ca78-5c83-3769-34e4df052660\",\"30f1f192-3850-2d31-45d1-4feebf975635\"],").toUtf8();
-        payload += QString("\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,").toUtf8();
-        payload += QString("\"IdentifierGuid\":\"fa298514-fc42-ea42-8789-637d27dc7497\"},{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,").toUtf8();
-        payload += QString("\"IsResetSelection\":false,\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,").toUtf8();
-        payload += QString("\"DropDownWaterMark\":\"Mois\",\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,").toUtf8();
-        payload += QString("\"OrderedCustomFieldValueGuids\":[\"fb511438-8d6b-f213-b5b2-9145e11bdebb\",\"ac45173c-0771-c015-0422-a1e80749f19e\",\"fb2c0d9f-5524-268c-8e3f-ce0998512ad3\",\"03dc9ae0-ec02-f1b4-5d8e-8d8f2a4ef15d\",").toUtf8();
-        payload += QString("\"d32918e4-651a-95c5-4582-473163c97638\",\"fabab403-8642-9635-8ddb-2dc112a72439\",\"cdc91ac9-3173-0171-0d40-fe7d51b6e3ed\",\"3ebc7d1a-1a52-781a-af8f-bee95eb68a4b\",\"8dc1c5bd-29b6-d751-8488-01d0d585415b\",").toUtf8();
-        payload += QString("\"a36e3575-53fd-ccb7-7470-812b3e9cf61d\",\"9daf4406-01f8-aa92-ab7f-56807c956728\",\"e3b6dddc-d45f-7253-1896-4700983ac8ca\"],\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,").toUtf8();
-        payload += QString("\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,\"IdentifierGuid\":\"0929ca2f-f855-3d41-77f4-754975621ace\"}],").toUtf8();
-        payload += QString("\"Tags\":[\"2a61180d-37c8-2cf9-4505-4f4596ae6de2\"],\"CatalogGuid\":\"00000000-0000-0000-0000-000000000000\",\"RedirectionZoneHierarchyId\":0,\"GroupByFamily\":false,\"GroupingCustomFieldGuids\":[],").toUtf8();
-        payload += QString("\"GetOnlyProductsWithUrl\":false,\"IsRedirectOnSelect\":true,\"HasGroupedQueryZone\":false,\"DateFilter\":0},\"CustomFieldGuids\":[\"92e07d8c-a292-4f21-1c9d-215bec4dbcb8\",\"d967506e-7ba5-26e4-6c40-1dd6b2c466b3\",").toUtf8();
-        payload += QString("\"4414d72d-0b7a-a13e-d92a-166cec1040b5\",\"17d538cf-a248-d961-d652-4a1db6d995a4\",\"407b7048-899b-2a2e-e230-7ae2d781f3f9\",\"e165c184-157a-1bae-454b-208ff2d84047\",\"e1e5eebc-a3dc-9c0f-845f-6dadc41c353e\",").toUtf8();
-        payload += QString("\"f2fec77b-53a8-484f-1526-0b7638c241a8\",\"a291054d-d746-7fcd-9d5f-99b7ea74304b\"],\"CultureId\":\"fr-CA\",\"CurrencyId\":1,\"CurrencyIsoCode\":\"CAD\",\"Facets\":[],\"Search\":\"\",\"OrderBy\":{\"PropertyName\":0,").toUtf8();
-        payload += QString("\"IdentifierGuid\":\"17d538cf-a248-d961-d652-4a1db6d995a4\"},\"IsDescOrder\":true,\"Index\":100,\"Count\":100}}").toUtf8();
-        //payload += QString("\"IdentifierGuid\":\"17d538cf-a248-d961-d652-4a1db6d995a4\"},\"IsDescOrder\":true,\"Index\":").toUtf8() + paramPlaceholder + PQString(",\"Count\":100}}").toUtf8();
+        payload  = QString("{\"args\":{\"FacetsConfiguration\":{\"Facets\":[{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,\"IsResetSelection\":false,").toUtf8();
+        payload += QString("\"IsRequired\":false,\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,\"DropDownWaterMark\":\"Tous les complexes\",").toUtf8();
+        payload += QString("\"DropDownWaterMarkResourceKey\":null,\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,\"OrderedCustomFieldValueGuids\":[\"c6fcf35d-54f6-2ca5-842e-fa5e97afad11\",").toUtf8();
+        payload += QString("\"39a7b55c-2463-1b60-90d0-77651b90cd99\",\"d4e34184-98cb-1384-0e90-9ce36ff8bba0\",\"fa1dff5e-16c0-24f1-646f-f61d9be797f6\"],\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,").toUtf8();
+        payload += QString("\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,\"IdentifierGuid\":\"3a04e611-8d55-a133-2737-a71c3a3b83dc\"},").toUtf8();
+        payload += QString("{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,\"IsResetSelection\":false,\"IsRequired\":false,").toUtf8();
+        payload += QString("\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,\"DropDownWaterMark\":\"Année\",\"DropDownWaterMarkResourceKey\":null,").toUtf8();
+        payload += QString("\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,\"OrderedCustomFieldValueGuids\":[\"31437352-d792-eacd-9912-924856406ec0\",\"f0a83c9b-729a-09c5-4d16-030d62440de6\",").toUtf8();
+        payload += QString("\"c2f91fdf-e176-2d78-9797-7964aaac7f4d\",\"c7cf8744-ee30-9dd6-977b-e44663c09b4d\",\"e48746bb-c539-67f3-52ac-aa81a02c09d0\",\"4371e341-7e7b-395f-c39e-51ac55b981f6\",\"3349231f-9f6e-9eed-43b2-ee35eb6504ee\",").toUtf8();
+        payload += QString("\"0deb842b-ca78-5c83-3769-34e4df052660\",\"30f1f192-3850-2d31-45d1-4feebf975635\",\"a7e36124-210e-aafe-1091-2118116ac8f3\"],\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,").toUtf8();
+        payload += QString("\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,\"IdentifierGuid\":\"fa298514-fc42-ea42-8789-637d27dc7497\"},").toUtf8();
+        payload += QString("{\"IdentifierGuidType\":3,\"IsExpandableSection\":false,\"IsExpandedByDefault\":true,\"IsMultipleSelection\":false,\"IsMutuallyExclusive\":true,\"IsResetSelection\":false,\"IsRequired\":false,").toUtf8();
+        payload += QString("\"IsCheckBoxSelection\":false,\"IsProportionalSize\":false,\"ShowResultCount\":false,\"IsDropDown\":true,\"Width\":0,\"Height\":0,\"ValueFormat\":null,\"DropDownWaterMark\":\"Mois\",\"DropDownWaterMarkResourceKey\":null,").toUtf8();
+        payload += QString("\"IsVerticalAlignement\":true,\"HideIfNoResult\":false,\"CustomText\":null,\"CustomTextResourceKey\":null,\"OrderedCustomFieldValueGuids\":[\"fb511438-8d6b-f213-b5b2-9145e11bdebb\",").toUtf8();
+        payload += QString("\"ac45173c-0771-c015-0422-a1e80749f19e\",\"fb2c0d9f-5524-268c-8e3f-ce0998512ad3\",\"03dc9ae0-ec02-f1b4-5d8e-8d8f2a4ef15d\",\"d32918e4-651a-95c5-4582-473163c97638\",\"fabab403-8642-9635-8ddb-2dc112a72439\",").toUtf8();
+        payload += QString("\"cdc91ac9-3173-0171-0d40-fe7d51b6e3ed\",\"3ebc7d1a-1a52-781a-af8f-bee95eb68a4b\",\"8dc1c5bd-29b6-d751-8488-01d0d585415b\",\"a36e3575-53fd-ccb7-7470-812b3e9cf61d\",\"9daf4406-01f8-aa92-ab7f-56807c956728\",").toUtf8();
+        payload += QString("\"e3b6dddc-d45f-7253-1896-4700983ac8ca\"],\"Range\":null,\"IsDescOrder\":false,\"IsSortOrder\":false,\"ParentTagGuid\":\"00000000-0000-0000-0000-000000000000\",").toUtf8();
+        payload += QString("\"ClassificationGuid\":\"00000000-0000-0000-0000-000000000000\",\"PropertyName\":0,\"IdentifierGuid\":\"0929ca2f-f855-3d41-77f4-754975621ace\"}],\"Tags\":[\"2a61180d-37c8-2cf9-4505-4f4596ae6de2\"],").toUtf8();
+        payload += QString("\"CatalogGuid\":\"00000000-0000-0000-0000-000000000000\",\"RedirectionZoneHierarchyId\":0,\"GroupByFamily\":false,\"GroupingCustomFieldGuids\":[],\"GetOnlyProductsWithUrl\":false,\"IsRedirectOnSelect\":true,").toUtf8();
+        payload += QString("\"HasGroupedQueryZone\":false,\"DateFilter\":0},\"CustomFieldGuids\":[\"92e07d8c-a292-4f21-1c9d-215bec4dbcb8\",\"d967506e-7ba5-26e4-6c40-1dd6b2c466b3\",\"4414d72d-0b7a-a13e-d92a-166cec1040b5\",").toUtf8();
+        payload += QString("\"17d538cf-a248-d961-d652-4a1db6d995a4\",\"407b7048-899b-2a2e-e230-7ae2d781f3f9\",\"e165c184-157a-1bae-454b-208ff2d84047\",\"e1e5eebc-a3dc-9c0f-845f-6dadc41c353e\",").toUtf8();
+        payload += QString("\"f2fec77b-53a8-484f-1526-0b7638c241a8\",\"a291054d-d746-7fcd-9d5f-99b7ea74304b\"],\"CultureId\":\"fr-CA\",\"CurrencyId\":1,\"CurrencyIsoCode\":\"CAD\",\"Facets\":[],\"Search\":\"\",").toUtf8();
+        payload += QString("\"OrderBy\":{\"PropertyName\":0,\"IdentifierGuid\":\"17d538cf-a248-d961-d652-4a1db6d995a4\"},\"IsDescOrder\":true,\"Index\":0,\"Count\":100}}").toUtf8();
 
         URLparams.numParams = 0;
 
@@ -4550,10 +4550,11 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         daysOfOverlap = 61;
         flowParameters.initialSetup = false;
         flowParameters.flowType = startToEnd;
-        flowParameters.flowIncrement = 30;
+        flowParameters.flowIncrement = 20;
 
         URLbase = baseURL;
-        URLaddressTemplate  = URLbase + PQString("/index.php/en/obituaries?start=") + paramPlaceholder;
+        URLaddressTemplate  = URLbase + PQString("/en/obituaries.html?option=com_ajax&module=minifrontpagepro&format=raw&start=") + paramPlaceholder + PQString("&Itemid=432&module_title=AVIS%20FULL");
+        //URLaddressTemplate  = URLbase + PQString("/index.php/en/obituaries?start=") + paramPlaceholder;
 
         URLparams.numParams = 1;
         URLparams.param1Type = ptUint;
@@ -4561,7 +4562,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
         flowParameters.currentPosition = 0;
         if (flowParameters.initialSetup == true)
-            flowParameters.endingPosition = 180;
+            flowParameters.endingPosition = 60;
         else
             flowParameters.endingPosition = 0;
 
@@ -5668,8 +5669,9 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         case 1:
             //https://manage.tukioswebsites.com/obitapi/ajax_obits/305/obit_page_obits/standard?sq=&page=4&screen=&filter=
             //https://manage.tukioswebsites.com/obitapi/ajax_obits/553/obit_page_obits/modern?sq=&page=2&screen=&filter=
+            // https://manage2.tukioswebsites.com305&page=2&per_page=10
             URLbase = baseURL;
-            URLaddressTemplate  = URLbase + PQString("/obitapi/ajax_obits/") + fhParam1 + PQString("/obit_page_obits/") + fhParam2 + PQString("?sq=&page=") + paramPlaceholder + PQString("&screen=&filter=");
+            URLaddressTemplate  = URLbase + PQString("/api/legacy/obituaries?fhid=") + fhParam1 + PQString("&page=") + paramPlaceholder + PQString("&per_page=10");
 
             URLparams.numParams = 1;
             URLparams.param1Type = ptUint;
@@ -5677,7 +5679,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             flowParameters.currentPosition = 1;
             if (flowParameters.initialSetup == true)
-                flowParameters.endingPosition = 3;
+                flowParameters.endingPosition = 4;
             else
                 flowParameters.endingPosition = 2;
 
@@ -5709,30 +5711,29 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             else
                 flowParameters.endingPosition = 2;
 
-            // Unique situation where a very specific preflight OPTION request is required
-            preflightRequest.instructions.verb = QString("OPTIONS");
-            preflightRequest.instructions.Accept = QString("ALL");
-            preflightRequest.instructions.Access_Control_Request_Method = QString("GET");
-            preflightRequest.instructions.Access_Control_Request_Headers = QString("authorization");
-            preflightRequest.instructions.Origin = baseURL.getString();
-            preflightRequest.instructions.User_Agent = QString("STD");
-            preflightRequest.instructions.Sec_Fetch_Mode = QString("cors");
-            preflightRequest.instructions.Sec_Fetch_Site = QString("cross-site");
-            preflightRequest.instructions.Sec_Fetch_Dest = QString("empty");
-            preflightRequest.instructions.Referer = baseURL.getString() + QString("/");
-            preflightRequest.instructions.Accept_Encoding = QString("br");
-            preflightRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
-
-            // Preflight Request
-            downloadRequest.instructions.Authorization = QString("Bearer k9PMgGzdKda2PGocioyUBzAtVwFj7FsKZlpxORi6");
-            createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
-            preflightRequest.instructions.url = downloadRequest.instructions.url;
-            www->download(preflightRequest);
-            while(www->processingDownload()){};
-
             break;
-
         }
+
+        // Unique situation where a very specific preflight OPTION request is required
+        preflightRequest.instructions.verb = QString("OPTIONS");
+        preflightRequest.instructions.Accept = QString("ALL");
+        preflightRequest.instructions.Access_Control_Request_Method = QString("GET");
+        preflightRequest.instructions.Access_Control_Request_Headers = QString("authorization");
+        preflightRequest.instructions.Origin = baseURL.getString();
+        preflightRequest.instructions.User_Agent = QString("STD");
+        preflightRequest.instructions.Sec_Fetch_Mode = QString("cors");
+        preflightRequest.instructions.Sec_Fetch_Site = QString("cross-site");
+        preflightRequest.instructions.Sec_Fetch_Dest = QString("empty");
+        preflightRequest.instructions.Referer = baseURL.getString() + QString("/");
+        preflightRequest.instructions.Accept_Encoding = QString("br");
+        preflightRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
+
+        // Preflight Request
+        downloadRequest.instructions.Authorization = QString("Bearer k9PMgGzdKda2PGocioyUBzAtVwFj7FsKZlpxORi6");
+        createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
+        preflightRequest.instructions.url = downloadRequest.instructions.url;
+        www->download(preflightRequest);
+        while(www->processingDownload()){};
 
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
@@ -6416,10 +6417,16 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         }
 
         URLaddressTemplate  = baseURL + PQString("/wp-admin/admin-ajax.php?");
-        URLaddressTemplate += PQString("action=vc_get_vc_grid_data&vc_action=vc_get_vc_grid_data&tag=vc_basic_grid&data%5Bvisible_pages%5D=5&data%5Bpage_id%5D=2635&data%5Bstyle%5D=pagination");
+        /*URLaddressTemplate += PQString("action=vc_get_vc_grid_data&vc_action=vc_get_vc_grid_data&tag=vc_basic_grid&data%5Bvisible_pages%5D=5&data%5Bpage_id%5D=2635&data%5Bstyle%5D=pagination");
         URLaddressTemplate += PQString("&data%5Baction%5D=vc_get_vc_grid_data&data%5Bshortcode_id%5D=1635354215831-df1a1f6e-9836-10&data%5Bitems_per_page%5D=12&data%5Bauto_play%5D=false&data%5Bgap%5D=30");
         URLaddressTemplate += PQString("&data%5Bspeed%5D=-1000&data%5Bloop%5D=&data%5Banimation_in%5D=&data%5Banimation_out%5D=&data%5Barrows_design%5D=vc_arrow-icon-arrow_01_left&data%5Barrows_color%5D=blue");
-        URLaddressTemplate += PQString("&data%5Barrows_position%5D=inside&data%5Bpaging_design%5D=pagination_square&data%5Bpaging_color%5D=black&data%5Btag%5D=vc_basic_grid&vc_post_id=") + param1 + PQString("&_vcnonce=") + param2;
+        URLaddressTemplate += PQString("&data%5Barrows_position%5D=inside&data%5Bpaging_design%5D=pagination_square&data%5Bpaging_color%5D=black&data%5Btag%5D=vc_basic_grid&vc_post_id=") + param1 + PQString("&_vcnonce=") + param2;*/
+
+        // 2635&_vcnonce=f3693976c6
+        URLaddressTemplate += PQString("action=vc_get_vc_grid_data&vc_action=vc_get_vc_grid_data&tag=vc_basic_grid&data%5Bvisible_pages%5D=5&data%5Bpage_id%5D=2635&data%5Bstyle%5D=pagination&data%5Baction%5D=vc_get_vc_grid_data");
+        URLaddressTemplate += PQString("&data%5Bshortcode_id%5D=1635354215831-df1a1f6e-9836-10&data%5Bitems_per_page%5D=12&data%5Bauto_play%5D=false&data%5Bgap%5D=30&data%5Bspeed%5D=-1000&data%5Bloop%5D=&data%5Banimation_in%5D=");
+        URLaddressTemplate += PQString("&data%5Banimation_out%5D=&data%5Barrows_design%5D=vc_arrow-icon-arrow_01_left&data%5Barrows_color%5D=blue&data%5Barrows_position%5D=inside&data%5Bpaging_design%5D=pagination_square");
+        URLaddressTemplate += PQString("&data%5Bpaging_color%5D=black&data%5Btag%5D=vc_basic_grid&vc_post_id=") + param1 + PQString("&_vcnonce=") + param2;
 
         URLparams.numParams = 0;
 
@@ -6437,7 +6444,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         downloadRequest.instructions.Sec_Fetch_Mode = QString("cors");
         downloadRequest.instructions.Sec_Fetch_Site = QString("same-origin");
         downloadRequest.instructions.Sec_Fetch_Dest = QString("empty");
-        downloadRequest.instructions.Accept_Encoding = QString("br");
+        //downloadRequest.instructions.Accept_Encoding = QString("br");
         downloadRequest.instructions.Accept_Language = QString("en-US,en;q=0.9");
         downloadRequest.instructions.Referer = URLbase.getString();
     }
@@ -14448,7 +14455,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 1123:  // J27
             {
-                while (sourceFile.consecutiveMovesTo(100, "class=\"article-title\"", "href="))
+                while (sourceFile.consecutiveMovesTo(50, "class=\"mfp_infinity_title\"", "href="))
                 {
                     record.clear();
                     pageVariables.reset();
@@ -15668,50 +15675,26 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
             case 1165:  // Tukio
             {
-                if (providerKey <= 1)
+                // JSON approach
+                QString anotherRecord;
+                dateFormat = QString("MMMM dd, yyyy");
+                sourceFile.beg();
+
+                while (sourceFile.loadValue(QString("id"), anotherRecord, false))
                 {
-                    while (sourceFile.consecutiveMovesTo(50, "class=\"obit-list\"", "href="))
-                    {
-                        record.clear();
-                        pageVariables.reset();
+                    record.clear();
+                    pageVariables.reset();
 
-                        // Read extension for each deceased
-                        pageVariables.webAddress = sourceFile.readNextBetween(QUOTES).replaceIneligibleURLchars();
-                        pageVariables.ID = OQString(pageVariables.webAddress).readURLparameter(fhURLid, fhURLidDivider).getString();
+                    pageVariables.ID = anotherRecord;
+                    sourceFile.loadValue(QString("public_url"), pageVariables.webAddress);
+                    sourceFile.loadValue(QString("formatted_date_of_birth"), pageVariables.currentDOB, dateFormat);
+                    sourceFile.loadValue(QString("formatted_date_of_death"), pageVariables.currentDOD, dateFormat);
+                    sourceFile.loadValue(QString("age"), pageVariables.ageAtDeath);
 
-                        // DOD
-                        if (sourceFile.conditionalMoveTo("class=\"date-location\"", "class=\"obit-list\"", 0))
-                            pageVariables.ucDOD = sourceFile.readNextBetween(BRACKETS);
-
-                        // Process
-                        process(record, pageVariables, lang);
-                        if ((pageVariables.includeRecord) || flowParameters.initialSetup)
-                            records.append(record);
-                    }
-                }
-                else
-                {
-                    // JSON approach
-                    QString anotherRecord;
-                    dateFormat = QString("MMMM dd, yyyy");
-                    sourceFile.beg();
-
-                    while (sourceFile.loadValue(QString("id"), anotherRecord, false))
-                    {
-                        record.clear();
-                        pageVariables.reset();
-
-                        pageVariables.ID = anotherRecord;
-                        sourceFile.loadValue(QString("public_url"), pageVariables.webAddress);
-                        sourceFile.loadValue(QString("formatted_date_of_birth"), pageVariables.currentDOB, dateFormat);
-                        sourceFile.loadValue(QString("formatted_date_of_death"), pageVariables.currentDOD, dateFormat);
-                        sourceFile.loadValue(QString("age"), pageVariables.ageAtDeath);
-
-                        // Process
-                        process(record, pageVariables, lang);
-                        if ((pageVariables.includeRecord) || flowParameters.initialSetup)
-                            records.append(record);
-                    }
+                    // Process
+                    process(record, pageVariables, lang);
+                    if ((pageVariables.includeRecord) || flowParameters.initialSetup)
+                        records.append(record);
                 }
 
                 updateFlowParameters(flowParameters, pageVariables, downloadRequest, URLaddressTemplate, URLparams);
@@ -18005,7 +17988,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
             {
                 sourceFile.moveTo("class=\"obituaries_list\"");
 
-                while (sourceFile.consecutiveMovesTo(25, "<li><span>", "href="))
+                while (sourceFile.consecutiveMovesTo(75, "<li", "<span>", "href="))
                 {
                     record.clear();
                     pageVariables.reset();

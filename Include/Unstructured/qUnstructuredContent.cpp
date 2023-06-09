@@ -4667,6 +4667,8 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
     bool keepWord, isSurname, hyphenatedName, noCommas;
     bool removed = false;
 
+    LANGUAGE lang = globals->globalDr->getLanguage();
+
     // Remove "(Age xx)
     targetI.setPattern(" ?\\(age (\\d+)\\)");
     match = targetI.match(itsString);
@@ -4812,7 +4814,12 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
         if (word.isTitle())
         {
             if (word.isMaleTitle() && (globals->globalDr->getGender() == genderUnknown))
-                globals->globalDr->setGender(Male);
+            {
+                if ((lang == french) && (word.lower() == PQString("sr")))
+                    globals->globalDr->setGender(Female);
+                else
+                    globals->globalDr->setGender(Male);
+            }
 
             if (word.isFemaleTitle() && (globals->globalDr->getGender() == genderUnknown))
                 globals->globalDr->setGender(Female);
@@ -4840,7 +4847,7 @@ void unstructuredContent::prepareNamesToBeRead(bool removeRecognized)
             dbSearch.nameStatLookup(originalWord.getString(), globals, nameStat1);
             dbSearch.nameStatLookup(nextWord.getString(), globals, nameStat2);
 
-            if (nameStat1.isLikelySurname && nameStat2.isLikelyGivenName && !originalWord.isCompoundName(globals->globalDr->getLanguage()))
+            if (nameStat1.isLikelySurname && nameStat2.isLikelyGivenName && !originalWord.isCompoundName(lang))
             {
                 // Rule out other believed uses of first name
                 if (!(originalWord.lower() == globals->globalDr->getUsedFirstNameFromStructured().toLower()) && !(originalWord.lower() == globals->globalDr->getUsedFirstNameFromUnstructured().toLower()))
@@ -7040,6 +7047,9 @@ bool unstructuredContent::validateNameOrder(bool initialCheck)
         }
         secondWord += temp.getString();
     }
+
+    if ((firstWord.length() == 1) && (secondWord.length() > 1))
+        return true;
 
     firstGivenNameUsedInSentence = globals->globalDr->getFirstGivenNameUsedInSentence();
     if ((firstWord == firstGivenNameUsedInSentence.getString()) || firstGivenNameUsedInSentence.isFormalVersionOf(firstWord, errMsg)

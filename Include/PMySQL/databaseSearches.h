@@ -19,6 +19,7 @@
 #include "../Internet/qWebStructures.h"
 #include "../UpdateFuneralHomes/Include/globalVars.h"
 #include "../PostalCodes/postalCodeInfo.h"
+#include "../PayAlertEnterprise/groupConfig.h"
 
 class databaseSearches
 {
@@ -53,6 +54,8 @@ public:
     dataRecord readMonitoredRecord(unsigned int deceasedID, QString lastName, GLOBALVARS *gv) const;
     QList<QString> getURLlist(unsigned int deceasedID, GLOBALVARS *gv) const;
     bool updateLastObit(dataRecord &dr, GLOBALVARS *gv) const;
+
+    QList<GROUPCONFIG> getAllGroupConfigs(unsigned int clientCode) const;
 
 private:
 

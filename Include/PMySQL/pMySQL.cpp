@@ -79,7 +79,24 @@ QString getLastExecutedQuery(const QSqlQuery& query)
     return str;
 }
 
-bool createTestConnection(QSqlDatabase &db, GLOBALVARS &globals)
+bool createEnterpriseConnection(QString user)
+{
+    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
+    db.setHostName("localhost");
+    db.setDatabaseName("client_info");
+    db.setUserName(user);
+    if (user == "voyager1")
+        db.setPassword("Scotty");
+    if (!db.open())
+    {
+        qDebug() << "Database error occurred";
+        qDebug() << db.lastError();
+        return false;
+    }
+    return true;
+}
+
+/*bool createTestConnection(QSqlDatabase &db, GLOBALVARS &globals)
 {
     QString table;
     QString computerIdentity = globals.baseDirectory.left(13).getString();
@@ -137,4 +154,4 @@ bool createDemoConnection(QSqlDatabase &db)
         return false;
     }
     return true;
-}
+}*/

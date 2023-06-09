@@ -2086,11 +2086,8 @@ void readObit::readInObitText()
 
     case J27:
     {
-        if (consecutiveMovesTo(300, "class=\"article-content\"", "</h", ">"))
-        {
-            moveTo("</div>", 20);
+        if (consecutiveMovesTo(100, "itemprop=\"articleBody\"", "<p>"))
             uc = getUntil("</div>");
-        }
     }
         break;
 
@@ -2585,6 +2582,7 @@ void readObit::readInObitText()
         break;
 
     case McInnis:
+    {
         switch (style)
         {
         case 0:
@@ -2600,7 +2598,16 @@ void readObit::readInObitText()
                 uc = getUntil("</div>");
             break;
         }
+
+        QRegularExpression target;
+        QString tempString = uc.getString();
+        target.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::InvertedGreedinessOption | QRegularExpression::UseUnicodePropertiesOption);
+        target.setPattern(">(January|February|March|April|May|June|July|August|September|October|November|December)( \\d\\d?, \\d{4}) - (.*)(</span)");
+        tempString.replace(target,">\\1\\2\\4");
+        uc.setItsString(tempString);
+
         break;
+    }
 
     case Sturgeon:
         switch (style)
@@ -5708,6 +5715,10 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
             locations = QString("halifax|sydney").split(QString("|"));
             break;
 
+        case 8286:
+            locations = QString("cowley|high|millarville|nanton|okotoks|pincher").split(QString("|"));
+            break;
+
         case 10307:
             locations = QString("ottawa").split(QString("|"));
             break;
@@ -5819,6 +5830,10 @@ QStringList readObit::getLocationWords(PROVIDER provider, unsigned int providerK
     {
         switch(providerKey)
         {
+        case 6:
+            locations = QString("saskatoon").split(QString("|"));
+            break;
+
         case 34:
             locations = QString("anson").split(QString("|"));
             break;
@@ -10572,8 +10587,9 @@ void readObit::readAndPrepareStructuredContent()
             moveTo("Send a private message of condolence");
         }
 
-        if (consecutiveMovesTo(100, "Date of Death:", "</strong"))
+        if (moveToEarliestOf("Date of Death:", "Date of Passing:"))
         {
+            moveTo("</strong");
             tempUC = readNextBetween(BRACKETS);
             fillInDatesStructured(tempUC);
 
@@ -10592,11 +10608,16 @@ void readObit::readAndPrepareStructuredContent()
                 tempUC = readNextBetween(BRACKETS);
                 tempUC.prepareStructuredNames();
 
-                if (consecutiveMovesTo(100, "Date of Death:", "</strong"))
+                if (moveToEarliestOf("Date of Death:", "Date of Passing:"))
                 {
+                    moveTo("</strong");
                     tempUC = readNextBetween(BRACKETS);
                     fillInDatesStructured(tempUC);
                 }
+            }
+            else
+            {
+
             }
         }
     }
@@ -11691,7 +11712,7 @@ void readObit::readAndPrepareStructuredContent()
 
     case J27:
     {
-        if (consecutiveMovesTo(100, "class=\"article-title\"", "itemprop=\"name\""))
+        if (moveTo("itemprop=\"headline\""))
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.prepareStructuredNames();
@@ -13661,12 +13682,12 @@ void readObit::readAndPrepareStructuredContent()
         break;
 
     case Steadman:
-        if (consecutiveMovesTo(20, "class=\"inner-page-ttl\"", "<h"))
+        if (consecutiveMovesTo(30, "class=\"inner-page-ttl\"", "<h"))
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.prepareStructuredNames();
 
-            consecutiveMovesTo(20, "class=\"single_ttl_btm\"", "<h");
+            consecutiveMovesTo(30, "class=\"single_ttl_btm\"", "<h");
             tempUC = readNextBetween(BRACKETS);
             fillInDatesStructured(tempUC);
         }
@@ -17418,6 +17439,7 @@ int readObit::runNameValidations()
 
     GENDER gender = globals->globalDr->getGender();
     QList<OQString> nameList;
+    QList<QString> firstThreeLetters;
     OQStream tempStream;
 
     QList<QString> recognizedExclusions = QString("bishop|deacon|french|good|husband|major|wall|way").split("|");
@@ -17433,13 +17455,18 @@ int readObit::runNameValidations()
         if (name.getLength() > 0)
         {
             nameList.append(name);
+            firstThreeLetters.append(name.left(3).getString());
             name = globals->globalDr->getLastNameAlt2();
             if (name.getLength() > 0)
             {
                 nameList.append(name);
+                firstThreeLetters.append(name.left(3).getString());
                 name = globals->globalDr->getLastNameAlt3();
                 if (name.getLength() > 0)
+                {
+                    firstThreeLetters.append(name.left(3).getString());
                     nameList.append(name);
+                }
             }
         }
     }
@@ -17601,7 +17628,7 @@ int readObit::runNameValidations()
 
         if (name.getLength() > 0)
         {
-            // All validations except one only apply to primary name
+            // All validations except first few only apply to primary name
 
             // Add points for errors
             if ((name.findPosition(PQString("(")) != -1) || (name.findPosition(PQString(")")) != -1))
@@ -17626,6 +17653,9 @@ int readObit::runNameValidations()
                 if ((gender == Female) && ((name == "April") || (name == "June") || (name == "Avril") || (name == "May")))
                     warningScore -= 5;
             }
+
+            if (firstThreeLetters.contains(name.left(3).getString()))
+                warningScore += 10;
 
             if (i == 0)
             {
@@ -17742,12 +17772,15 @@ int readObit::runRecordValidation()
             break;
 
         case 3:
-            if (globals->globalDr->getGender() == genderUnknown)
+            //if (globals->globalDr->getGender() == genderUnknown)
+            //    valid = false;
+            if (globals->globalDr->getYOD() == 0)
                 valid = false;
             break;
 
         case 4:
-            if(!globals->globalDr->getDOD().isValid() || (globals->today < globals->globalDr->getDOD()) || (globals->globalDr->getDOD().daysTo(globals->today) > 30))
+            //if(!globals->globalDr->getDOD().isValid() || (globals->today < globals->globalDr->getDOD()) || (globals->globalDr->getDOD().daysTo(globals->today) > 30))
+            if((globals->today < globals->globalDr->getDOD()) || (globals->globalDr->getDOD().daysTo(globals->today) > 180))
                 valid = false;
             break;
 
@@ -17758,7 +17791,7 @@ int readObit::runRecordValidation()
 
         case 6:
             if (((globals->globalDr->wi.dateFlag >= 10) && (globals->globalDr->wi.dateFlag <= 20)) || (globals->globalDr->wi.genderFlag >= 10) ||
-                (globals->globalDr->wi.nameFlagGeneral > 10) || (globals->globalDr->wi.doubleMemorialFlag >= 10))
+                (globals->globalDr->wi.nameFlagGeneral >= 10) || (globals->globalDr->wi.doubleMemorialFlag >= 10) || (globals->globalDr->wi.nameReversalFlag == 20))
                 valid = false;
             break;
 
@@ -17781,6 +17814,11 @@ int readObit::runRecordValidation()
             // Provider specific issues
             switch (globals->globalDr->getProvider())
             {
+            case 16:
+                if ((globals->globalDr->getProviderKey() == 4297) && !globals->globalDr->getDOD().isValid())
+                    valid = false;
+                break;
+
             case 1040:
                 if (!globals->globalDr->getDOD().isValid())
                 {

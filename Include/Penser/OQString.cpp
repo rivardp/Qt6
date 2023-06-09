@@ -902,6 +902,7 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
         targetI.setPattern(QString("\\b") + writtenDay + QString("[ ,]"));
         itsString.replace(targetI, "");
     }
+    itsString.replace("()", "");  // In case written days were in parentheses
 
     // Remove double spaces - Interim run as prior additions mess up other changes below
     targetS.setPattern("  ");
@@ -1118,6 +1119,7 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     itsString.replace(QString("bien-aimé "), QString(""), Qt::CaseInsensitive);
     itsString.replace(QString("bien aimé "), QString(""), Qt::CaseInsensitive);
     itsString.replace(QString("adorée "), QString(""), Qt::CaseInsensitive);
+    itsString.replace(QString("aimante "), QString(""), Qt::CaseInsensitive);
 
     // Remove plural references
     itsString.replace(QString("daughters"), QString("daughter"), Qt::CaseInsensitive);
@@ -1274,7 +1276,7 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     itsString.replace(targetS,"née ");
     itsString.replace("Irènée", "Irène");  // "è" is treated as a non-word character
     itsString.replace("Hélènée", "Hélène");  // "è" is treated as a non-word character
-    targetS.setPattern("\\b[N|n][é|è|e][é|è|e]\\b\\s?[-|:]?");
+    targetS.setPattern("\\b[N|n][é|è|e][é|è|e]\\b\\s?[-|:|;]?");
     itsString.replace(targetS,"née ");
     targetS.setPattern("'née\\s'");
     itsString.replace(targetS,"née");
@@ -4000,14 +4002,14 @@ QList<QString> OQString::provLong           = QList<QString> () << "alberta" << 
 QList<QString> OQString::otherAbbreviations = QList<QString> () << "fr" << "mt" << "sts";
 
 QList<QString> OQString::aboriginalNames = QList<QString> () << "alone" << "bad" << "bare" << "bear" << "bears" << "big" << "bird" << "black" << "blue" << "bone" << "bow" << "brave" << "bruised" << "buffalo" << "bull"
-                                                             << "calf" << "canoe" << "cat" << "chief" << "child" << "crazy" << "crop" << "cross" << "crow" << "crying" << "day" << "duck"
-                                                            << "eagle" << "eared" << "eyes" << "face" << "feathers" << "fingers" << "first" << "flying" << "good" << "grass" << "grey" << "guns"
-                                                             << "hawk" << "head" << "heavy" << "horn" << "horses" << "hungry" << "iron" << "legs" << "light" << "little" << "long" << "low"
+                                                             << "calf" << "canoe" << "cat" << "chief" << "child" << "crazy" << "crop" << "cross" << "crow" << "crying" << "dagger" << "day" << "duck"
+                                                             << "eagle" << "eared" << "eyes" << "face" << "feathers" << "fingers" << "first" << "flying" << "good" << "grass" << "grey" << "guns"
+                                                             << "hawk" << "head" << "heavy" << "holy" << "horn" << "horses" << "hungry" << "iron" << "legs" << "light" << "little" << "long" << "low"
                                                              << "man" << "many" << "melting" << "mistaken" << "moccasin" << "moon" << "morning" << "mountain" << "no" << "north" << "old"
-                                                            << "panther" << "peigan" << "pine" << "plain" << "plume" << "quills" << "rain" << "red" << "rider" << "robe" << "runner" << "running"
-                                                             << "shin" << "shoes" << "shots" << "sitting" << "sky" << "skies" << "small" << "smoke" << "speaker" << "spear" << "spotted" << "squirrel"
+                                                             << "panther" << "peigan" << "pine" << "plain" << "plume" << "quills" << "rain" << "red" << "rider" << "robe" << "runner" << "running"
+                                                             << "shin" << "shoes" << "shots" << "sitting" << "sky" << "skies" << "small" << "smoke" << "speaker" << "spear" << "spirit" << "spotted" << "squirrel"
                                                              << "standing" << "strangling" << "striker" << "striped" << "sun" << "swallow" << "swan" << "sweet"
-                                                            << "tail" << "tallow" << "tent" << "three" << "throat" << "thunder" << "time" << "turning" << "two" << "water" << "weasel" << "wolf" << "woman" << "yellow" << "young";
+                                                             << "tail" << "tallow" << "tent" << "three" << "throat" << "thunder" << "time" << "turning" << "two" << "water" << "weasel" << "wolf" << "woman" << "yellow" << "young";
 QList<QString> OQString::problematicAboriginalNames = QList<QString> ()    << "bird" << "black" << "cross" << "day" << "good" << "grey" << "hawk" << "head" << "iron" << "little"
                                                                            << "man" << "moon" << "north" << "pine" << "small" << "sweet" << "wolf" << "young";
 QList<QString> OQString::noVowelNames = QList<QString> ()    << "lynn";
@@ -4035,7 +4037,7 @@ QList<QString> OQString::routes          = QList<QString> ()  << "ave" << "avenu
 QList<QString> OQString::femaleTitlesEnglish   = QList<QString> () << "miss" << "mlle" << "mrs" << "ms" << "smt";
 QList<QString> OQString::femaleTitlesFrench    = QList<QString> () << "dame" << "madame" << "mademoiselle" << "mlle" << "mme";
 QList<QString> OQString::femaleTitlesSpanish   = QList<QString> () << "señora" << "sra";
-QList<QString> OQString::maleTitlesEnglish     = QList<QString> () << "mr" << "mst" << "sri";
+QList<QString> OQString::maleTitlesEnglish     = QList<QString> () << "mr" << "mst" << "sir" << "sri";
 QList<QString> OQString::maleTitlesFrench      = QList<QString> () << "m" << "monsieur" << "mssr";
 QList<QString> OQString::maleTitlesSpanish     = QList<QString> () << "senor" << "sr";
 
@@ -4060,7 +4062,7 @@ QList<QString> OQString::prefixesAbbreviatedSpanish = QList<QString> () << "test
 
 QList<QString> OQString::prefixesFullEnglish = QList<QString> () << "admiral" << "archbishop" << "baby" << "bishop" << "brigadier" << "brother"
                                                                  << "cadet" << "canon" << "captain" << "colonel" << "commander" << "constable" << "corporal"
-                                                                 << "deacon" << "doctor" << "father" << "flt" << "frère" << "general" << "governor"
+                                                                << "deacon" << "doctor" << "emeritus" << "father" << "flt" << "frère" << "general" << "governor"
                                                                  << "honorable" << "honourable" << "inspector" << "justice" << "lieutenant"
                                                                  << "madame" << "major" << "master" << "monsignor" << "officer" << "padre" << "pastor" << "private" << "professor"
                                                                  << "retired" << "reverend" << "right"
@@ -4084,13 +4086,17 @@ QList<QString> OQString::suffixesDegree  = QList<QString> () << "a" << "comm" <<
 
 QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "acii" << "agronone" << "ba" << "bcomm" << "bed" << "bmsc" << "bpe"
                                                                     << "bs" << "bsc" << "bscn" << "bve" << "bvoced"
-                                                                    << "ca" << "cd" << "cdr" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmc" << "cmm" << "cpa" << "cplc" << "cps" << "crcs" << "crm" << "csb" << "csc" << "csj" << "cssr" << "cvo"
+                                                                    << "ca" << "cd" << "cdr" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmc" << "cmm" << "cpa" << "cplc" << "cps"
+                                                                    << "crcs" << "crm" << "csb" << "csc" << "csj" << "cssr" << "cvo"
                                                                     << "dds" << "dip" << "doctor" << "dsl" << "dsm" << "dvm" << "eng" << "esq"
-                                                                    << "facs" << "fca" << "fcahs" <<  "fcia" << "fciarp" << "fcip" << "fcpa" << "fcscj" << "fdlc" << "fics" << "fiic" << "fj" << "fma" << "fr" << "frcp" << "frcpc" << "frcsc" << "frdc" << "fsa"
+                                                                    << "facs" << "fca" << "fcahs" <<  "fcia" << "fciarp" << "fcip" << "fcj" << "fcpa" << "fcscj" << "fdlc"
+                                                                    << "fics" << "fiic" << "fj" << "fma" << "fr" << "frcp" << "frcpc" << "frcsc" << "frdc" << "fsa"
                                                                     << "gclj" << "gm" << "gsic" << "honors" << "honours" << "ibvm" << "ing" << "juris" << "kc" << "kstj"
-                                                                    << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "med" << "meng" << "mgr" << "mmm" << "msc" << "ndsc"
-                                                                    << "obgyn" << "ocad" << "offm" << "ohc" << "olm" << "omi" << "omri" << "onl" << "osb" << "osbm" << "osj" << "pc" << "peng" << "pgeo" << "ph" << "phd" << "pmp"
-                                                                    << "qc" << "qffq" << "rcmp" << "ret" << "ret'd" << "retd" << "rev" << "rhsj" << "rn" << "rna" << "rndm" << "sdb" << "sgm" << "snjm" << "sos" << "ssm" << "ssmi"
+                                                                    << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "med" << "meng" << "mgr" << "mmm" << "mnda" << "msc" << "ndsc"
+                                                                    << "obgyn" << "ocad" << "offm" << "ohc" << "olm" << "omi" << "omri" << "onl" << "osb" << "osbm" << "osj"
+                                                                    << "pc" << "peng" << "pgeo" << "ph" << "phd" << "pmp"
+                                                                    << "qc" << "qffq" << "rcmp" << "ret" << "ret'd" << "retd" << "rev" << "rhsj" << "rn" << "rna" << "rndm"
+                                                                    << "sca" << "sdb" << "sgm" << "snjm" << "sos" << "ssm" << "ssmi"
                                                                     << "ue" << "wwi" << "wwii";
 QList<QString> OQString::suffixesDropFrench     = suffixesDropEnglish;
 QList<QString> OQString::suffixesDropSpanish    = QList<QString> () << "testtest";
@@ -4104,7 +4110,7 @@ QList<QString> OQString::uncapitalizedNames  = QList<QString> () << "cinq" << "d
                                                                  << "di" << "do" << "dos" << "du" << "dè" << "e" << "el" << "grand"
                                                                  << "la" << "le" << "lo" << "los" << "san" << "st" << "st." << "te" << "ten" << "ter"
                                                                  << "van" << "van't" << "vande" << "vanden" << "vander" << "von" ;
-QList<QString> OQString::singleVans          = QList<QString> () << "du" << "ho" << "hoan" << "huynh" << "la" << "le" << "luong" << "ngo" << "nguyen" << "pham" << "phan" << "tran" << "vo";
+QList<QString> OQString::singleVans          = QList<QString> () << "buu" << "cuong" << "du" << "duong" << "ho" << "hoan" << "huynh" << "la" << "le" << "luong" << "ngo" << "nguyen" << "pham" << "phan" << "tran" << "vo";
 QList<QString> OQString::hyphenatedNameBeginnings = QList<QString> () << "abu" << "ad" << "al" << "el" << "ud";
 
 QList<QString> OQString::ignoreWordsEnglish1 = QList<QString> () << "aa";
@@ -4113,7 +4119,8 @@ QList<QString> OQString::ignoreWordsEnglish2 = QList<QString> () << "as" << "at"
 QList<QString> OQString::ignoreWordsEnglish3 = QList<QString> () << "age" << "all" << "and" << "are" << "but" << "cow" << "dad" << "due" << "fly" << "for"
                                                                  << "had" << "has" << "its" << "mom" << "new" << "not" << "off" << "old" << "our" << "sad" << "say"
                                                                  << "the" << "was" << "way" << "who" << "you" << "yrs";
-QList<QString> OQString::ignoreWordsEnglish4 = QList<QString> () << "aged" << "also" << "away" << "best" << "born" << "care" << "dada" << "dadi" << "dear" << "deep" << "died" << "down" << "free" << "from" << "gift" << "good" << "grew"
+QList<QString> OQString::ignoreWordsEnglish4 = QList<QString> () << "aged" << "also" << "away" << "best" << "born" << "care" << "dada" << "dadi" << "dear" << "deep" << "died" << "down"
+                                                                 << "free" << "from" << "gift" << "gone" << "good" << "grew"
                                                                  << "have" << "held" << "here" << "high" << "home" << "into" << "late" << "left" << "life" << "lock" << "lost"
                                                                  << "made" << "many" << "mass" << "miss" << "more" << "nana" << "nani" << "near" << "once" << "ones" << "papa"
                                                                  << "read" << "rest" << "safe" << "sale" << "side" << "that" << "they" << "this" << "urne"
@@ -4126,12 +4133,12 @@ QList<QString> OQString::ignoreWordsEnglish6 = QList<QString> () << "access" << 
                                                                  << "cancer" << "candle" << "caring" << "change" << "chapel" << "christ" << "dearly" << "divine" << "doting" << "during" << "earned" << "easter"
                                                                  << "family" << "father" << "former" << "friday" << "friend" << "garden"
                                                                  << "health" << "hearts" << "joined" << "leaves" << "loving"
-                                                                 << "memory" << "missed" << "monday" << "mother" << "moving"
-                                                                 << "online" << "parish" << "passed" << "please" << "public"
+                                                                 << "mémère" << "memory" << "missed" << "monday" << "mother" << "moving"
+                                                                 << "online" << "parish" << "passed" << "pépère" << "please" << "public"
                                                                  << "second" << "sister" << "sorrow" << "source" << "sunday" << "thanks"
                                                                  << "update" << "walked" << "wishes" << "worked";
 QList<QString> OQString::ignoreWordsEnglish7 = QList<QString> () << "adoring" << "beloved" << "brother" << "crossed" << "details" << "devoted" << "drifted"
-                                                                 << "entered" << "eternal" << "flowers" << "forever" << "friends" << "funeral"
+                                                                 << "entered" << "eternal" << "fishing" << "flowers" << "forever" << "friends" << "funeral"
                                                                  << "goodbye" << "grandma" << "grandpa" << "healing" << "hospice" << "husband" << "illness"
                                                                  << "journey" << "married" << "nursing" << "outlaws" << "passing" << "prayers" << "private" << "quietly" << "retired"
                                                                  << "sadness" << "servant" << "service" << "special" << "through" << "tuesday" << "updated" << "veteran";

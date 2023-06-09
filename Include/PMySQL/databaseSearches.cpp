@@ -1336,7 +1336,7 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv) const
             query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
 
             success = query.exec();
-            updated = success;
+            updated = success;           
         }
 
         if ((recDOD > QDate(1900,1,1)) && (recDOD < firstObit))
@@ -1368,7 +1368,6 @@ bool databaseSearches::updateLastObit(dataRecord &dr, GLOBALVARS *gv) const
             query.bindValue(":providerKey", QVariant(dr.getProviderKey()));
 
             success = query.exec();
-            updated = success;
         }
     }
 
@@ -1480,6 +1479,55 @@ POSTALCODE_INFO databaseSearches::getPostalCodeInfo(int deceasedNumber, GLOBALVA
         result.convertPCtoProv(query.value(0).toString(), provEnum);
 
         result.setData(query.value(0).toString(), query.value(1).toString(), query.value(2).toString(), query.value(3).toString(), provEnum, -1, query.value(4).toDouble(), query.value(5).toDouble());
+    }
+
+    return result;
+}
+
+QList<GROUPCONFIG> databaseSearches::getAllGroupConfigs(unsigned int clientCode) const
+{
+    QSqlQuery query;
+    QSqlError error;
+    PQString errorMessage;
+    bool success;
+
+    QList<GROUPCONFIG> result;
+    GROUPCONFIG record;
+    QString emailAddress;
+
+    success = query.prepare("SELECT clientCode, groupName, lastRun, freqOption, weeklyDay, monthlyDay, customDay, reportLevel, email1, email2, email3 "
+                            "FROM client_info.groups WHERE clientCode = :clientCode");
+    if (!success)
+        qDebug() << "Problem with SQL statement formulation";
+    query.bindValue(":clientCode", QVariant(clientCode));
+
+    success = query.exec();
+
+    if (success)
+    {
+        while(query.next())
+        {
+            record.clientCode = query.value(0).toUInt();
+            record.groupName = query.value(1).toString();
+            record.lastRun = query.value(2).toDateTime();
+            record.groupSchedule.freqOptions = static_cast<FREQOPTIONS>(query.value(3).toInt());
+            record.groupSchedule.weeklyDay = static_cast<DAYSOFWEEK>(query.value(4).toInt());
+            record.groupSchedule.monthDayChosen = query.value(5).toInt();
+            record.groupSchedule.customDaysChosen = query.value(6).toInt();
+            record.groupMatchesIncluded = query.value(7).toInt();
+            record.emailRecipients.clear();
+            emailAddress = query.value(8).toString();
+            if (emailAddress.length() > 0)
+                record.emailRecipients.append(emailAddress);
+            emailAddress = query.value(9).toString();
+            if (emailAddress.length() > 0)
+                record.emailRecipients.append(emailAddress);
+            emailAddress = query.value(10).toString();
+            if (emailAddress.length() > 0)
+                record.emailRecipients.append(emailAddress);
+
+            result.append(record);
+        }
     }
 
     return result;
