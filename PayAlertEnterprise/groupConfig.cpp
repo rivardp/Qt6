@@ -41,8 +41,8 @@ void GROUPCONFIG::determineNextRunDate()
     case WeekDays:
         nextRun = nextRunTime;
         dayNum = (nextRunDate.dayOfWeek() % 7) + 1;
-        nextRunDayOfWeek = findNextDay(nextRunDate, int(inclMonday|inclTuesday|inclWednesday|inclThursday|inclFriday));
-        daysToAdd = (dayNum + 7 - static_cast<int>(nextRunDayOfWeek)) % 7;
+        nextRunDayOfWeek = findNextIncludedDay(nextRunDate, int(inclMonday|inclTuesday|inclWednesday|inclThursday|inclFriday));
+        daysToAdd = (static_cast<int>(nextRunDayOfWeek) + 7 - dayNum) % 7;
         nextRun = nextRun.addDays(daysToAdd);
         break;
 
@@ -50,18 +50,18 @@ void GROUPCONFIG::determineNextRunDate()
     case BiWeekly:
         nextRun = nextRunTime;
         dayNum = (nextRunDate.dayOfWeek() % 7) + 1;
-        nextRunDayOfWeek = findNextDay(nextRunDate, groupSchedule.weeklyDay);
-        daysToAdd = (dayNum + 7 - static_cast<int>(nextRunDayOfWeek)) % 7;
+        nextRunDayOfWeek = groupSchedule.weeklyDay;
+        daysToAdd = (static_cast<int>(nextRunDayOfWeek) + 7 - dayNum) % 7;
         nextRun = nextRun.addDays(daysToAdd);
-        if ((groupSchedule.freqOptions == BiWeekly) && (lastRun.daysTo(nextRun) <= 7))
+        if ((groupSchedule.freqOptions == BiWeekly) && lastRun.isValid() && (lastRun.daysTo(nextRun) <= 7))
             nextRun = nextRun.addDays(7);
         break;
 
     case Custom:
         nextRun = nextRunTime;
         dayNum = (nextRunDate.dayOfWeek() % 7) + 1;
-        nextRunDayOfWeek = findNextDay(nextRunDate, groupSchedule.customDaysChosen);
-        daysToAdd = (dayNum + 7 - static_cast<int>(nextRunDayOfWeek)) % 7;
+        nextRunDayOfWeek = findNextIncludedDay(nextRunDate, groupSchedule.customDaysChosen);
+        daysToAdd = (static_cast<int>(nextRunDayOfWeek) + 7 - dayNum) % 7;
         nextRun = nextRun.addDays(daysToAdd);
         break;
 
@@ -113,7 +113,55 @@ void GROUPCONFIG::setDefaultValues()
     groupMatchesIncluded = High|Good|Reasonable|Possible;
 }
 
-DAYSOFWEEK findNextDay(QDate startDate, int daysChosen)
+GROUPCONFIG GROUPCONFIG::createNewGroupConfig(unsigned int clientCode)
+{
+    QStringList existingGroupNames;
+    return createNewGroupConfig(clientCode, existingGroupNames);
+}
+
+GROUPCONFIG GROUPCONFIG::createNewGroupConfig(unsigned int clientCode, QStringList &existingGroupNames)
+{
+    GROUPCONFIG newGroupRecord;
+    newGroupRecord.setDefaultValues();
+
+    bool uniqueNameFound = false;
+    unsigned int i = 1;
+    QString newName;
+
+    while (!uniqueNameFound){
+        newName = QString("Default Name ") + QString::number(i);
+        uniqueNameFound = !existingGroupNames.contains(newName);
+        i++;
+    }
+
+    newGroupRecord.key = QString::number(clientCode) + newName;
+    newGroupRecord.groupName = newName;
+    newGroupRecord.clientCode = clientCode;
+    return newGroupRecord;
+}
+
+DAYSOFWEEK findNextDay(QDate startDate, int dayChosen)
+{
+    if (dayChosen == 0)
+        return Monday;
+
+    bool found = false;
+    int dayOfWeek = (startDate.dayOfWeek() % 7) + 1;
+    int dayValue;
+
+    while (!found)
+    {
+        dayValue = enumValue(dayOfWeek);
+        if (dayValue == dayChosen)
+            found = true;
+        else
+            dayOfWeek = (dayOfWeek + 1) % 7;
+    }
+
+    return static_cast<DAYSOFWEEK>(dayOfWeek);
+}
+
+DAYSOFWEEK findNextIncludedDay(QDate startDate, int daysChosen)
 {
     if (daysChosen == 0)
         return Monday;

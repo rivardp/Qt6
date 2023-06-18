@@ -5776,7 +5776,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
         determineCutOffDate(daysOfOverlap, flowParameters, pageVariables);
         createURLaddress(downloadRequest, URLaddressTemplate, URLparams);
     }
-        break; // 1166 Etincelle
+        break; // 1167 Etincelle
 
     case 1168:      // ObitAssistant
     {
@@ -15720,8 +15720,8 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
 
                     if (sourceFile.conditionalMoveTo("Age", "class=\"basic-information\"", 0))
                     {
-                        sourceFile.moveTo("decedent-date-info");
-                        pageVariables.ageAtDeath = sourceFile.readNextBetween(BRACKETS).asNumber();
+                        if(sourceFile.moveTo("decedent-date-info"))
+                            pageVariables.ageAtDeath = sourceFile.readNextBetween(BRACKETS).asNumber();
                     }
 
                     // Process

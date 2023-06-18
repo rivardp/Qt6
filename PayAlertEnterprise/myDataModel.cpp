@@ -1,4 +1,5 @@
 #include "myDataModel.h"
+#include "enterprise.h"
 
 #include <QDebug>
 #include <QTextStream>
@@ -137,10 +138,20 @@ QVariant myDataModel::headerData(int section, Qt::Orientation orientation, int r
 bool myDataModel::insertRows(int position, int rows, const QModelIndex &index)
 {
     Q_UNUSED(index);
+    GROUPCONFIG newGroup, gc;
+    QStringList existingGroupNames;
+
     beginInsertRows(QModelIndex(), position, position + rows - 1);
 
     for (int row = 0; row < rows; ++row)
-        groupConfigs.insert(position, { QString(), (int)0, QString(), QDateTime(), QDateTime(), QString(), QString(), {(FREQOPTIONS)0, (DAYSOFWEEK)0, (int)0, (int)0}, QString(), (int)0 });
+    {
+        existingGroupNames = getExistingGroupNames();
+        newGroup = gc.createNewGroupConfig(clientCode, existingGroupNames);
+        groupConfigs.insert(position, { newGroup.key, clientCode, newGroup.groupName, newGroup.lastRun, newGroup.nextRun, newGroup.lastRunString, newGroup.nextRunString,
+                                       {newGroup.groupSchedule.freqOptions, newGroup.groupSchedule.weeklyDay, newGroup.groupSchedule.customDaysChosen, newGroup.groupSchedule.monthDayChosen},
+                                       newGroup.emailRecipients, newGroup.groupMatchesIncluded });
+    }
+    //    groupConfigs.insert(position, { QString(), (int)0, QString(), QDateTime(), QDateTime(), QString(), QString(), {(FREQOPTIONS)0, (DAYSOFWEEK)0, (int)0, (int)0}, QString(), (int)0 });
 
     endInsertRows();
     return true;
@@ -280,3 +291,17 @@ void myDataModel::refreshRunDateTimes()
     }
 }
 
+QStringList myDataModel::getExistingGroupNames()
+{
+    QStringList result;
+
+    typedef QList<GROUPCONFIG>::Iterator Iterator;
+
+    Iterator start = groupConfigs.begin();
+    Iterator end = groupConfigs.end();
+    for (Iterator it = start; it != end; ++it) {
+        result.append(it->groupName);
+    }
+
+    return result;
+}

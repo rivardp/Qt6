@@ -36,9 +36,12 @@ public:
     void formatData();
     void determineNextRunDate();
     void setDefaultValues();
+    GROUPCONFIG createNewGroupConfig(unsigned int clientCode);
+    GROUPCONFIG createNewGroupConfig(unsigned int clientCode, QStringList &existingGroupNames);
 };
 
-DAYSOFWEEK findNextDay(QDate startDate, int daysChosen);
+DAYSOFWEEK findNextDay(QDate startDate, int dayChosen);
+DAYSOFWEEK findNextIncludedDay(QDate startDate, int daysChosen);
 int enumValue(int dayOfWeek);
 
 class USERINFO

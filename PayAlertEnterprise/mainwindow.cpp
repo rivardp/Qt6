@@ -26,8 +26,8 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_model(new myDataModel(this))
 {
-    allUsers = getAllUsers(1000);
-    GROUPCONFIG initialActiveRecord = m_model->loadInitialData(getGroupConfigs(1000));
+    allUsers = getAllUsers(clientCode);
+    GROUPCONFIG initialActiveRecord = m_model->loadInitialData(getGroupConfigs(clientCode));
     setActiveRecord(initialActiveRecord);
 
     ui = new Ui::MainWindow;
@@ -41,6 +41,8 @@ MainWindow::MainWindow(QWidget *parent)
         SIGNAL(selectionChanged(const QItemSelection &, const QItemSelection &)),
         SLOT(groupSelected(const QItemSelection &, const QItemSelection &))
         );
+
+    connect(ui->PB_Exit, SIGNAL(clicked()), qApp, SLOT(close()));
 
     // Scheduling
     initScheduling(ui, activeRecord);
@@ -89,11 +91,20 @@ void MainWindow::initTableView()
     hp.setColor( QPalette::Normal, QPalette::Highlight, Qt::darkBlue );
     hp.setColor( QPalette::Normal, QPalette::HighlightedText, Qt::white );
     ui->tableView->horizontalHeader()->setPalette(hp);
+
 }
 
 void MainWindow::initScheduling(Ui::MainWindow *ui, GROUPCONFIG &activeRecord)
 {
     setupWeeklyDropDown(*ui, activeRecord);
+    ui->IB_DayOfMonthChosen->setEnabled(false);
+    ui->CB_Sunday->setEnabled(false);
+    ui->CB_Monday->setEnabled(false);
+    ui->CB_Tuesday->setEnabled(false);
+    ui->CB_Wednesday->setEnabled(false);
+    ui->CB_Thursday->setEnabled(false);
+    ui->CB_Friday->setEnabled(false);
+    ui->CB_Saturday->setEnabled(false);
     updateSchedulingGroup(*ui, activeRecord);
 
     QValidator *validator = new QIntValidator(0, 31, this);
@@ -131,69 +142,120 @@ void MainWindow::initReporting(QList<USERINFO> &allUsers, QStringList &allEligib
 void MainWindow::groupSelected(const QItemSelection &rowSelected, const QItemSelection &rowDeselected)
 {
     Q_UNUSED(rowSelected);
-    Q_UNUSED(rowDeselected);
+    int numRowsSelected;
     QModelIndex selection;
     QVariant data;
 
-    for (int col = 0; col < 13; col++)
+    if (rowDeselected.size() > 0)
     {
-        selection = ui->tableView->selectionModel()->selectedRows(col).first();
+        // Update data modal
+        // Table View is updated on the fly or indirectly through scheduling view
 
-        if (!selection.isValid())
-            return;
+        // Update scheduling view
+        activeRecord.determineNextRunDate();
 
-        if (selection.row() < 0)
-            return;
-
-        data = ui->tableView->model()->data(selection);
-        switch (col)
-        {
-        case 0:
-            activeRecord.key = data.toString();
-            break;
-        case 1:
-            activeRecord.clientCode = data.toInt();
-            break;
-        case 2:
-            activeRecord.groupName = data.toString();
-            break;
-        case 3:
-            activeRecord.lastRun = data.toDateTime();
-            break;
-        case 4:
-            activeRecord.nextRun = data.toDateTime();
-            break;
-        case 5:
-            activeRecord.lastRunString = data.toString();
-            break;
-        case 6:
-            activeRecord.nextRunString = data.toString();
-            break;
-        case 7:
-            activeRecord.groupSchedule.freqOptions = static_cast<FREQOPTIONS>(data.toInt());
-            break;
-        case 8:
-            activeRecord.groupSchedule.weeklyDay = static_cast<DAYSOFWEEK>(data.toInt());
-            break;
-        case 9:
-            activeRecord.groupSchedule.customDaysChosen = data.toInt();
-            break;
-        case 10:
-            activeRecord.groupSchedule.monthDayChosen = data.toInt();
-            break;
-        case 11:
-            activeRecord.emailRecipients = data.toString();
-            break;
-        case 12:
-            activeRecord.groupMatchesIncluded = data.toInt();
-            break;
-        default:
-            break;
-        }
+        // Update reporting view
+        const QModelIndex priorEmailSelectionIndex = ui->tableView->model()->index(rowDeselected.indexes().first().row(), 11);
+        ui->tableView->model()->setData(priorEmailSelectionIndex, QVariant(activeRecord.emailRecipients), Qt::EditRole);
     }
 
-    updateSchedulingGroup(*ui, activeRecord);
-    updateReportingGroup(*ui, activeRecord);
+    numRowsSelected = ui->tableView->selectionModel()->selectedRows(0).size();
+    if (numRowsSelected > 0)
+    {
+        // Populate window with current selection
+        // Populate table view
+        for (int col = 0; col < 13; col++)
+        {
+            selection = ui->tableView->selectionModel()->selectedRows(col).first();
+
+            if (!selection.isValid())
+                return;
+
+            if (selection.row() < 0)
+                return;
+
+            data = ui->tableView->model()->data(selection);
+            switch (col)
+            {
+            case 0:
+                activeRecord.key = data.toString();
+                break;
+            case 1:
+                activeRecord.clientCode = data.toInt();
+                break;
+            case 2:
+                activeRecord.groupName = data.toString();
+                break;
+            case 3:
+                activeRecord.lastRun = data.toDateTime();
+                break;
+            case 4:
+                activeRecord.nextRun = data.toDateTime();
+                break;
+            case 5:
+                activeRecord.lastRunString = data.toString();
+                break;
+            case 6:
+                activeRecord.nextRunString = data.toString();
+                break;
+            case 7:
+                activeRecord.groupSchedule.freqOptions = static_cast<FREQOPTIONS>(data.toInt());
+                break;
+            case 8:
+                activeRecord.groupSchedule.weeklyDay = static_cast<DAYSOFWEEK>(data.toInt());
+                break;
+            case 9:
+                activeRecord.groupSchedule.customDaysChosen = data.toInt();
+                break;
+            case 10:
+                activeRecord.groupSchedule.monthDayChosen = data.toInt();
+                break;
+            case 11:
+                activeRecord.emailRecipients = data.toString();
+                break;
+            case 12:
+                activeRecord.groupMatchesIncluded = data.toInt();
+                break;
+            default:
+                break;
+            }
+        }
+
+        ui->sourceFile->setText(CSVfileDirectory.path() + QString("/") + activeRecord.groupName + QString(".csv"));
+
+        // Populate scheduling view
+        updateSchedulingGroup(*ui, activeRecord);
+
+        // Populate reporting view
+        updateReportingGroup(*ui, activeRecord);
+    }
+    else
+    {
+        ui->sourceFile->setText("");
+        activeRecord = GROUPCONFIG();
+
+        // Populate scheduling view
+        updateSchedulingGroup(*ui, activeRecord);
+
+        // Populate reporting view
+        updateReportingGroup(*ui, activeRecord);
+    }
+}
+
+void MainWindow::on_PB_DeleteGroup_clicked()
+{
+    if (ui->tableView->selectionModel()->hasSelection())
+    {
+        QModelIndex currentSelection = ui->tableView->selectionModel()->selectedRows(0).first();
+        int row = currentSelection.row();
+        if ((row >= 0) && (row < ui->tableView->model()->rowCount()))
+            ui->tableView->model()->removeRow(row);
+    }
+}
+
+void MainWindow::on_PB_AddGroup_clicked()
+{
+    ui->tableView->model()->insertRow(0);
 }
 
 void MainWindow::updateModel()
@@ -205,6 +267,11 @@ void MainWindow::updateModel()
         if ((row >= 0) && (row < ui->tableView->model()->rowCount()))
             m_model->updateGroupRecord(currentSelection, getActiveRecord());
     }
+}
+
+void MainWindow::updateModel(QModelIndex &indexToUpdate)
+{
+    m_model->updateGroupRecord(indexToUpdate, getActiveRecord());
 }
 
 void MainWindow::setActiveRecord(GROUPCONFIG &ar)
@@ -219,15 +286,16 @@ GROUPCONFIG MainWindow::getActiveRecord() const
 
 void MainWindow::setupWeeklyDropDown(Ui::MainWindow &ui, GROUPCONFIG &activeRecord)
 {
-    ui.DD_WeeklyChosen->insertItem(0, "Sunday");
-    ui.DD_WeeklyChosen->insertItem(1, "Monday");
-    ui.DD_WeeklyChosen->insertItem(2, "Tuesday");
-    ui.DD_WeeklyChosen->insertItem(3, "Wednesday");
-    ui.DD_WeeklyChosen->insertItem(4, "Thursday");
-    ui.DD_WeeklyChosen->insertItem(5, "Friday");
-    ui.DD_WeeklyChosen->insertItem(6, "Saturday");
+    ui.DD_WeeklyChosen->addItem("Sunday");
+    ui.DD_WeeklyChosen->addItem("Monday");
+    ui.DD_WeeklyChosen->addItem("Tuesday");
+    ui.DD_WeeklyChosen->addItem("Wednesday");
+    ui.DD_WeeklyChosen->addItem("Thursday");
+    ui.DD_WeeklyChosen->addItem("Friday");
+    ui.DD_WeeklyChosen->addItem("Saturday");
 
-    ui.DD_WeeklyChosen->setCurrentIndex(activeRecord.groupSchedule.weeklyDay - 1);
+    ui.DD_WeeklyChosen->setCurrentIndex(static_cast<int>(activeRecord.groupSchedule.weeklyDay) - 1);
+    ui.DD_WeeklyChosen->setEnabled(false);
 }
 
 void MainWindow::setupDayPicks(Ui::MainWindow &ui, GROUPCONFIG &activeRecord)
@@ -251,6 +319,8 @@ void MainWindow::setupDayPicks(Ui::MainWindow &ui, GROUPCONFIG &activeRecord)
 void MainWindow::updateSchedulingGroup(Ui::MainWindow &ui, GROUPCONFIG &activeRecord)
 {
     setupDayPicks(ui, activeRecord);
+    ui.DD_WeeklyChosen->setCurrentIndex(static_cast<int>(activeRecord.groupSchedule.weeklyDay) - 1);
+    ui.IB_DayOfMonthChosen->setText(QString::number(activeRecord.groupSchedule.monthDayChosen));
 
     switch(activeRecord.groupSchedule.freqOptions)
     {
@@ -282,6 +352,9 @@ void MainWindow::updateSchedulingGroup(Ui::MainWindow &ui, GROUPCONFIG &activeRe
         ui.RB_Custom->setChecked(true);
         break;
     }
+
+    activeRecord.determineNextRunDate();
+    updateModel();
 }
 
 void MainWindow::updateReportingGroup(Ui::MainWindow &ui, GROUPCONFIG &activeRecord)
@@ -290,40 +363,84 @@ void MainWindow::updateReportingGroup(Ui::MainWindow &ui, GROUPCONFIG &activeRec
     QString nameToMove;
     QModelIndexList foundIndices;
     QModelIndex oldIndex;
+    bool putOnLeftSide, onLeftSide;
 
-    for (int i = 0; i < selectedRecipients.size(); i++)
+    // Deal with Recipients
+    for (int i = 0; i < allUsers.size(); i++)
     {
-        /*void MyComboBox::setValor(const QVariant& myValue, int column = 0, int role = Qt::DisplayRole, const QModelIndex& parent=QModelIndex())
-        {
-            if(myValue.isNull()) return;
-            const int rowCount= model()->rowCount(parent);
-            for(int i=0;i<rowCount;++i){
-                const QVariant currVal = model()->index(i,column,parent ).data(role );
-                if(currVal.isNull()) continue;
-                if(currVal == myValue)
-                    return setCurrentIndex(i);
-            }
-        }*/
+        putOnLeftSide = !selectedRecipients.contains(allUsers.at(i).emailAddress);
+        foundIndices = matchColumnValues(*ui.CV_RegisteredUsers, allUsers.at(i).emailAddress);
+        onLeftSide = foundIndices.size() > 0;
 
-        foundIndices = matchColumnValues(*ui.CV_RegisteredUsers, selectedRecipients);
-        //foundIndices = ui.CV_RegisteredUsers->model()->match(QModelIndex(), Qt::DisplayRole, QVariant(selectedRecipients.at(i)));
-        if (foundIndices.size() > 0)
+        if (onLeftSide)
         {
-            oldIndex = foundIndices.first();
-
-            if (oldIndex.isValid())
+            if (putOnLeftSide)
             {
-                nameToMove = ui.CV_RegisteredUsers->model()->data(oldIndex, Qt::DisplayRole).toString();
-                ui.CV_RegisteredUsers->model()->removeRow(oldIndex.row());
+                // Nothing to do
+            }
+            else
+            {
+                oldIndex = foundIndices.first();
 
-                int rowCount = ui.CV_ReportRecipients->model()->rowCount();
-                ui.CV_ReportRecipients->model()->insertRow(rowCount);
-                const QModelIndex newIndex = ui.CV_ReportRecipients->model()->index(rowCount, 0);
-                ui.CV_ReportRecipients->model()->setData(newIndex, QVariant(nameToMove), Qt::EditRole);
+                if (oldIndex.isValid())
+                {
+                    nameToMove = ui.CV_RegisteredUsers->model()->data(oldIndex, Qt::DisplayRole).toString();
+                    ui.CV_RegisteredUsers->model()->removeRow(oldIndex.row());
+
+                    int rowCount = ui.CV_ReportRecipients->model()->rowCount();
+                    ui.CV_ReportRecipients->model()->insertRow(rowCount);
+                    const QModelIndex newIndex = ui.CV_ReportRecipients->model()->index(rowCount, 0);
+                    ui.CV_ReportRecipients->model()->setData(newIndex, QVariant(nameToMove), Qt::EditRole);
+                }
+            }
+        }
+        else
+        {
+            // on right side
+            if (putOnLeftSide)
+            {
+                // Move to left side
+                foundIndices = matchColumnValues(*ui.CV_ReportRecipients, allUsers.at(i).emailAddress);
+                oldIndex = foundIndices.first();
+
+                if (oldIndex.isValid())
+                {
+                    nameToMove = ui.CV_ReportRecipients->model()->data(oldIndex, Qt::DisplayRole).toString();
+                    ui.CV_ReportRecipients->model()->removeRow(oldIndex.row());
+
+                    int rowCount = ui.CV_RegisteredUsers->model()->rowCount();
+                    ui.CV_RegisteredUsers->model()->insertRow(rowCount);
+                    const QModelIndex newIndex = ui.CV_RegisteredUsers->model()->index(rowCount, 0);
+                    ui.CV_RegisteredUsers->model()->setData(newIndex, QVariant(nameToMove), Qt::EditRole);
+                }
+            }
+            else
+            {
+                // Nothing to do
             }
         }
     }
 
+    // Deal with match types
+    if ((activeRecord.groupMatchesIncluded & static_cast<int>(High)) == static_cast<int>(High))
+        ui.CB_High->setCheckState(Qt::Checked);
+    else
+        ui.CB_High->setCheckState(Qt::Unchecked);
+
+    if ((activeRecord.groupMatchesIncluded & static_cast<int>(Good)) == static_cast<int>(Good))
+        ui.CB_Good->setCheckState(Qt::Checked);
+    else
+        ui.CB_Good->setCheckState(Qt::Unchecked);
+
+    if ((activeRecord.groupMatchesIncluded & static_cast<int>(Reasonable)) == static_cast<int>(Reasonable))
+        ui.CB_Reasonable->setCheckState(Qt::Checked);
+    else
+        ui.CB_Reasonable->setCheckState(Qt::Unchecked);
+
+    if ((activeRecord.groupMatchesIncluded & static_cast<int>(Possible)) == static_cast<int>(Possible))
+        ui.CB_Possible->setCheckState(Qt::Checked);
+    else
+        ui.CB_Possible->setCheckState(Qt::Unchecked);
 }
 
 void MainWindow::disableDayPicks(Ui::MainWindow *ui)
@@ -420,17 +537,16 @@ void MainWindow::on_RB_Custom_clicked()
 
 void MainWindow::on_IB_DayOfMonthChosen_textChanged(const QString &arg1)
 {
-    int initialInput = arg1.toInt();
-    if (initialInput < 1)
-    {
-        initialInput = 1;
-        ui->IB_DayOfMonthChosen->setText("1");
-    }
-    if (initialInput > 31)
-    {
-        initialInput = 31;
-        ui->IB_DayOfMonthChosen->setText("31");
-    }
+    if (arg1.length() == 0)
+        return;
+
+    int input = arg1.toInt();
+    if (input < 1)
+        input = 1;
+    if (input > 31)
+        input = 31;
+    ui->IB_DayOfMonthChosen->setText(QString::number(input));
+    activeRecord.groupSchedule.monthDayChosen = input;
     activeRecord.determineNextRunDate();
     updateModel();
 }
@@ -439,6 +555,123 @@ void MainWindow::on_DD_WeeklyChosen_currentIndexChanged(int index)
 {
     activeRecord.groupSchedule.weeklyDay = static_cast<DAYSOFWEEK>(index + 1);
     activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Sunday_clicked()
+{
+    if (ui->CB_Sunday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclSunday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclSunday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Monday_clicked()
+{
+    if (ui->CB_Monday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclMonday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclMonday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Tuesday_clicked()
+{
+    if (ui->CB_Tuesday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclTuesday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclTuesday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Wednesday_clicked()
+{
+    if (ui->CB_Wednesday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclWednesday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclWednesday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Thursday_clicked()
+{
+    if (ui->CB_Thursday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclThursday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclThursday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Friday_clicked()
+{
+    if (ui->CB_Friday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclFriday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclFriday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_Saturday_clicked()
+{
+    if (ui->CB_Saturday->isChecked())
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen | inclSaturday;
+    else
+        activeRecord.groupSchedule.customDaysChosen = activeRecord.groupSchedule.customDaysChosen & ~inclSaturday;
+
+    activeRecord.determineNextRunDate();
+    updateModel();
+}
+
+void MainWindow::on_CB_High_clicked()
+{
+    if (ui->CB_High->isChecked())
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded | High;
+    else
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded & ~High;
+
+    updateModel();
+}
+
+void MainWindow::on_CB_Good_clicked()
+{
+    if (ui->CB_Good->isChecked())
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded | Good;
+    else
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded & ~Good;
+
+    updateModel();
+}
+
+void MainWindow::on_CB_Reasonable_clicked()
+{
+    if (ui->CB_Reasonable->isChecked())
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded | Reasonable;
+    else
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded & ~Reasonable;
+
+    updateModel();
+}
+
+void MainWindow::on_CB_Possible_clicked()
+{
+    if (ui->CB_Possible->isChecked())
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded | Possible;
+    else
+        activeRecord.groupMatchesIncluded = activeRecord.groupMatchesIncluded & ~Possible;
+
     updateModel();
 }
 
@@ -456,6 +689,8 @@ void MainWindow::on_PB_Add_clicked()
     ui->CV_ReportRecipients->model()->insertRow(rowCount);
     const QModelIndex newIndex = ui->CV_ReportRecipients->model()->index(rowCount, 0);
     ui->CV_ReportRecipients->model()->setData(newIndex, QVariant(nameToMove), Qt::EditRole);
+
+    activeRecord.emailRecipients.append(QString("|") + nameToMove);
 }
 
 void MainWindow::on_PB_Remove_clicked()
@@ -472,6 +707,9 @@ void MainWindow::on_PB_Remove_clicked()
     ui->CV_RegisteredUsers->model()->insertRow(rowCount);
     const QModelIndex newIndex = ui->CV_RegisteredUsers->model()->index(rowCount, 0);
     ui->CV_RegisteredUsers->model()->setData(newIndex, QVariant(nameToMove), Qt::EditRole);
+
+    activeRecord.emailRecipients.remove(QString("|") + nameToMove);
+    activeRecord.emailRecipients.remove(nameToMove);
 }
 
 QModelIndexList MainWindow::matchColumnValues(QColumnView &cv, QList<QString>& toBeMatched)
@@ -498,3 +736,53 @@ QModelIndexList MainWindow::matchColumnValues(QColumnView &cv, QList<QString>& t
 
     return result;
 }
+
+QModelIndexList MainWindow::matchColumnValues(QColumnView &cv, QString toBeMatched)
+{
+    QList<QString> qListToBeMatched;
+    qListToBeMatched.append(toBeMatched);
+
+    return matchColumnValues(cv, qListToBeMatched);
+}
+
+void MainWindow::closeEvent (QCloseEvent *event)
+{
+    QMessageBox::StandardButton resBtn = QMessageBox::question( this, "PayAlert",
+                                                               tr("Are you sure? All unsaved changes will be lost permanently.\n"),
+                                                               QMessageBox::Cancel | QMessageBox::No | QMessageBox::Yes,
+                                                               QMessageBox::Yes);
+    if (resBtn != QMessageBox::Yes) {
+        event->ignore();
+    } else {
+        event->accept();
+    }
+}
+
+void MainWindow::on_PB_Exit_clicked()
+{
+    close();
+}
+
+void MainWindow::on_PB_SaveAndExit_clicked()
+{
+    save();
+    close();
+}
+
+void MainWindow::on_PB_Save_clicked()
+{
+    save();
+}
+
+void MainWindow::save()
+{
+    // Trigger update of model
+    const QModelIndex selection = ui->tableView->selectionModel()->selectedRows(0).first();
+    QItemSelection itemSelected;
+    itemSelected.select(selection, selection);
+    groupSelected(itemSelected, itemSelected);
+
+    saveGroupConfigs(m_model->getAllGroupConfigs());
+}
+
+

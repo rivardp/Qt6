@@ -17755,12 +17755,17 @@ int readObit::runRecordValidation()
 {
     bool valid = true;
     bool finished = false;
-    int check = 1;
+    int check = 0;
+    QList<QString> tempList;
 
     while (valid && !finished)
     {
         switch(check)
         {
+        case 0:
+            valid = !globals->globalDr->removeExtraneousCommas();
+            break;
+
         case 1:
             if (globals->globalDr->getLastName().getLength() < 2)
                 valid = false;
@@ -17827,6 +17832,23 @@ int readObit::runRecordValidation()
                 }
                 break;
 
+            case 2003:
+                if (globals->globalDr->getFirstNameAKA2() == PQString("Alberta"))
+                    globals->globalDr->setFirstName("", 3);
+                if (globals->globalDr->getFirstNameAKA1() == PQString("Alberta"))
+                    globals->globalDr->setFirstName(globals->globalDr->getFirstNameAKA2(), 2);
+                globals->globalDr->getMiddleNameList(tempList);
+                if (tempList.contains("Ab"))
+                {
+                    globals->globalDr->clearMiddleNames();
+                    for (int i = 0; i < tempList.size(); i++)
+                    {
+                        if (tempList.at(i) != "Ab")
+                            globals->globalDr->setMiddleNames(PQString(tempList.at(i)));
+                    }
+                }
+                break;
+
             default:
                 break;
             }
@@ -17843,7 +17865,11 @@ int readObit::runRecordValidation()
         return 1;
     }
     else
+    {
+        if (globals->globalDr->permanentErrorFlag)
+            globals->globalDr->wi.nameFlagGeneral = 99;
         return 0;
+    }
 }
 
 int readObit::runGenderValidation()

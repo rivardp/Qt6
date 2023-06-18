@@ -52,6 +52,7 @@ public:
     bool removeRows(int position, int rows, const QModelIndex &index = QModelIndex()) override;
     const QList<GROUPCONFIG> &getAllGroupConfigs() const;
     bool getActiveRecord(GROUPCONFIG &gc, const QModelIndex &index);
+    QStringList getExistingGroupNames();
 
 private:
     QList<GROUPCONFIG> groupConfigs;

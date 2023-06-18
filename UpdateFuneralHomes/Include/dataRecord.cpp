@@ -3,11 +3,12 @@
 #include "dataRecord.h"
 #include "../Include/PMySQL/databaseSearches.h"
 
-dataRecord::dataRecord() :  gender(genderUnknown), YOB(0), YOD(0), deemedYOD(0), ageAtDeath(0),
-                            DOBfullyCredible(false), DODfullyCredible(false), YOBfullyCredible(false), YODfullyCredible(false),
-                            ageAtDeathFullyCredible(false), datesLocked(false), language(language_unknown),
-                            cycle(0), numUnmatched(0), priorUnmatched(0), previouslyLoaded(0),
-                            neeEtAlEncountered(false), ageNextReference(false), maleHyphenated(false), singleYear(0)
+dataRecord::dataRecord() :  permanentErrorFlag(false), gender(genderUnknown), YOB(0), YOD(0), deemedYOD(0),
+    ageAtDeath(0), DOBfullyCredible(false), DODfullyCredible(false), YOBfullyCredible(false),
+    YODfullyCredible(false), ageAtDeathFullyCredible(false), datesLocked(false),
+    language(language_unknown), cycle(0), numUnmatched(0), priorUnmatched(0),
+    previouslyLoaded(0), neeEtAlEncountered(false), ageNextReference(false), maleHyphenated(false),
+    singleYear(0)
 {
     wi.clear();
 }
@@ -1732,8 +1733,9 @@ void dataRecord::setFirstGivenNameUsedInSentence(const QString name)
 }
 
 void dataRecord::setSpouseName(const QString name)
-{
+{    
     spouseName = name;
+    spouseName.replace(",", "");
 }
 
 void dataRecord::storeContent(PQString *content, unsigned int fieldType)
@@ -2984,6 +2986,7 @@ void dataRecord::clear()
  spouseName.clear();
  wi.clear();
  postalCodeInfo.clear();
+ permanentErrorFlag = false;
 }
 
 void dataRecord::clearLastNames()
@@ -4353,6 +4356,62 @@ int dataRecord::reorderLee()
     return result;
 }
 
+bool dataRecord::removeExtraneousCommas()
+{
+    bool removed = false;
+    PQString *pField = nullptr;
+    QString field;
+
+    for(int i = 0; i <= 7; i++)
+    {
+        switch(i)
+        {
+        case 0:
+            pField = &familyName;
+            break;
+
+        case 1:
+            pField = &familyNameAlt1;
+            break;
+
+        case 2:
+            pField = &familyNameAlt2;
+            break;
+
+        case 3:
+            pField = &familyNameAlt3;
+            break;
+
+        case 4:
+            pField = &firstName;
+            break;
+
+        case 5:
+            pField = &firstNameAKA1;
+            break;
+
+        case 6:
+            pField = &firstNameAKA2;
+            break;
+
+        case 7:
+            pField = &middleNames;
+            break;
+        }
+
+        field = pField->getString();
+        if (field.contains(","))
+        {
+            field.replace(",", "");
+            *pField = field;
+            removed = true;
+            permanentErrorFlag = true;
+        }
+    }
+
+    return removed;
+}
+
 bool SOURCEID::operator ==(SOURCEID const& newSource) const
 {
     return  (provider == newSource.provider) && (providerKey == newSource.providerKey) && (ID == newSource.ID) && (URL == newSource.URL) && (deceasedNumber == newSource.deceasedNumber);
@@ -4368,3 +4427,4 @@ void SOURCEID::clear()
 
     deceasedNumber = 0;
 }
+

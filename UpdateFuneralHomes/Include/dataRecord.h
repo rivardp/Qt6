@@ -229,9 +229,11 @@ public:
     unsigned int getNumSavedNames() const;
 	bool missingDOB() const;
 	bool missingDOD() const;
+    bool removeExtraneousCommas();
 
     GLOBALVARS globals;
     WARNINGINFO wi;
+    bool permanentErrorFlag;
 
 private:
     PQString familyName;

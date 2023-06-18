@@ -327,15 +327,18 @@ bool GLOBALVARS::determineIfBatchRun()
 {
     bool isBatchRun = false;
 
-    QDateTime batchStart, thisStart, dateForName;
-
-    dateForName = QDateTime::currentDateTime();
-    if (dateForName.time() > QTime(22, 55))
-        dateForName = dateForName.addDays(1);
+    QDateTime batchStart, thisStart;
 
     QString targetFileName(QString("C:\\Obits\\Batch Read\\Nightly Obit Run Log for "));
-    targetFileName += dateForName.toString("yyyyMMdd");
+    targetFileName += QDate::currentDate().toString("yyyyMMdd");
     targetFileName += QString(".log");
+
+    if(!QFileInfo::exists(targetFileName))
+    {
+        targetFileName = QString("C:\\Obits\\Batch Read\\Nightly Obit Run Log for ");
+        targetFileName += QDate::currentDate().addDays(-1).toString("yyyyMMdd");
+        targetFileName += QString(".log");
+    }
 
     if(QFileInfo::exists(targetFileName))
     {
@@ -344,7 +347,7 @@ bool GLOBALVARS::determineIfBatchRun()
         thisStart = QDateTime::currentDateTime();
         int seconds = batchStart.secsTo(thisStart);
         double mins = seconds / 60;
-        if (mins < 240)
+        if (mins < 480)
         {
             isBatchRun = true;
             batchRunFlag = true;

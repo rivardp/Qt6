@@ -1,5 +1,6 @@
 
 #include "mainwindow.h"
+#include "enterprise.h"
 #include "../Include/PMySQL/pMySQL.h"
 
 #include <QApplication>
@@ -7,6 +8,8 @@
 
 #include <QLocale>
 #include <QTranslator>
+#include <QDir>
+#include <QMessageBox>
 
 int main(int argc, char *argv[])
 {
@@ -22,6 +25,22 @@ int main(int argc, char *argv[])
             app.installTranslator(&translator);
             break;
         }
+    }
+
+    // Initiate settings
+    installDirectory = QCoreApplication::applicationDirPath();
+    CSVfileDirectory.setPath(installDirectory.path() + QString("/CSVfiles"));
+    clientCode = getClientCode();
+    if (clientCode == 0)
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Critical);
+        msgBox.setText("Missing or invalid PayAlert.config file");
+        msgBox.setInformativeText("Call (xxx) xxx-xxxx or email support@payalert.ca for assistance");
+        msgBox.setStandardButtons(QMessageBox::Ok);
+        msgBox.setDefaultButton(QMessageBox::Ok);
+        msgBox.exec();
+        return 0;
     }
 
     // MySQL

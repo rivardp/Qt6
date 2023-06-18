@@ -5,7 +5,9 @@
 #include "qitemselectionmodel.h"
 #include <qstringlistmodel.h>
 #include <QMainWindow>
+#include <QCloseEvent>
 #include <QColumnView>
+#include <QDir>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -30,6 +32,7 @@ public:
     void initReporting(QList<USERINFO> &allUsers, QStringList &allEligibleEmails, QStringList &allChosenEmails);
 
     void updateModel();
+    void updateModel(QModelIndex &indexToUpdate);
 
     // Scheduling Methods
     void setupWeeklyDropDown(Ui::MainWindow &ui, GROUPCONFIG &activeRecord);
@@ -42,12 +45,19 @@ public:
     void updateReportingGroup(Ui::MainWindow &ui, GROUPCONFIG &activeRecord);
 
     // Other methods
-    QModelIndexList matchColumnValues(QColumnView &cv, QList<QString>& toBeMatched);
+    QModelIndexList matchColumnValues(QColumnView &cv, QList<QString> &toBeMatched);
+    QModelIndexList matchColumnValues(QColumnView &cv, QString toBeMatched);
+
+    void closeEvent (QCloseEvent *event);
+    void save();
 
 protected slots:
     void groupSelected(const QItemSelection &rowSelected, const QItemSelection &rowDeselected);
 
 private slots:
+    void on_PB_DeleteGroup_clicked();
+    void on_PB_AddGroup_clicked();
+
     void on_RB_Disabled_clicked();
     void on_RB_Daily_clicked();
     void on_RB_Weekdays_clicked();
@@ -60,6 +70,24 @@ private slots:
 
     void on_PB_Add_clicked();
     void on_PB_Remove_clicked();
+
+    void on_CB_Sunday_clicked();
+    void on_CB_Monday_clicked();
+    void on_CB_Tuesday_clicked();
+    void on_CB_Wednesday_clicked();
+    void on_CB_Thursday_clicked();
+    void on_CB_Friday_clicked();
+    void on_CB_Saturday_clicked();
+
+    void on_CB_High_clicked();
+    void on_CB_Good_clicked();
+    void on_CB_Reasonable_clicked();
+    void on_CB_Possible_clicked();
+
+    void on_PB_Exit_clicked();
+    void on_PB_SaveAndExit_clicked();
+    void on_PB_Save_clicked();
+
 
 private:
     Ui::MainWindow *ui;
