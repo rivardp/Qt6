@@ -111,6 +111,7 @@ void GROUPCONFIG::setDefaultValues()
     groupSchedule.monthDayChosen = 31;
     groupSchedule.customDaysChosen = inclMonday|inclTuesday|inclWednesday|inclThursday|inclFriday;
     groupMatchesIncluded = High|Good|Reasonable|Possible;
+    fullHistory = true;
 }
 
 GROUPCONFIG GROUPCONFIG::createNewGroupConfig(unsigned int clientCode)
@@ -138,6 +139,12 @@ GROUPCONFIG GROUPCONFIG::createNewGroupConfig(unsigned int clientCode, QStringLi
     newGroupRecord.groupName = newName;
     newGroupRecord.clientCode = clientCode;
     return newGroupRecord;
+}
+
+void GROUPCONFIG::setPriorToIncremental()
+{
+    if (lastRun.isValid())
+        fullHistory = false;
 }
 
 DAYSOFWEEK findNextDay(QDate startDate, int dayChosen)

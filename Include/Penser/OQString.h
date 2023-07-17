@@ -8,6 +8,7 @@
 #include <QString>
 #include <QSqlQuery>
 #include <QUrl>
+#include <QDate>
 
 #include "../../UpdateFuneralHomes/Include/enums.h"
 

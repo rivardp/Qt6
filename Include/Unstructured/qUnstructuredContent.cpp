@@ -5992,164 +5992,167 @@ void unstructuredContent::readFirstNameFirst(QList<NAMESTATS> &nameStatsList)
                             QList<OQString> wordList = WordList;
                             QList<QString> QwordList;
 
-                            if (isEOS())
+                            if (wordList.size() > 0)
                             {
-                                OQString tempString = wordList.at(0).lower();
-
-                                if (wordList.size() == 2)
+                                if (isEOS())
                                 {
-                                    if ((tempString == PQString("aka")) || (tempString == PQString("a.k.a.")))
+                                    OQString tempString = wordList.at(0).lower();
+
+                                    if (wordList.size() == 2)
                                     {
-                                        globals->globalDr->setFirstNames(wordList.at(1));
-                                        wordRemoved = true;
+                                        if ((tempString == PQString("aka")) || (tempString == PQString("a.k.a.")))
+                                        {
+                                            globals->globalDr->setFirstNames(wordList.at(1));
+                                            wordRemoved = true;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if ((wordList.size() >= 2) && (tempString == PQString("revised")))
+                                            wordRemoved = true;
                                     }
                                 }
                                 else
                                 {
-                                    if ((wordList.size() >= 2) && (tempString == PQString("revised")))
+                                    if ((wordList.size() == 1) && (gender == Male) && (word.getLength() < 12) && !word.isSuffix() && !word.isPrefix())
+                                    {
+                                        // Word length cutoff intended to catch long aborigional names
+                                        globals->globalDr->setFirstNames(word);
                                         wordRemoved = true;
-                                }
-                            }
-                            else
-                            {
-                                if ((wordList.size() == 1) && (gender == Male) && (word.getLength() < 12) && !word.isSuffix() && !word.isPrefix())
-                                {
-                                    // Word length cutoff intended to catch long aborigional names
-                                    globals->globalDr->setFirstNames(word);
-                                    wordRemoved = true;
-                                }
-                                else
-                                {
-                                    bool containsNeeEtAl = false;
-                                    bool containsAltName = false;
-                                    bool containsIrrelevant = false;
-                                    while (wordList.size() > 0)
-                                    {
-                                        word = wordList.takeFirst().lower();
-                                        if (word.isNeeEtAl())
-                                            containsNeeEtAl = true;
-                                        if (word.isAltNameIndicator())
-                                            containsAltName = true;
-                                        if ((word == PQString("revised")) || (word == PQString("celebration")))
-                                            containsIrrelevant = true;
                                     }
-
-                                    if (containsNeeEtAl)
+                                    else
                                     {
-                                        QList<OQString> remainder;
-                                        wordList = WordList;
-
+                                        bool containsNeeEtAl = false;
+                                        bool containsAltName = false;
+                                        bool containsIrrelevant = false;
                                         while (wordList.size() > 0)
                                         {
                                             word = wordList.takeFirst().lower();
                                             if (word.isNeeEtAl())
-                                            {
-                                               if (wordList.size() > 0)
-                                               {
-                                                   word = wordList.takeFirst();
-                                                   globals->globalDr->setNeeEtAlEncountered(true);
-                                                   globals->globalDr->setMaidenNames(word);
-                                                   globals->globalDr->setGender(Female);
-                                               }
-                                            }
-                                            else
-                                                remainder.append(word);
-                                        }
-
-                                        if (remainder.size() == 0)
-                                        {
-                                            wordList.clear();
-                                            wordRemoved = true;
-                                        }
-                                        else
-                                        {
-                                            wordList = remainder;
-                                            WordList = remainder;
-                                            word = remainder.takeFirst();
-                                            while (remainder.size() > 0)
-                                            {
-                                                word += OQString(" ");
-                                                word += remainder.takeFirst();
-                                            }
-                                        }
-                                    }
-
-                                    if (containsAltName)
-                                    {
-                                        QList<OQString> remainder;
-                                        wordList = WordList;
-
-                                        while (wordList.size() > 0)
-                                        {
-                                            word = wordList.takeFirst().lower();
+                                                containsNeeEtAl = true;
                                             if (word.isAltNameIndicator())
-                                            {
-                                               if (wordList.size() > 0)
-                                               {
-                                                   word = wordList.takeFirst();
-                                                   globals->globalDr->setFirstNames(word);
-                                               }
-                                            }
-                                            else
-                                                remainder.append(word);
+                                                containsAltName = true;
+                                            if ((word == PQString("revised")) || (word == PQString("celebration")))
+                                                containsIrrelevant = true;
                                         }
 
-                                        if (remainder.size() == 0)
+                                        if (containsNeeEtAl)
                                         {
-                                            wordList.clear();
-                                            wordRemoved = true;
-                                        }
-                                        else
-                                        {
-                                            wordList = remainder;
-                                            WordList = remainder;
-                                            word = remainder.takeFirst();
-                                            while (remainder.size() > 0)
-                                            {
-                                                word += OQString(" ");
-                                                word += remainder.takeFirst();
-                                            }
-                                        }
-                                    }
+                                            QList<OQString> remainder;
+                                            wordList = WordList;
 
-                                    if (containsIrrelevant)
-                                    {
-                                        wordList.clear();
-                                        wordRemoved = true;
-                                    }
-
-                                    if (wordList.size() > 0)
-                                    {
-                                        if (word.getString().contains(" or ", Qt::CaseInsensitive))
-                                        {
                                             while (wordList.size() > 0)
                                             {
-                                                word = wordList.takeFirst();
-                                                if (word.lower() != PQString("or"))
-                                                    globals->globalDr->setFirstNames(word);
+                                                word = wordList.takeFirst().lower();
+                                                if (word.isNeeEtAl())
+                                                {
+                                                   if (wordList.size() > 0)
+                                                   {
+                                                       word = wordList.takeFirst();
+                                                       globals->globalDr->setNeeEtAlEncountered(true);
+                                                       globals->globalDr->setMaidenNames(word);
+                                                       globals->globalDr->setGender(Female);
+                                                   }
+                                                }
+                                                else
+                                                    remainder.append(word);
                                             }
-                                            wordRemoved = true;
-                                        }
-                                        else
-                                        {
-                                            QwordList = OQString::convertToQStringList(wordList);
-                                            if (dbSearch.areUniquelySurnames(QwordList, globals, globals->globalDr->getGender()))
+
+                                            if (remainder.size() == 0)
                                             {
-                                                wordList = WordList;
-                                                globals->globalDr->setFamilyNames(wordList);
+                                                wordList.clear();
                                                 wordRemoved = true;
                                             }
                                             else
                                             {
-                                                nextWord = peekAtWord(true);
-                                                dbSearch.nameStatLookup(nextWord.getString(), globals, nameStats);
-                                                if (!(nameStats.isSurname || nameStats.isGivenName))
+                                                wordList = remainder;
+                                                WordList = remainder;
+                                                word = remainder.takeFirst();
+                                                while (remainder.size() > 0)
+                                                {
+                                                    word += OQString(" ");
+                                                    word += remainder.takeFirst();
+                                                }
+                                            }
+                                        }
+
+                                        if (containsAltName)
+                                        {
+                                            QList<OQString> remainder;
+                                            wordList = WordList;
+
+                                            while (wordList.size() > 0)
+                                            {
+                                                word = wordList.takeFirst().lower();
+                                                if (word.isAltNameIndicator())
+                                                {
+                                                   if (wordList.size() > 0)
+                                                   {
+                                                       word = wordList.takeFirst();
+                                                       globals->globalDr->setFirstNames(word);
+                                                   }
+                                                }
+                                                else
+                                                    remainder.append(word);
+                                            }
+
+                                            if (remainder.size() == 0)
+                                            {
+                                                wordList.clear();
+                                                wordRemoved = true;
+                                            }
+                                            else
+                                            {
+                                                wordList = remainder;
+                                                WordList = remainder;
+                                                word = remainder.takeFirst();
+                                                while (remainder.size() > 0)
+                                                {
+                                                    word += OQString(" ");
+                                                    word += remainder.takeFirst();
+                                                }
+                                            }
+                                        }
+
+                                        if (containsIrrelevant)
+                                        {
+                                            wordList.clear();
+                                            wordRemoved = true;
+                                        }
+
+                                        if (wordList.size() > 0)
+                                        {
+                                            if (word.getString().contains(" or ", Qt::CaseInsensitive))
+                                            {
+                                                while (wordList.size() > 0)
+                                                {
+                                                    word = wordList.takeFirst();
+                                                    if (word.lower() != PQString("or"))
+                                                        globals->globalDr->setFirstNames(word);
+                                                }
+                                                wordRemoved = true;
+                                            }
+                                            else
+                                            {
+                                                QwordList = OQString::convertToQStringList(wordList);
+                                                if (dbSearch.areUniquelySurnames(QwordList, globals, globals->globalDr->getGender()))
                                                 {
                                                     wordList = WordList;
-                                                    QwordList = OQString::convertToQStringList(wordList);
-                                                    // Assume to be a location if not a name
-                                                    if (!dbSearch.areAllNames(QwordList, globals))
-                                                        wordRemoved = true;
+                                                    globals->globalDr->setFamilyNames(wordList);
+                                                    wordRemoved = true;
+                                                }
+                                                else
+                                                {
+                                                    nextWord = peekAtWord(true);
+                                                    dbSearch.nameStatLookup(nextWord.getString(), globals, nameStats);
+                                                    if (!(nameStats.isSurname || nameStats.isGivenName))
+                                                    {
+                                                        wordList = WordList;
+                                                        QwordList = OQString::convertToQStringList(wordList);
+                                                        // Assume to be a location if not a name
+                                                        if (!dbSearch.areAllNames(QwordList, globals))
+                                                            wordRemoved = true;
+                                                    }
                                                 }
                                             }
                                         }

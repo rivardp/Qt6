@@ -10903,6 +10903,7 @@ void MINER::createUpdateObitURLlist(const unsigned int &providerID, const unsign
                             sourceFile.loadValue(QString("deathDate"), pageVariables.currentDOD, dateFormat);
                             sourceFile.loadValue(QString("tributeUrl"), URLtemp);
                             pageVariables.webAddress = URLbase + URLtemp + PQString("/#!/Obituary");
+                            sourceFile.loadValue(QString("locationCity"), pageVariables.pcKey);
 
                             // Process
                             process(record, pageVariables, lang);

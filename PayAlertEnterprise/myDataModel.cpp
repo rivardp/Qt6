@@ -20,7 +20,7 @@ int myDataModel::rowCount(const QModelIndex &parent) const
 
 int myDataModel::columnCount(const QModelIndex &parent) const
 {
-    return parent.isValid() ? 0 : 13;
+    return parent.isValid() ? 0 : 14;
 }
 //! [1]
 
@@ -33,7 +33,7 @@ QVariant myDataModel::data(const QModelIndex &index, int role) const
     if (index.row() >= groupConfigs.size() || index.row() < 0)
         return QVariant();
 
-    if (role == Qt::DisplayRole) {
+    if ((role == Qt::DisplayRole) || (role == Qt::EditRole)) {
         const auto &groupConfig = groupConfigs.at(index.row());
 
         switch (index.column()) {
@@ -76,6 +76,8 @@ QVariant myDataModel::data(const QModelIndex &index, int role) const
         case 12:
             return groupConfig.groupMatchesIncluded;
             break;
+        case 13:
+            return groupConfig.fullHistory;
         default:
             break;
         }
@@ -86,6 +88,19 @@ QVariant myDataModel::data(const QModelIndex &index, int role) const
             return int(Qt::AlignRight | Qt::AlignVCenter);
         else
             return int(Qt::AlignLeft | Qt::AlignVCenter);
+    }
+
+    if (role == Qt::BackgroundRole){
+        if (hoverRows.isEmpty())
+            return QVariant(QColor(Qt::white));
+        else
+        {
+            int row = hoverRows.at(0);
+            if (row == index.row())
+                return QVariant(QColor(qRgb(185,225,253)));
+            else
+                return QVariant(QColor(Qt::white));
+        }
     }
 
     return QVariant();
@@ -126,6 +141,8 @@ QVariant myDataModel::headerData(int section, Qt::Orientation orientation, int r
             return tr("Emails");
         case 12:
             return tr("Reports Incl");
+        case 13:
+            return tr("Full History");
         default:
             break;
         }
@@ -149,9 +166,8 @@ bool myDataModel::insertRows(int position, int rows, const QModelIndex &index)
         newGroup = gc.createNewGroupConfig(clientCode, existingGroupNames);
         groupConfigs.insert(position, { newGroup.key, clientCode, newGroup.groupName, newGroup.lastRun, newGroup.nextRun, newGroup.lastRunString, newGroup.nextRunString,
                                        {newGroup.groupSchedule.freqOptions, newGroup.groupSchedule.weeklyDay, newGroup.groupSchedule.customDaysChosen, newGroup.groupSchedule.monthDayChosen},
-                                       newGroup.emailRecipients, newGroup.groupMatchesIncluded });
+                                       newGroup.emailRecipients, newGroup.groupMatchesIncluded, newGroup.fullHistory });
     }
-    //    groupConfigs.insert(position, { QString(), (int)0, QString(), QDateTime(), QDateTime(), QString(), QString(), {(FREQOPTIONS)0, (DAYSOFWEEK)0, (int)0, (int)0}, QString(), (int)0 });
 
     endInsertRows();
     return true;
@@ -221,6 +237,9 @@ bool myDataModel::setData(const QModelIndex &index, const QVariant &value, int r
         case 12:
             groupConfig.groupMatchesIncluded = value.toInt();
             break;
+        case 13:
+            groupConfig.fullHistory = value.toBool();
+            break;
         default:
             break;
         }
@@ -274,7 +293,7 @@ void myDataModel::updateGroupRecord(const QModelIndex &index, const GROUPCONFIG 
     {
         groupConfigs.replace(row, groupConfig);
         const QModelIndex firstCol = index.sibling(row, 0);
-        const QModelIndex lastCol = index.sibling(row, 12);
+        const QModelIndex lastCol = index.sibling(row, 13);
         emit dataChanged(firstCol, lastCol, {Qt::DisplayRole, Qt::EditRole});
     }
 }
@@ -288,6 +307,7 @@ void myDataModel::refreshRunDateTimes()
     for (Iterator it = start; it != end; ++it) {
         it->formatData();
         it->determineNextRunDate();
+        it->setPriorToIncremental();
     }
 }
 
@@ -305,3 +325,28 @@ QStringList myDataModel::getExistingGroupNames()
 
     return result;
 }
+
+void myDataModel::addHoverRow(const QModelIndex &index)
+{
+    savedIndex = index;
+    int row = index.row();
+    hoverRows.prepend(row);
+
+    QModelIndex topLeft = index.siblingAtColumn(2);
+    QModelIndex bottomRight = index.siblingAtColumn(6);
+    emit dataChanged(topLeft, bottomRight, {Qt::DisplayRole});
+}
+
+void myDataModel::removeHoverRow()
+{
+    if (!hoverRows.isEmpty())
+    {
+        int row = hoverRows.takeLast();
+
+        QModelIndex topLeft = savedIndex.sibling(row, 2);
+        QModelIndex bottomRight = savedIndex.sibling(row, 6);
+        emit dataChanged(topLeft, bottomRight, {Qt::DisplayRole});
+    }
+}
+
+

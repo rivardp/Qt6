@@ -485,7 +485,7 @@ OQString OQStream::getWord(const bool considerParentheses, unsigned int secondar
     bool hasParentheses;
     OQString word;
     OQString singleChar;
-    OQString stopChar;
+    OQString stopChar, startChar;
     OQString space(_T(" "));
     unsigned int singleCharType;
     int startPos, endPos;
@@ -508,6 +508,7 @@ OQString OQStream::getWord(const bool considerParentheses, unsigned int secondar
     {
         if ((singleChar.getCharType() & (OPENING | PARENTHESES)) == (OPENING | PARENTHESES))
         {
+            startChar = singleChar;
             stopChar = singleChar.reciprocal();
             ignoreSecondaryBreak = !secondaryBreakInParentheses;
             startPos = position - 1;
@@ -530,19 +531,28 @@ OQString OQStream::getWord(const bool considerParentheses, unsigned int secondar
         stopChar = space;
 
     // Continue reading characters until end of word is reached
+    int numOccurences = 1; // Needed for nested parentheses
     while (!EOS && !wordEnded)
     {
         singleChar = get();
+        if (hasParentheses && (startChar.getLength() > 0) && (singleChar == startChar))
+            numOccurences++;
         singleCharType = singleChar.getCharType() & secondaryBreakChar;
         if ((singleChar != stopChar) && (ignoreSecondaryBreak || (singleCharType != secondaryBreakChar)))
             word += singleChar;
         else
         {
-            wordEnded = true;
-            endPos = position - 1;
-            // Copy ending parentheses or quotes
-            if ((stopChar != space) && (singleCharType != secondaryBreakChar))
-                word += stopChar;
+            numOccurences--;
+            if (numOccurences == 0)
+            {
+                wordEnded = true;
+                endPos = position - 1;
+                // Copy ending parentheses or quotes
+                if ((stopChar != space) && (singleCharType != secondaryBreakChar))
+                    word += stopChar;
+            }
+            else
+                word += singleChar;
         }
     }
 
@@ -1052,8 +1062,12 @@ void OQStream::removeLinks(bool removeAnyLink)
 {
     QRegularExpression targetI;
     QRegularExpressionMatch match;
-
     targetI.setPatternOptions(QRegularExpression::CaseInsensitiveOption | QRegularExpression::InvertedGreedinessOption | QRegularExpression::UseUnicodePropertiesOption);
+
+    // Preliminary replace to handle "target=" embedded coding
+    targetI.setPattern("<a target=\"(.*)\" href=");
+    itsString.replace(targetI, "<a href=)");
+
     if (removeAnyLink)
         targetI.setPattern("<a href=\"(.*)(\">)(.*)(?!<a)</a>");
     else

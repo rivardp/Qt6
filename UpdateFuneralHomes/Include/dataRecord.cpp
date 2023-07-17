@@ -3894,7 +3894,7 @@ void dataRecord::updateToBestOf(dataRecord &dbRecord)
     {
         if (dbRecord.postalCodeInfo.isValid() && (postalCodeInfo != dbRecord.postalCodeInfo))
         {
-            if ((globals.globalDr->getProvider() < 1000) && (dbRecord.getProvider() >= 1000))
+            if ((globals.globalDr->getProvider() < 1000) && (dbRecord.getProvider() >= 1000) && (dbRecord.getProvider() != 1021))
                 postalCodeInfo = dbRecord.postalCodeInfo;
         }
     }
@@ -4261,10 +4261,12 @@ void dataRecord::setPostalCode(POSTALCODE_INFO &pc)
 
 bool dataRecord::setPostalCode(QString &pc)
 {
-    postalCodeInfo.clear();
+    POSTALCODE_INFO newPCinfo;
 
     databaseSearches dbSearch;
-    dbSearch.fillInPostalCodeInfo(&globals, postalCodeInfo, pc);
+    dbSearch.fillInPostalCodeInfo(&globals, newPCinfo, pc);
+    if (newPCinfo.isValid())
+        postalCodeInfo = newPCinfo;
 
     return postalCodeInfo.isValid();
 }

@@ -1034,6 +1034,24 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     itsString.replace(targetS, "(\\2 \\3, \\1 - \\5 \\6, \\4)");
     targetS.setPattern("(\\d{4}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d\\d?) - (\\d{4}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d\\d?)");
     itsString.replace(targetS, "(\\2 \\3, \\1 - \\5 \\6, \\4)");
+    targetS.setPattern("(\\d\\d?)\\.(\\d\\d?)\\.([1-2][0|9][0-9][0-9])");
+    match = targetS.match(itsString);
+    if (match.hasMatch())
+    {
+        int mm = match.captured(1).toInt();
+        int dd = match.captured(2).toInt();
+        int yyyy = match.captured(3).toInt();
+        if (mm > 12)
+        {
+            mm = match.captured(2).toInt();
+            dd = match.captured(1).toInt();
+        }
+        if ((mm <= 12) && (dd <= 31))
+        {
+            QDate date = QDate(yyyy,mm, dd);
+            QString replacement = date.toString("MMM dd, yyyy");
+        }
+    }
 
     // Put parentheses around DOB - DOD - FIRST IMPLEMENTATION run before removing locations due to "May 1, 1960 - June 1, 2021 On June 1, 2021 Jeff ...." being caught in parentheses at end
     // Also combine any back to back dates missing hyphen

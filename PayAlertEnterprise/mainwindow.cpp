@@ -42,7 +42,19 @@ MainWindow::MainWindow(QWidget *parent)
         SLOT(groupSelected(const QItemSelection &, const QItemSelection &))
         );
 
+    connect(ui->tableView->model(),
+            SIGNAL(dataChanged(QModelIndex,QModelIndex)), this,
+            SLOT(onGroupNameEdit(const QModelIndex&, const QModelIndex&)));
+
     connect(ui->PB_Exit, SIGNAL(clicked()), qApp, SLOT(close()));
+
+    connect(ui->tableView,
+            SIGNAL(addHoverRowSignal(const QModelIndex&)), m_model,
+            SLOT(addHoverRow(const QModelIndex&)));
+
+    connect(ui->tableView,
+            SIGNAL(removeHoverRowSignal(const QModelIndex&)), m_model,
+            SLOT(removeHoverRow(const QModelIndex&)));
 
     // Scheduling
     initScheduling(ui, activeRecord);
@@ -72,6 +84,7 @@ void MainWindow::initTableView()
     ui->tableView->hideColumn(10);  // monthlyDayChosen
     ui->tableView->hideColumn(11);  // emailRecipients
     ui->tableView->hideColumn(12);  // groupMatchesIncluded
+    ui->tableView->hideColumn(13);  // fullHistory
 
     ui->tableView->setColumnWidth(2, 160);   // name
     ui->tableView->setColumnWidth(5, 200);;  // lastRunDateString
@@ -79,7 +92,10 @@ void MainWindow::initTableView()
 
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableView->setMouseTracking(true);
+    ui->tableView->viewport()->setAttribute(Qt::WA_Hover,true);
 
+    //ui->tableView->setStyleSheet(QString("QTableView::item:hover{}"));
     //ui->tableView->setStyleSheet("QHeaderView::section { background-color: #B9E1FD; border: 0.5px solid #6c6c6c; }");
 
     QPalette p = palette();
@@ -216,12 +232,14 @@ void MainWindow::groupSelected(const QItemSelection &rowSelected, const QItemSel
             case 12:
                 activeRecord.groupMatchesIncluded = data.toInt();
                 break;
+            case 13:
+                activeRecord.fullHistory = data.toBool();
             default:
                 break;
             }
         }
 
-        ui->sourceFile->setText(CSVfileDirectory.path() + QString("/") + activeRecord.groupName + QString(".csv"));
+        updateSourceReference();
 
         // Populate scheduling view
         updateSchedulingGroup(*ui, activeRecord);
@@ -239,6 +257,16 @@ void MainWindow::groupSelected(const QItemSelection &rowSelected, const QItemSel
 
         // Populate reporting view
         updateReportingGroup(*ui, activeRecord);
+    }
+}
+
+void MainWindow::onGroupNameEdit(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+    if ((topLeft.column() == 2) && (bottomRight.column() == 2))
+    {
+        activeRecord.groupName = m_model->data(topLeft, Qt::DisplayRole).toString();
+        updateSourceReference();
+        qDebug() << "Edit hit";
     }
 }
 
@@ -441,6 +469,12 @@ void MainWindow::updateReportingGroup(Ui::MainWindow &ui, GROUPCONFIG &activeRec
         ui.CB_Possible->setCheckState(Qt::Checked);
     else
         ui.CB_Possible->setCheckState(Qt::Unchecked);
+
+    // History parameters
+    if (activeRecord.fullHistory == true)
+        ui.RB_FullHistory->click();
+    else
+        ui.RB_IncrementalOnly->click();
 }
 
 void MainWindow::disableDayPicks(Ui::MainWindow *ui)
@@ -785,4 +819,37 @@ void MainWindow::save()
     saveGroupConfigs(m_model->getAllGroupConfigs());
 }
 
+void MainWindow::updateSourceReference()
+{
+    QString fileName = CSVfileDirectory.path() + QString("/") + activeRecord.groupName + QString(".csv");
+    ui->sourceFile->setText(fileName);
+
+    QPalette palette = ui->sourceFile->palette();
+    QFont font = ui->sourceFile->font();
+
+    QFileInfo check_file(fileName);
+    bool fileExists = check_file.exists() && check_file.isFile();
+    if (fileExists)
+    {
+        palette.setColor(QPalette::Text, Qt::black);
+        ui->sourceFile->setPalette(palette);
+        font.setBold(false);
+    }
+    else
+    {
+        palette.setColor(QPalette::Text, Qt::red);
+        ui->sourceFile->setPalette(palette);
+        font.setBold(true);
+    }
+}
+
+void MainWindow::on_RB_FullHistory_clicked()
+{
+    activeRecord.fullHistory = true;
+}
+
+void MainWindow::on_RB_IncrementalOnly_clicked()
+{
+    activeRecord.fullHistory = false;
+}
 

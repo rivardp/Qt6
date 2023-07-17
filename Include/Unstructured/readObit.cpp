@@ -701,8 +701,10 @@ void readObit::readInObitText()
         {
         case 0:
         case 1:
-            if (consecutiveMovesTo(300, "\"obituary-text\"", "Obituary of", "</h1>"))
+            if (consecutiveMovesTo(300, "\"obituary-text", "Obituary of", "</h1>"))
             {
+                if (conditionalMoveTo("<p", "<div class=\"obituary-button-row\"", 0))
+                    backward(2);
                 unsigned int position = getPosition();
                 if (consecutiveMovesTo(75, "<p>", "B I O G R A P H Y", "</p>"))
                     uc = getUntil("</div>");
@@ -755,8 +757,12 @@ void readObit::readInObitText()
         if (uc.getLength() == 0)
         {
             beg();
-            if (consecutiveMovesTo(300, "\"obituary-text\"", "</h1>"))
+            if (consecutiveMovesTo(300, "\"obituary-text", "</h1>"))
+            {
+                if (conditionalMoveTo("<p", "<div class=\"obituary-button-row\"", 0))
+                    backward(2);
                 uc = getUntil("</div>");
+            }
         }
 
         if (uc.getLength() == 0)
@@ -18639,6 +18645,16 @@ void readObit::readInCustomAddress()
         }
         break;
 
+    case 1010:
+        if ((providerKey == 44) && !globals->globalDr->getPostalCodeInfo().isValid())
+        {
+            if (moveTo("Milverton"))
+                pc = QString("N0K 1M0");
+            else
+                pc = QString("N3A 1J5");
+        }
+        break;
+
     case 1080:
         if (providerKey == 1)
         {
@@ -18676,6 +18692,58 @@ void readObit::readInCustomAddress()
             {
                 location = readNextBetween(BRACKETS).getString();
                 //globals->globalDr->wi.checkInclName = location;
+                pc = dbSearch.pcLookupPlaces(globals, providerID, providerKey, location).getPostalCode();
+            }
+        }
+        break;
+
+    case 1126:
+        if (providerKey == 1)
+        {
+            QString word;
+            OQString OWord;
+            QStringList leadInWords = QString("À|De|From").split("|");
+
+            if (consecutiveMovesTo(50, "class=\"deces-text\"", "<p>"))
+            {
+                uc = getUntil("</p>");
+                word = uc.getWord().getString();
+                if (leadInWords.contains(word))
+                {
+                    OWord = uc.getWord();
+                    OWord.removeEnding(COMMA);
+                    location = OWord.getString();
+                }
+                else
+                {
+                    beg();
+                    if (moveTo("Hemmingford"))
+                        location = QString("Hemmingford");
+                    else
+                    {
+                        beg();
+                        if (moveTo("Saint-Michel"))
+                            location = QString("Saint-Michel");
+                        else
+                        {
+                            beg();
+                            if (moveTo("Saint-Édouard"))
+                                location = QString("Saint-Édouard");
+                            else
+                            {
+                                beg();
+                                if (moveTo("Sherrington"))
+                                    location = QString("Sherrington");
+                                else
+                                {
+                                    beg();
+                                    if (moveTo("Napierville"))
+                                        location = QString("Napierville");
+                                }
+                            }
+                        }
+                    }
+                }
                 pc = dbSearch.pcLookupPlaces(globals, providerID, providerKey, location).getPostalCode();
             }
         }

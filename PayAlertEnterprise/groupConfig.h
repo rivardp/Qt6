@@ -31,11 +31,13 @@ public:
     SCHEDULING groupSchedule;
     QString emailRecipients;
     int groupMatchesIncluded;
+    bool fullHistory;
 
     QString name() const;
     void formatData();
     void determineNextRunDate();
     void setDefaultValues();
+    void setPriorToIncremental();
     GROUPCONFIG createNewGroupConfig(unsigned int clientCode);
     GROUPCONFIG createNewGroupConfig(unsigned int clientCode, QStringList &existingGroupNames);
 };

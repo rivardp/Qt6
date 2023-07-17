@@ -19,6 +19,7 @@ SOURCES += \
 HEADERS += \
     ../Include/PMySQL/pMySQL.h \
     ../UpdateFuneralHomes/Include/globalVars.h \
+    TableView.h \
     enterprise.h \
     groupConfig.h \
     mainwindow.h \

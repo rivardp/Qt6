@@ -4,6 +4,7 @@
 
 #include <QAbstractTableModel>
 #include <QList>
+#include <QColor>
 
 #include "groupConfig.h"
 
@@ -38,10 +39,6 @@ class myDataModel : public QAbstractTableModel
 public:
     myDataModel(QObject *parent = nullptr);
 
-    GROUPCONFIG loadInitialData(const QList<GROUPCONFIG> &groupConfig);
-    void updateGroupRecord(const QModelIndex &index, const GROUPCONFIG &groupConfig);
-    void refreshRunDateTimes();
-
     int rowCount(const QModelIndex &parent) const override;
     int columnCount(const QModelIndex &parent) const override;
     QVariant data(const QModelIndex &index, int role) const override;
@@ -50,12 +47,22 @@ public:
     bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
     bool insertRows(int position, int rows, const QModelIndex &index = QModelIndex()) override;
     bool removeRows(int position, int rows, const QModelIndex &index = QModelIndex()) override;
+
+    GROUPCONFIG loadInitialData(const QList<GROUPCONFIG> &groupConfig);
+    void updateGroupRecord(const QModelIndex &index, const GROUPCONFIG &groupConfig);
+    void refreshRunDateTimes();
     const QList<GROUPCONFIG> &getAllGroupConfigs() const;
-    bool getActiveRecord(GROUPCONFIG &gc, const QModelIndex &index);
+    //bool getActiveRecord(GROUPCONFIG &gc, const QModelIndex &index);
     QStringList getExistingGroupNames();
+
+protected slots:
+    void addHoverRow(const QModelIndex &index);
+    void removeHoverRow();
 
 private:
     QList<GROUPCONFIG> groupConfigs;
+    QList<int> hoverRows;
+    QModelIndex savedIndex;
 };
 //! [0]
 

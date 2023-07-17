@@ -8,6 +8,7 @@
 #include <QCloseEvent>
 #include <QColumnView>
 #include <QDir>
+#include <QFileInfo>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -24,6 +25,7 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    // TableView methods
     void setActiveRecord(GROUPCONFIG &ar);
     GROUPCONFIG getActiveRecord() const;
 
@@ -33,6 +35,7 @@ public:
 
     void updateModel();
     void updateModel(QModelIndex &indexToUpdate);
+    void updateSourceReference();
 
     // Scheduling Methods
     void setupWeeklyDropDown(Ui::MainWindow &ui, GROUPCONFIG &activeRecord);
@@ -53,6 +56,7 @@ public:
 
 protected slots:
     void groupSelected(const QItemSelection &rowSelected, const QItemSelection &rowDeselected);
+    void onGroupNameEdit(const QModelIndex &topLeft, const QModelIndex &bottomRight);
 
 private slots:
     void on_PB_DeleteGroup_clicked();
@@ -88,6 +92,10 @@ private slots:
     void on_PB_SaveAndExit_clicked();
     void on_PB_Save_clicked();
 
+
+    void on_RB_FullHistory_clicked();
+
+    void on_RB_IncrementalOnly_clicked();
 
 private:
     Ui::MainWindow *ui;
