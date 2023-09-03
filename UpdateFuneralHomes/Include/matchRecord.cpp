@@ -28,6 +28,8 @@ void MATCHRECORD::clear()
     closeDOBrange = false;
     potentialNumDataMatches = 0;
     numNameMatches = 0;
+    nameMatchCount = 0;
+    finalAttemptPoints = 0;
     pcDistance = 9999;
 
     matchedLNAME = false;
@@ -53,7 +55,8 @@ void MATCHRECORD::clear()
     inconsistentDOD = false;
     inconsistentAgeAtDeath = false;
     inconsistentSpouseName = false;
-    inconsistentPC = false;    
+    inconsistentPC = false;
+    inconsistentPubDate = false;
 }
 
 void MATCHRECORD::setID(unsigned int id)
@@ -151,6 +154,8 @@ unsigned int MATCHRECORD::countItems(int score)
         result++;
     if (score & mPC)
         result++;
+    if (score & mPubDate)
+        result++;
 
     return result;
 }
@@ -207,6 +212,7 @@ void MATCHRECORD::analyze()
     inconsistentSpouseName = ((inconsistencyScore & mSPOUSENAME) == mSPOUSENAME);
     inconsistentLNAME = ((inconsistencyScore & mLNAME) == mLNAME);
     inconsistentPC = ((inconsistencyScore & mPC) == mPC);
+    inconsistentPubDate = ((inconsistencyScore & mPubDate) == mPubDate);
 
     if (!inconsistentDOB && !inconsistentDOD && !inconsistentAgeAtDeath)
     {
@@ -372,12 +378,20 @@ void MATCHRECORD::analyze()
             }
         }
 
+        if (!sufficientlyMatched && (inconsistencyScore == 0) && (nameMatchCount >= 3) && (numNameMatches >= 2))
+        {
+            if (finalAttemptPoints >= 2)
+            {
+                sufficientlyMatched = true;
+                newRecord = false;
+            }
+        }
+
         if (!sufficientlyMatched && (inconsistencyScore > 0))
         {
             newRecord = true;
             matchKey = mkNone;
         }
-
     }
 
     isAnalyzed = true;
@@ -466,10 +480,15 @@ void MATCHRECORD::compareLastNames(QStringList &recLastNameList, QStringList &DB
     if ((DBlastNameList.size() > numMatches) && (recLastNameList.size() > numMatches))
         addToInconsistencyScore(mLNAME);
     else
+    {
         numNameMatches += numMatches;
+        nameMatchCount += numMatches;
+    }
 
     if ((numMatches >= 2) && (numMatches == maxMatches))
-        sufficientNameMatch = true;    
+        sufficientNameMatch = true;
+
+    finalAttemptPoints += (2 * numMatches) - (DBlastNameList.size() + recLastNameList.size());
 }
 
 void MATCHRECORD::compareFirstNames(QStringList &recFirstNameList, QStringList &DBfirstNameList)
@@ -530,6 +549,9 @@ void MATCHRECORD::compareFirstNames(QStringList &recFirstNameList, QStringList &
 
     if (numMatches >= 1)
         numNameMatches += 1;
+
+    nameMatchCount += numMatches;
+    finalAttemptPoints += (2 * numMatches) - (DBfirstNameList.size() + recFirstNameList.size());
 }
 
 void MATCHRECORD::compareMiddleNames(QStringList &recMiddleNameList, QStringList &DBmiddleNameList)
@@ -581,6 +603,9 @@ void MATCHRECORD::compareMiddleNames(QStringList &recMiddleNameList, QStringList
         addToInconsistencyScore(mMIDDLENAMES);
     else
         numNameMatches += numMatches;
+
+    nameMatchCount += numMatches;
+    finalAttemptPoints += (2 * numMatches) - (DBmiddleNameList.size() + recMiddleNameList.size());
 }
 
 void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
@@ -711,6 +736,9 @@ void MATCHRECORD::compareDOBinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
         if ((recDateInfo.year > 0) || (DBdateInfo.year > 0))
             potentialNumDataMatches++;
     }
+
+    if ((recDateInfo.minDate == DBdateInfo.minDate) && (recDateInfo.maxDate == DBdateInfo.maxDate))
+        finalAttemptPoints += 1;
 }
 
 void MATCHRECORD::compareDODinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
@@ -763,6 +791,9 @@ void MATCHRECORD::compareDODinfo(DATEINFO &recDateInfo, DATEINFO &DBdateInfo)
         if ((recDateInfo.year > 0) || (DBdateInfo.year > 0))
             potentialNumDataMatches++;
     }
+
+    if ((recDateInfo.year > 0) && (recDateInfo.year == DBdateInfo.year))
+        finalAttemptPoints += 1;
 }
 
 void MATCHRECORD::compareDOBDODinfo(DATEINFO &recDOBInfo, DATEINFO &DBDOBInfo, DATEINFO &recDODInfo, DATEINFO &DBDODInfo)
@@ -797,13 +828,19 @@ void MATCHRECORD::compareSpouseName(QString recSpouseName, QString DBspouseName)
         return;
 
     if (recSpouseName.toLower() == DBspouseName.toLower())
+    {
         addToScore(mSPOUSENAME);
+        finalAttemptPoints += 1;
+    }
     else
     {
         OQString name(recSpouseName);
         PQString errMsg;
         if (name.isFormalVersionOf(DBspouseName, errMsg) || name.isInformalVersionOf(DBspouseName, errMsg))
+        {
             addToScore(mSPOUSENAME);
+            finalAttemptPoints += 1;
+        }
         else
             addToInconsistencyScore(mSPOUSENAME);
     }
@@ -827,6 +864,51 @@ void MATCHRECORD::comparePostalCodes(POSTALCODE_INFO &pc1, POSTALCODE_INFO &pc2)
         if (pcDistance > 200)
             sameDataProvided = false;
     }
+
+    if (pcDistance <= 150)
+        finalAttemptPoints += 1;
+}
+
+void MATCHRECORD::checkPubDates(DATEINFO &recInfoDOD, DATEINFO &DBinfoDOD, QDate &recPubDate, QDate &DBpubDate)
+{
+    bool test1 = false;
+    bool test2 = false;
+    bool test3 = false;
+
+    if (recPubDate.isValid() && DBinfoDOD.exactDate.isValid())
+    {
+        if (recPubDate < DBinfoDOD.exactDate)
+            addToInconsistencyScore(mPubDate);
+        else
+        {
+            if ((recPubDate.toJulianDay() - DBinfoDOD.exactDate.toJulianDay()) <= 45)
+                test1 = true;
+        }
+    }
+    else
+    {
+        if (DBpubDate.isValid() && recInfoDOD.exactDate.isValid())
+        {
+            if (DBpubDate < recInfoDOD.exactDate)
+                addToInconsistencyScore(mPubDate);
+            else
+            {
+                if ((DBpubDate.toJulianDay() - recInfoDOD.exactDate.toJulianDay()) <= 45)
+                    test2 = true;
+            }
+        }
+        else
+        {
+            if (DBpubDate.isValid() && recPubDate.isValid())
+            {
+                if (((DBpubDate.toJulianDay() - recPubDate.toJulianDay()) <= 10) && ((DBpubDate.toJulianDay() - recPubDate.toJulianDay()) >= -10))
+                    test3 = true;
+            }
+        }
+    }
+
+    if (test1 || test2 || test3)
+        finalAttemptPoints += 1;
 }
 
 MATCHRESULT::MATCHRESULT() : bestScore(0), bestNetScore(0), bestID(0), bestNetID(0), bestMatchKeyID(0)
@@ -1275,9 +1357,10 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
     MATCHRECORD matchRecord;
 
     PQString DOBdateSQL, DODdateSQL;
-    QDate recDOB, recDOD, DBpubDate;
+    QDate recDOB, recDOD, DBpubDate, recPubDate;
     QString comma(", ");
     QString passLastName;
+    QString recSpouseName, DBspouseName;
     QStringList recFirstNameList, DBfirstNameList, recMiddleNameList, DBmiddleNameList, recLastNameList, DBlastNameList;
     DATEINFO recInfoDOB, recInfoDOD, DBinfoDOB, DBinfoDOD;
     POSTALCODE_INFO recPCinfo, dbPCinfo;
@@ -1294,6 +1377,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
     recProviderKey = dr.getProviderKey();
     recID = dr.getID().getString();
     recPCinfo = dr.getPostalCodeInfo();
+    recPubDate = dr.getPublishDate();
 
     // Before comparing data, check if a perfect ID match exists
     success = query.prepare("SELECT deceasedNumber, publishDate FROM death_audits.deceasedidinfo "
@@ -1366,6 +1450,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
 
     updateList(recMiddleNameList, dr.getMiddleNames(), removeAccents, true);
 
+    recSpouseName = dr.getSpouseName();
+
     // Strategy is to use least ambiguous available data first
 
     /*******************************************************/
@@ -1387,7 +1473,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
         {
         case 0:
             success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
-                                    "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
+                                    "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath, spouseName "
                                     "FROM death_audits.deceased "
                                     "WHERE (deceasedNumber = :deceasedNumber)");
             if (!success)
@@ -1409,7 +1495,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 DODdateSQL << recDOD.toString("yyyy/MM/dd") << QString(" 0:0:0");
 
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
-                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
+                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath, spouseName "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND DOB = :DOB AND DOD = :DOD");
                 if (!success)
                     qDebug() << "Problem with SQL statement in matchRecord - match";
@@ -1429,7 +1515,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 DOBdateSQL << recDOB.toString("yyyy/MM/dd") << QString(" 0:0:0");
 
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
-                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
+                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath, spouseName "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND DOB = :DOB");
                 if (!success)
                     qDebug() << "Problem with SQL statement in matchRecord - match";
@@ -1448,7 +1534,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                 DODdateSQL << recDOD.toString("yyyy/MM/dd") << QString(" 0:0:0");
 
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
-                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
+                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath, spouseName "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND DOD = :DOD");
                 if (!success)
                     qDebug() << "Problem with SQL statement in matchRecord - match";
@@ -1461,7 +1547,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
             if (execute)
             {
                 success = query.prepare("SELECT firstName, nameAKA1, nameAKA2, middleNames, lastName, altLastName1, altLastName2, altLastName3, "
-                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath "
+                                        "gender, deceasedNumber, DOB, DOD, minDOB, maxDOB, YOB, YOD, ageAtDeath, spouseName "
                                         "FROM death_audits.deceased WHERE lastName = :lastName AND (firstName = :firstName OR nameAKA1 = :firstName OR nameAKA2 = :firstname)");
                 if (!success)
                     qDebug() << "Problem with SQL statement in matchRecord - match";
@@ -1500,6 +1586,7 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                         DBlastNameList.clear();
                         DBinfoDOB.clear();
                         DBinfoDOD.clear();
+                        DBspouseName.clear();
                         dbPCinfo.clear();
 
                         query.next();
@@ -1528,8 +1615,13 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
 
                         DBageAtDeath = query.value(16).toUInt();
 
+                        DBspouseName = query.value(17).toString();
+
                         // Step 1b - Pull Postal Code info
                         dbPCinfo = dbSearch.getPostalCodeInfo(deceasedNumber, &gv);
+
+                        // Step 1c - Pull pubDate
+                        DBpubDate = dbSearch.getPubDateInfo(deceasedNumber, &gv);
 
                         // Step 2 - Run generic comparisons
                         matchRecord.compareLastNames(recLastNameList, DBlastNameList);
@@ -1538,6 +1630,8 @@ MATCHKEY match(const dataRecord &dr, MATCHRESULT &matchScore, bool removeAccents
                         matchRecord.compareGenders(recGender, DBgender);
                         matchRecord.compareAgeAtDeath(recAgeAtDeath, DBageAtDeath);
                         matchRecord.comparePostalCodes(recPCinfo, dbPCinfo);
+                        matchRecord.checkPubDates(recInfoDOD, DBinfoDOD, recPubDate, DBpubDate);
+                        matchRecord.compareSpouseName(recSpouseName, DBspouseName);
 
                         // Step 3:  Run pass specific comparisons
                         switch(queryPass)
@@ -1996,7 +2090,10 @@ void MATCHRECORD::compareAgeAtDeath(unsigned int recDateAge, unsigned int DBdate
     if ((recDateAge > 0) && (DBdateAge > 0))
     {
         if (recDateAge == DBdateAge)
+        {
             addToScore(mAGEDEATH);
+            finalAttemptPoints += 1;
+        }
         else
             addToInconsistencyScore(mAGEDEATH);
     }

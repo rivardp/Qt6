@@ -363,31 +363,13 @@ void DownloadWorkerBR3::addToURLlist(PQString &qUrl, downloadOutputs &outputs)
 {
     qDebug() << "Made it to addFileToQueue " << qUrl.getString();
 
-    QString entry(QString::number(outputs.providerID));
-    entry.append("||");
-    entry.append(QString::number(outputs.providerKey));
-    entry.append("||");
-    entry.append(outputs.ID);
-    entry.append("||");
-    entry.append(qUrl.getString());
-    entry.append("||");
-    entry.append(outputs.dob);
-    entry.append("||");
-    entry.append(outputs.yob);
-    entry.append("||");
-    entry.append(outputs.dod);
-    entry.append("||");
-    entry.append(outputs.yod);
-    entry.append("||");
-    entry.append(outputs.maidenNames);
-    entry.append("||");
-    entry.append(outputs.pubDate);
-    entry.append("||");
-    entry.append(QString::number(outputs.ageAtDeath));
-    entry.append("||");
-    entry.append(outputs.pcKey);
-    entry.append("||");
+    outputs.createObitEntry(qUrl.getString());
+}
 
-    outputs.obitListEntry = entry;
+void DownloadWorkerBR3::delay(int seconds)
+{
+    QTime dieTime= QTime::currentTime().addSecs(seconds);
+    while (QTime::currentTime() < dieTime)
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
 }
 

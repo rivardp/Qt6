@@ -35,6 +35,7 @@ public:
     void removeLowConviction(QList<QString> &nameList, GLOBALVARS *gv) const;
     bool validRecordExists(downloadOutputs &outputs, GLOBALVARS *gv) const;
     bool deceasedRecordExists(const unsigned int &providerID, const unsigned int &providerKey, const QString &deceasedID, const QString &url, const QDate &pubDate) const;
+    bool FHrecordExists(const QString fhURL, QString &pc, GLOBALVARS *gv) const;
 
     QString IDforLastDeathPreceding(const QDate &DOD, const unsigned int providerID, const unsigned int providerKey, GLOBALVARS *gv) const;
     QDate getLastPubDate(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey) const;
@@ -45,6 +46,7 @@ public:
     bool fillInPostalCodeInfo(GLOBALVARS *gv, POSTALCODE_INFO &pci, QString pc) const;
     bool savePostalCodeInfo(int deceasedNumber, int providerID, int providerKey, POSTALCODE_INFO &pc) const;
     POSTALCODE_INFO getPostalCodeInfo(int deceasedNumber, GLOBALVARS *gv) const;
+    QDate getPubDateInfo(int deceasedNumber, GLOBALVARS *gv) const;
 
     // The functions below are all called by, or rely on, dataRecord members
     bool pureNickNameLookup(const QString name, GLOBALVARS *gv) const;

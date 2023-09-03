@@ -35,6 +35,8 @@ void dataRecord::setFamilyName(const PQString &name)
 	formattedName.removeBookEnds();
     formattedName.removeLeading("(");
     formattedName.removeEnding(")");
+    if (OQString(formattedName).isNeeEtAl())
+        return;
 
     // Fix issue with French obits where unstructured starts "nee le 11 octobre"
     if ((formattedName.left(2) == PQString("le")) && formattedName.isAlphaNumeric())
@@ -660,12 +662,33 @@ void dataRecord::setMinMaxDOB()
                 else
                 {
                     maxDOB = globals.today;
+
                     if (globals.globalDr->getPublishDate().isValid() && (globals.globalDr->getPublishDate() < maxDOB))
+                    {
                         maxDOB = globals.globalDr->getPublishDate();
+                        if ((maxDOB.month() >= 2) || (maxDOB.day() > 7))
+                            YOD = maxDOB.year();
+                        else
+                            YOD = maxDOB.year() - 1;
+                    }
+
                     if (globals.globalDr->getCommentDate().isValid() && (globals.globalDr->getCommentDate() < maxDOB))
+                    {
+                        if ((maxDOB.month() >= 2) || (maxDOB.day() > 7))
+                            YOD = maxDOB.year();
+                        else
+                            YOD = maxDOB.year() - 1;
                         maxDOB = globals.globalDr->getCommentDate();
+                    }
+
                     if (globals.globalDr->getDOS().isValid() && (globals.globalDr->getDOS() < maxDOB))
+                    {
                         maxDOB = globals.globalDr->getDOS();
+                        if ((maxDOB.month() >= 2) || (maxDOB.day() > 10))
+                            YOD = maxDOB.year();
+                        else
+                            YOD = maxDOB.year() - 1;
+                    }
                 }
             }
         }
@@ -754,6 +777,9 @@ void dataRecord::setMinMaxDOB()
         if (minAge != maxAge)
             ageAtDeath = 0;
     }
+
+    if ((minDOB != maxDOB) && sourceID.publishDate.isValid() && (sourceID.publishDate < maxDOB))
+        maxDOB = sourceID.publishDate;
 }
 
 void dataRecord::setDOD(const QDate &dod, const bool forceOverride, const bool fullyCredible)
@@ -2224,8 +2250,19 @@ POSTALCODE_INFO dataRecord::getPostalCodeInfo() const
     return postalCodeInfo;
 }
 
+QString dataRecord::getRawFullName() const
+{
+    return rawFullName;
+}
+
+QString dataRecord::getObitSnippet() const
+{
+    return obitSnippet;
+}
+
 void dataRecord::xport(QString filename, int extraOptParam)
 {
+    Q_UNUSED(extraOptParam);
     QString comma(",");
     PQString outputFile(filename);
 
@@ -2233,7 +2270,6 @@ void dataRecord::xport(QString filename, int extraOptParam)
     if(globals.output->open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append))
     {
         QTextStream outputStream(globals.output);
-        //outputStream.setCodec("UTF-8");
         outputStream.setEncoding(QStringEncoder::Utf8);
 
         // Before exporting, check for problematic double quotes in names
@@ -2986,7 +3022,31 @@ void dataRecord::clear()
  spouseName.clear();
  wi.clear();
  postalCodeInfo.clear();
+ rawFullName.clear();
+ obitSnippet.clear();
  permanentErrorFlag = false;
+}
+
+void dataRecord::clearDates()
+{
+ DOB.setDate(0,0,0);
+ DOD.setDate(0,0,0);
+ typoDOB.setDate(0,0,0);
+ typoDOD.setDate(0,0,0);
+ YOB = 0;
+ YOD = 0;
+ deemedYOD = 0;
+ ageAtDeath = 0;
+ DOBfullyCredible = false;
+ DODfullyCredible = false;
+ YOBfullyCredible = false;
+ YODfullyCredible = false;
+ ageAtDeathFullyCredible = false;
+ datesLocked = false;
+ minDOB.setDate(0,0,0);
+ maxDOB.setDate(0,0,0);
+ DOS.setDate(0,0,0);
+ commentDate.setDate(0,0,0);
 }
 
 void dataRecord::clearLastNames()
@@ -3894,7 +3954,22 @@ void dataRecord::updateToBestOf(dataRecord &dbRecord)
     {
         if (dbRecord.postalCodeInfo.isValid() && (postalCodeInfo != dbRecord.postalCodeInfo))
         {
-            if ((globals.globalDr->getProvider() < 1000) && (dbRecord.getProvider() >= 1000) && (dbRecord.getProvider() != 1021))
+            bool dbIsBetter = false;
+
+            if ((globals.globalDr->getProvider() < 1000) && (dbRecord.getProvider() >= 1000) && (dbRecord.getProvider() != 1021) && (dbRecord.getProvider() != 2147))
+                dbIsBetter = true;
+            else
+            {
+                if ((globals.globalDr->getProvider() >= 3000) && (dbRecord.getProvider() >= 1000) && (dbRecord.getProvider() != 1021) && (dbRecord.getProvider() != 2147))
+                    dbIsBetter = true;
+                else
+                {
+                    if (((globals.globalDr->getProvider() == 1021) || (globals.globalDr->getProvider() == 2147)) && (dbRecord.getProvider() >= 1000) && (dbRecord.getProvider() < 3000))
+                       dbIsBetter = true;
+                }
+            }
+
+            if (dbIsBetter)
                 postalCodeInfo = dbRecord.postalCodeInfo;
         }
     }
@@ -3984,7 +4059,7 @@ int dataRecord::runDateValidations()
             ageAtDeath = 0;
             minDOB = QDate(YOB, 1, 1);
             maxDOB = QDate(YOB, 12, 31);
-            wi.dateFlag = 25;
+            wi.dateFlag = 17;
         }
     }
 
@@ -4061,6 +4136,14 @@ int dataRecord::runDateValidations()
         DOD = DOB;
         DOB = QDate(0,0,0);
         globals.globalDr->setMinMaxDOB();
+    }
+
+    // Legacy common issues
+    if ((sourceID.provider == Legacy3000) && !DOB.isValid() && sourceID.publishDate.isValid() && (ageAtDeath > 0) && (static_cast<int>(YOD + ageAtDeath) == sourceID.publishDate.year()))
+    {
+        ageAtDeath = 0;
+        minDOB = QDate(1875,1,1);
+        maxDOB = QDate(YOD,12,31);
     }
 
     return wi.dateFlag;
@@ -4170,7 +4253,8 @@ int dataRecord::countNames()
     addToList(nameList, firstName);
     addToList(nameList, firstNameAKA1);
     addToList(nameList, firstNameAKA2);
-    addToList(nameList, middleNames.getString().split(" "));
+    if (middleNames.getLength() > 0)
+        addToList(nameList, middleNames.getString().split(" "));
 
     return nameList.size();
 }
@@ -4269,6 +4353,16 @@ bool dataRecord::setPostalCode(QString &pc)
         postalCodeInfo = newPCinfo;
 
     return postalCodeInfo.isValid();
+}
+
+void dataRecord::setRawFullName(const QString &fullName)
+{
+    rawFullName = fullName;
+}
+
+void dataRecord::setObitSnippet(const QString &snippet)
+{
+    obitSnippet = snippet;
 }
 
 void dataRecord::standardizeBadRecord()
@@ -4413,6 +4507,97 @@ bool dataRecord::removeExtraneousCommas()
 
     return removed;
 }
+
+void dataRecord::drDoubles(QList<dataRecord> &listDoubles, QString obitSnippet)
+{
+    if (wi.doubleMemorialFlag != 10)
+        return;
+
+    if (getProvider() != Legacy3000)
+        return;
+
+    dataRecord drCopy(*this);
+
+    QString word;
+    QList<QString> middles;
+    getMiddleNameList(middles);
+    bool matched = false;
+
+    while (!matched && (middles.size() >= 2))
+    {
+        word = middles.takeFirst();
+        if (word.toLower() == "and")
+            matched = true;
+    }
+
+    if (matched)
+    {
+        word = middles.takeFirst();
+        middleNames.clear();
+        drCopy.middleNames.clear();
+        setSpouseName(word);
+        drCopy.clearFirstNames();
+        drCopy.setFirstNames(word);
+        drCopy.setSpouseName(getFirstName().getString());
+    }
+
+    if (gender == Male)
+        drCopy.setGender(Female, true);
+    else
+    {
+        if (gender == Female)
+            drCopy.setGender(Male, true);
+    }
+    drCopy.sourceID.ID = PQString("9") + sourceID.ID;
+
+    OQString tempString(obitSnippet);
+    tempString.fixBasicErrors();
+    obitSnippet = tempString.getString();
+    QRegularExpression targetS;
+    targetS.setPatternOptions(QRegularExpression::UseUnicodePropertiesOption);
+    targetS.setPattern("\\((January|February|March|April|May|June|July|August|September|October|November|December) (\\d+, \\d{4}) - (January|February|March|April|May|June|July|August|September|October|November|December) (\\d+, \\d{4})\\)");
+    QRegularExpressionMatch match;
+    QRegularExpressionMatchIterator i = targetS.globalMatch(obitSnippet);
+    bool adjusted = false;
+
+    if (i.hasNext())
+    {
+        match = i.next();
+        if (i.hasNext())  // second match
+        {
+            match = i.next();
+            QString stringDOB = match.captured(1) + QString(" ") + match.captured(2);
+            QString stringDOD = match.captured(3) + QString(" ") + match.captured(4);
+            QDate dob = QDate::fromString(stringDOB, "MMMM d, yyyy");
+            QDate dod = QDate::fromString(stringDOD, "MMMM d, yyyy");
+            if (dob.isValid())
+                drCopy.setDOB(dob, true);
+            if (dod.isValid())
+                drCopy.setDOD(dod, true);
+            adjusted = true;
+        }
+    }
+
+    if (!adjusted && DOB.isValid() && DOD.isValid() && (ageAtDeath <= 30))
+    {
+        drCopy.DOB = QDate();
+        drCopy.minDOB = QDate(1875,1,1);
+        drCopy.maxDOB = drCopy.DOD;
+        drCopy.YOB = 0;
+        drCopy.ageAtDeath = 0;
+
+        DOD = DOB;
+        DOB = QDate();
+        minDOB = QDate(1875,1,1);
+        maxDOB = DOD;
+        YOB = 0;
+        YOD = DOD.year();
+        ageAtDeath = 0;
+    }
+
+    listDoubles.append(drCopy);
+}
+
 
 bool SOURCEID::operator ==(SOURCEID const& newSource) const
 {

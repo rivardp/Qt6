@@ -361,7 +361,7 @@ void DownloadWorker::startNextDownload()
                 // Normal POST
                 if (currentRequest.instructions.payload.length() > 0)
                 {
-                    networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, currentRequest.instructions.payload.count());
+                    networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, currentRequest.instructions.payload.size());
 
                     networkReply = networkMgr->post(networkRequest, currentRequest.instructions.payload);
                 }
@@ -377,7 +377,7 @@ void DownloadWorker::startNextDownload()
                         networkRequest.setUrl(currentRequest.instructions.qUrl);
                         messageBody.append(tempURL.right(tempURL.length() - index - 1).toUtf8());
                     }
-                    networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, messageBody.count());
+                    networkRequest.setHeader(QNetworkRequest::ContentLengthHeader, messageBody.size());
 
                     networkReply = networkMgr->post(networkRequest, messageBody);
                 }
@@ -398,6 +398,7 @@ void DownloadWorker::downloadFinished(QNetworkReply *netReply)
 {
     qDebug() << "Network returned finished() signal";
     qDebug() << " ";
+    bool skipRead = false;
 
     if (netReply->error())
     {
@@ -424,6 +425,14 @@ void DownloadWorker::downloadFinished(QNetworkReply *netReply)
             {
             case 100:   // Continue
                 qDebug() << "Encountered status code == 100";
+
+                if (currentRequest.instructions.providerID == 1)
+                {
+                    statusCode = 301;
+                    redirectURL = currentRequest.instructions.url;
+                    skipRead = true;
+                }
+
                 break;
 
             case 301:   // Redirected
@@ -453,75 +462,77 @@ void DownloadWorker::downloadFinished(QNetworkReply *netReply)
             }
         }
 
-        // Determine charset encoding
-        QStringConverter::Encoding encoding;
-
-        CHARSET charset = UTF8;
-        OQString quote("\"");
-        QByteArray encodedString = netReply->readAll();
-        OQStream tempStream(QString::fromUtf8(encodedString));
-        OQString word, nextChar;
-        if (tempStream.moveTo(QString("charset=")))
+        if(!skipRead)
         {
-            nextChar = tempStream.peekAtNext(1);
-            if (nextChar == quote)
-                word = tempStream.readNextBetween(QUOTES);
-            else
-                word = tempStream.getUntil(quote.getString(), 20, true);
+            // Determine charset encoding
+            QStringConverter::Encoding encoding;
 
-            if (word == OQString("us-ascii"))
-                charset = USASCII;
-            if ((word == OQString("ISO-8859-1")) || (word == OQString("iso-8859-1")))
-                charset = ISO88591;
-            if ((word == OQString("ISO-8859-5")) || (word == OQString("iso-8859-5")))
-                charset = ISO88595;
-
-            // problem with 1144 with charset commented out
-            if (tempStream.moveTo("-->", 10))
-                charset = ISO88591;
-        }
-
-        switch (charset)
-        {
-        case ISO88591:
-        case ISO88595:
-            encoding = QStringConverter::Latin1;
-            break;
-
-        case Windows1252:
-        case USASCII:
-            encoding = QStringConverter::System;
-            break;
-
-        default:
-            encoding = QStringConverter::Utf8;
-        }
-
-        //std::optional<QStringConverter::Encoding> encoding = QStringConverter::encodingForHtml(encodedString);
-        auto toUtf16 = QStringDecoder(encoding);
-
-        QString decodedString = toUtf16(encodedString);
-        QString cleanString = PQString(decodedString).replaceLigatures();
-
-        if (decodedString.size() > 0)
-        {
-            qFile = new QFile(currentRequest.outputs.downloadFileName);
-            if (qFile->open(QIODevice::WriteOnly | QIODevice::Text))
+            CHARSET charset = UTF8;
+            OQString quote("\"");
+            QByteArray encodedString = netReply->readAll();
+            OQStream tempStream(QString::fromUtf8(encodedString));
+            OQString word, nextChar;
+            if (tempStream.moveTo(QString("charset=")))
             {
-                QTextStream streamFileOut(qFile);
-                streamFileOut << decodedString;
-                streamFileOut.flush();
+                nextChar = tempStream.peekAtNext(1);
+                if (nextChar == quote)
+                    word = tempStream.readNextBetween(QUOTES);
+                else
+                    word = tempStream.getUntil(quote.getString(), 20, true);
 
-                qFile->close();
-                downloadSuccessful = true;
+                if (word == OQString("us-ascii"))
+                    charset = USASCII;
+                if ((word == OQString("ISO-8859-1")) || (word == OQString("iso-8859-1")))
+                    charset = ISO88591;
+                if ((word == OQString("ISO-8859-5")) || (word == OQString("iso-8859-5")))
+                    charset = ISO88595;
+
+                // problem with 1144 with charset commented out
+                if (tempStream.moveTo("-->", 10))
+                    charset = ISO88591;
             }
-            delete qFile;
-            qFile = nullptr;
-        }
-        else
-        {
-            if (currentRequest.instructions.verb == "OPTIONS")
-                downloadSuccessful = true;
+
+            switch (charset)
+            {
+            case ISO88591:
+            case ISO88595:
+                encoding = QStringConverter::Latin1;
+                break;
+
+            case Windows1252:
+            case USASCII:
+                encoding = QStringConverter::System;
+                break;
+
+            default:
+                encoding = QStringConverter::Utf8;
+            }
+
+            auto toUtf16 = QStringDecoder(encoding);
+
+            QString decodedString = toUtf16(encodedString);
+            //QString cleanString = PQString(decodedString).replaceLigatures();
+
+            if (decodedString.size() > 0)
+            {
+                qFile = new QFile(currentRequest.outputs.downloadFileName);
+                if (qFile->open(QIODevice::WriteOnly | QIODevice::Text))
+                {
+                    QTextStream streamFileOut(qFile);
+                    streamFileOut << decodedString;
+                    streamFileOut.flush();
+
+                    qFile->close();
+                    downloadSuccessful = true;
+                }
+                delete qFile;
+                qFile = nullptr;
+            }
+            else
+            {
+                if (currentRequest.instructions.verb == "OPTIONS")
+                    downloadSuccessful = true;
+            }
         }
     }
      netReply->deleteLater();

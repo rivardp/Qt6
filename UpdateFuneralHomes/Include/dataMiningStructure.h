@@ -24,6 +24,8 @@ struct RECORD
     QString maidenNames;
     QString ID;
     QString pcKey;
+    QString fullName;
+    QString snippet;
 
     void clear(){
         providerID = 0;
@@ -39,6 +41,8 @@ struct RECORD
         maidenNames.clear();
         ID.clear();
         pcKey.clear();
+        fullName.clear();
+        snippet.clear();
     }
 };
 
@@ -73,6 +77,8 @@ struct PAGEVARIABLES
     QString fhURLidDivider;
     QString cutOffID;
     QString pcKey;
+    QString fullName;
+    QString snippet;
 
     bool sequentialID;
     bool alphabeticalListing;
@@ -98,6 +104,8 @@ struct PAGEVARIABLES
         webAddress.clear();
         maidenName.clear();
         pcKey.clear();
+        fullName.clear();
+        snippet.clear();
         currentDOB.setDate(1900,1,1);
         currentDOD.setDate(1900,1,1);
         currentPubDate.setDate(1900,1,1);
@@ -124,6 +132,8 @@ struct PAGEVARIABLES
         webAddress.clear();
         maidenName.clear();
         pcKey.clear();
+        fullName.clear();
+        snippet.clear();
         POSTformRequest.clear();
         ID.clear();
         currentDOB.setDate(1900,1,1);

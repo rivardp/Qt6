@@ -1443,15 +1443,25 @@ unsigned int unstructuredContent::pullOutEnglishDates(QList<QDate> &dateList, un
                                             yyyy = existingDOB.year();
                                         else
                                         {
-                                            // Regular run where we should only be seeing current deaths
-                                            if (mm > globals->today.month())
-                                                yyyy = globals->today.year() - 1;
+                                            if (globals->globalDr->getYOD() > 0)
+                                                yyyy = globals->globalDr->getYOD();
                                             else
                                             {
-                                                if ((mm == globals->today.month()) && (dd > globals->today.day()))
-                                                    yyyy = globals->today.year() - 1;
+                                                if (globals->globalDr->getPublishDate().year() > 0)
+                                                    yyyy = globals->globalDr->getPublishDate().year();
                                                 else
-                                                    yyyy = globals->today.year();
+                                                {
+                                                    // Regular run where we should only be seeing current deaths
+                                                    if (mm > globals->today.month())
+                                                        yyyy = globals->today.year() - 1;
+                                                    else
+                                                    {
+                                                        if ((mm == globals->today.month()) && (dd > globals->today.day()))
+                                                            yyyy = globals->today.year() - 1;
+                                                        else
+                                                            yyyy = globals->today.year();
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -5337,6 +5347,33 @@ void unstructuredContent::pickOffNames()
                                                  nextNextWord.isFormalVersionOf(globals->globalDr->getFirstName().getString(), errMsg ));
                         acceptableAll  = acceptableFirst || globals->globalDr->isASavedName(nextWord);
 
+                        // Coding for some Legacy sites
+                        if (!acceptableFirst && !acceptableDouble && !acceptableAll && (globals->globalDr->countNames() == 1))
+                        {
+                            dbSearch.nameStatLookup(nextWord.getString(), globals, nameStats, gender);
+                            if (nameStats.isLikelyGivenName)
+                            {
+                                acceptableFirst = true;
+                                globals->globalDr->setFirstName(nextWord);
+                            }
+                            else
+                            {
+                                if (nameStats.isLikelySurname)
+                                {
+                                    acceptableDouble = true;
+                                    globals->globalDr->setFamilyName(nextWord);
+                                }
+                                else
+                                {
+                                    if (nameStats.isGivenName && lastNameStarted && (namesKept == 1))
+                                    {
+                                        acceptableFirst = true;
+                                        globals->globalDr->setFirstName(nextWord);
+                                    }
+                                }
+                            }
+                        }
+
                         // Look for key situation of "LASTNAME - FirstName MiddleName LastName ....."
                         //   or "LASTNAME - LASTNAME, FirstName MiddleName..."  which is the double
                         if (((word.getCharType() & HYPHENATED) == HYPHENATED) && (namesKept == 1))
@@ -9036,7 +9073,7 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
                                 bornFlag = false;
                             else
                             {
-                                if ((nextWord == "years") && (peekTwoAhead == "ago"))
+                                if ((nextWord == "years") && ((peekTwoAhead == "ago") || (peekTwoAhead == "since")))
                                 {
                                     numFound = true;
                                     contextError = false;
@@ -9090,9 +9127,23 @@ unsigned int unstructuredContent::sentenceReadAgeAtDeath(bool updateDirectly, bo
 		{
             if (precedingFlag || reduceByOne)
             {
-                ageAtDeath--;
-                if (reduceByOne && !preRead)
-                    globals->globalDr->setAgeNextReference(true);
+                bool makeAdjust = true;
+
+                // Ignore preceding flag if it creates an error
+                if ((globals->globalDr->getYOB() >0) && (globals->globalDr->getYOD() > 0))
+                {
+                    unsigned int yob = globals->globalDr->getYOB();
+                    unsigned int yod = globals->globalDr->getYOD();
+                    if ((yod - yob - 1) == ageAtDeath)
+                        makeAdjust = false;
+                }
+
+                if (makeAdjust)
+                {
+                    ageAtDeath--;
+                    if (reduceByOne && !preRead)
+                        globals->globalDr->setAgeNextReference(true);
+                }
             }
 
             if (contextError && !preRead)
@@ -9299,7 +9350,7 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
     bool limitWords = false;
     bool fullyCredible = false;
     QList<QDate> dateList;
-    OQString word, nextWord, doubleWord, cleanString, peekTwoAhead, peekThreeAhead;
+    OQString word, nextWord, doubleWord, cleanString, peekTwoAhead, peekThreeAhead, priorWord;
     QString target;
     bool contextError = false;
     bool eventCheck = false;
@@ -9333,6 +9384,7 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
             reduceByOne = false;
         lastHadComma = currentHasComma;
         lastWasMonth = word.isWrittenMonth(globals->globalDr->getLanguage());
+        priorWord = word;
 
         word = getWord(true).lower();
         if (word.isHyphenated() || (word.left(1) == PQString("-")))
@@ -9431,15 +9483,27 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
                     ageAtDeath = num;
                     fullyCredible = false;
 
-                    // Run error checking to catch errors such as "..at the age of 3 months"
-                    bool endOfSentence = word.removeEnding(QString("."));
-                    if (!endOfSentence)
-                        readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
-                    ageAtDeath = num;
+                    // Run error checking for ...it's been 5 years since... or ...5 years have passed....
+                    if ((priorWord == OQString("been")) || (peekTwoAhead == OQString("since")) || (peekTwoAhead == OQString("ago")) || ((peekTwoAhead == OQString("have")) && (peekThreeAhead == OQString("passed"))))
+                    {
+                        if ((globals->globalDr->getYOD() == 0) && (globals->globalDr->getPublishDate().year() > 0))
+                        {
+                            globals->globalDr->setYOD(globals->globalDr->getPublishDate().year() - num);
+                            numFound = false;
+                        }
+                    }
+                    else
+                    {
+                        // Run error checking to catch errors such as "..at the age of 3 months"
+                        bool endOfSentence = word.removeEnding(QString("."));
+                        if (!endOfSentence)
+                            readAgeAtDeathPostNumChecks(numFound, contextError, eventCheck, num, altNum, nextWord, peekTwoAhead, peekThreeAhead, lang);
+                        ageAtDeath = num;
 
-                    // Check for special instances of "John Smith, 68, left us...."
-                    if (lastHadComma && currentHasComma)
-                        wordMatched = true;
+                        // Check for special instances of "John Smith, 68, left us...."
+                        if (lastHadComma && currentHasComma)
+                            wordMatched = true;
+                    }
                 }
             }
         }
@@ -9450,9 +9514,23 @@ unsigned int unstructuredContent::sentenceReadNakedAgeAtDeath(bool updateDirectl
     {
         if (precedingFlag || reduceByOne)
         {
-            ageAtDeath--;
-            if (reduceByOne)
-                globals->globalDr->setAgeNextReference(true);
+            bool makeAdjust = true;
+
+            // Ignore preceding flag if it creates an error
+            if ((globals->globalDr->getYOB() >0) && (globals->globalDr->getYOD() > 0))
+            {
+                unsigned int yob = globals->globalDr->getYOB();
+                unsigned int yod = globals->globalDr->getYOD();
+                if ((yod - yob - 1) == ageAtDeath)
+                    makeAdjust = false;
+            }
+
+            if (makeAdjust)
+            {
+                ageAtDeath--;
+                if (reduceByOne)
+                    globals->globalDr->setAgeNextReference(true);
+            }
         }
 
         if (contextError)
@@ -9496,7 +9574,7 @@ void unstructuredContent::readAgeAtDeathPostNumChecks(bool &numFound, bool &cont
     }
 
     if (numFound && !contextError &&  ((peek1 == QString("anniversary")) || (peek1 == QString("lbs")) || (peek1 == QString("child")) || (peek1 == QString("am")) || (peek1 == QString("pm"))
-                                            || (peek1 == QString("a.m")) || (peek1 == QString("p.m"))))
+                                      || (peek1 == QString("a.m")) || (peek1 == QString("p.m")) || (peek1 == QString("generations"))))
     {
         numFound = false;
         num = 0;
@@ -10401,6 +10479,25 @@ int unstructuredContent::countFrequency(unstructuredContent *uc, QString word, Q
 int unstructuredContent::countFrequencyFirst(unstructuredContent *uc, QString word, Qt::CaseSensitivity caseSensitivity) const
 {
     return uc->countFrequencyFirst(word, caseSensitivity);
+}
+
+int unstructuredContent::countFirstNames()
+{
+    int total = 0;
+    QString word;
+    NAMESTATS nameStats;
+    databaseSearches dbSearch;
+
+    beg();
+    while (!isEOS())
+    {
+        word = getWord().getString();
+        dbSearch.nameStatLookup(word, globals, nameStats);
+        if (nameStats.isGivenName)
+            total++;
+    }
+
+    return total;
 }
 
 bool unstructuredContent::nameAndGenderConsistent(QString name, GENDER gender)

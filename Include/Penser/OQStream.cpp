@@ -1282,6 +1282,7 @@ bool OQStream::loadStringValue(const QString from, QString &toString, const bool
     OQString completeFrom(from);
     QString completedFrom;
     int startingPosition = position;
+    toString.clear();
 
     if (completeFrom.hasBookEnds(QUOTES))
         completedFrom = completeFrom.getString() + QString(":");

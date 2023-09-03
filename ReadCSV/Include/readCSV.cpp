@@ -374,6 +374,13 @@ bool loadRecord(const dataRecord &dr, MATCHKEY &matchKeyResult, bool &newRec)
             errorMessage << QString("  - New information available! ");
         gv.logMsg(AuditListing, errorMessage);
 
+        // Print out match testing
+        if ((matchKeyResult >= mkNoKeyAltNameAlt) && !(sufficientlyMatched || acceptableOverride))
+        {
+            drDB.xport(exportFile);
+            drCopy.xport(exportFile);
+        }
+
         // Quit processing (i.e., don't load)
         return false;
     }

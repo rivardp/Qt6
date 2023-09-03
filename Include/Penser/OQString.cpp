@@ -944,6 +944,8 @@ void OQString::fixBasicErrors(bool onlyContainsNames)
     itsString.replace(targetS, " \\1");
 
     // Fix malformed dates
+    targetS.setPattern("(January|February|March|April|May|June|July|August|September|October|November|December) (\\d+)/(2\\d)( - )(January|February|March|April|May|June|July|August|September|October|November|December) (\\d+)/(2\\d)");
+    itsString.replace(targetS, "(\\1 \\2, 19\\3 - \\5 \\6, 20\\7)");
     targetS.setPattern("\\b(January|February|March|April|May|June|July|August|September|October|November|December) (\\d\\d?)\\.\\s?([1-2][0|9][0-9][0-9])\\b");  // period instead of comma
     itsString.replace(targetS, "\\1 \\2, \\3");
     targetS.setPattern("\\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec) (\\d\\d?)\\.\\s?([1-2][0|9][0-9][0-9])\\b");  // period instead of comma
@@ -4102,7 +4104,7 @@ QList<QString> OQString::saints          = QList<QString> () << "saint" << "st" 
 
 QList<QString> OQString::suffixesDegree  = QList<QString> () << "a" << "comm" << "ed" << "phys" << "s" << "sc" << "voc";  // Preceded by "B" or "M"
 
-QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "acii" << "agronone" << "ba" << "bcomm" << "bed" << "bmsc" << "bpe"
+QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "acii" << "agronone" << "arct" << "ba" << "bcomm" << "bed" << "bmsc" << "bpe"
                                                                     << "bs" << "bsc" << "bscn" << "bve" << "bvoced"
                                                                     << "ca" << "cd" << "cdr" << "cds" <<  "cfc" << "cga" << "cm" << "cma" << "cmc" << "cmm" << "cpa" << "cplc" << "cps"
                                                                     << "crcs" << "crm" << "csb" << "csc" << "csj" << "cssr" << "cvo"
@@ -4110,7 +4112,7 @@ QList<QString> OQString::suffixesDropEnglish    = QList<QString> () << "acii" <<
                                                                     << "facs" << "fca" << "fcahs" <<  "fcia" << "fciarp" << "fcip" << "fcj" << "fcpa" << "fcscj" << "fdlc"
                                                                     << "fics" << "fiic" << "fj" << "fma" << "fr" << "frcp" << "frcpc" << "frcsc" << "frdc" << "fsa"
                                                                     << "gclj" << "gm" << "gsic" << "honors" << "honours" << "ibvm" << "ing" << "juris" << "kc" << "kstj"
-                                                                    << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "med" << "meng" << "mgr" << "mmm" << "mnda" << "msc" << "ndsc"
+                                                                << "llb" << "lld" << "llm" << "masc" << "mba" << "md" << "mdcm" << "med" << "meng" << "mgr" << "mmm" << "mnda" << "msc" << "ndsc"
                                                                     << "obgyn" << "ocad" << "offm" << "ohc" << "olm" << "omi" << "omri" << "onl" << "osb" << "osbm" << "osj"
                                                                     << "pc" << "peng" << "pgeo" << "ph" << "phd" << "pmp"
                                                                     << "qc" << "qffq" << "rcmp" << "ret" << "ret'd" << "retd" << "rev" << "rhsj" << "rn" << "rna" << "rndm"
@@ -4124,7 +4126,7 @@ QList<QString> OQString::suffixesKeepEnglish    = QList<QString> () <<  "i" << "
 QList<QString> OQString::suffixesKeepFrench     = QList<QString> () <<  "testtest";
 QList<QString> OQString::suffixesKeepSpanish    = QList<QString> () <<  "testtest";
 
-QList<QString> OQString::uncapitalizedNames  = QList<QString> () << "cinq" << "da" << "dal" << "dalla" << "das" << "de" << "del" << "dela" << "den" << "des"
+QList<QString> OQString::uncapitalizedNames  = QList<QString> () << "cinq" << "da" << "dal" << "dalla" << "das" << "de" << "del" << "dela" << "della" << "den" << "des"
                                                                  << "di" << "do" << "dos" << "du" << "dè" << "e" << "el" << "grand"
                                                                  << "la" << "le" << "lo" << "los" << "san" << "st" << "st." << "te" << "ten" << "ter"
                                                                  << "van" << "van't" << "vande" << "vanden" << "vander" << "von" ;

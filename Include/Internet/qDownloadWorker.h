@@ -14,6 +14,7 @@
 #include <QFileInfo>
 #include <QDebug>
 #include <QCoreApplication>
+#include <QStringDecoder>
 
 #include "../Include/Penser/OQString.h"
 #include "../Include/Internet/qSourceFile.h"

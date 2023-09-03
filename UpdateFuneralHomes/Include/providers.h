@@ -24,7 +24,7 @@ enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, Coopera
                InoVision, FRM, PassageCoop, Ah, JBCote, BlackCreek, CityMax, SYGIF, PortNeuf, Burke,
                Canadian, BallaMedia, Jac, Ministry, Multinet, PropulC, Nexion, LCProduction, Absolu, SuiteB,
                Map, iClic, Bouille, Pub30, Theories14, Techlogical, GyOrgy, GemWebb, RedChair, ExtremeSurf,
-               Cahoots, Tride, Jensii, InterWeb, Brown, Tukio, WebCemeteries, Etincelle, ObitAssistant,
+               Cahoots, Tride, Jensii, InterWeb, Brown, Tukio, Unused, Etincelle, ObitAssistant,
                MikePurdy = 2000, BowRiver, Serenity, McInnis, Sturgeon, CornerStone, Pierson, Trinity, CelebrateLife, Funks,
                WowFactor, Dalmeny, Hansons, IDOmedia, Martens, Shine, Simply, McCall, Care, Ancient,
                Amherst, Bowers, Heritage, Koru, Kowalchuk, Loehmer, Doyle, Ethical, Integrity, Direct,
@@ -40,7 +40,8 @@ enum PROVIDER {Undefined, Legacy , Passages, LifeMoments, AFHA, Brandon, Coopera
                Montcalm, Trahan, Laurent, Eternel, Ruel, Hamel, CremAlt, London, Dryden, Forest,
                JasonSmith, Lampman, ecoPassages, Peaceful, Ranger, People, Whitcroft, TriCity, LegacyCardstrom, Wiebe,
                Arimathea, GFournier, CharleVoix2, Harmonia, Omega, HeritageWP, Ouellet, HommageNB, Drake, CityLine,
-               Komitas, Driftwood, MLBW, Sproing};
+               Komitas, Driftwood, MLBW, Sproing, Ultek,
+               WebCemeteries = 3000, Legacy3000};
 
 // Search parameters
 

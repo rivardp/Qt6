@@ -149,6 +149,7 @@ public:
     int countFrequencyFirst(QString word, Qt::CaseSensitivity = Qt::CaseInsensitive) const;
     int countFrequency(unstructuredContent *uc, QString word, Qt::CaseSensitivity = Qt::CaseInsensitive) const;
     int countFrequencyFirst(unstructuredContent *uc, QString word, Qt::CaseSensitivity = Qt::CaseInsensitive) const;
+    int countFirstNames();
 
     void copyKeyVariablesFrom(const unstructuredContent &uc);
     void clear();

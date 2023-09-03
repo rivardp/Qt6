@@ -14,6 +14,7 @@
 
 #include <QDate>
 #include <QList>
+#include <QStringEncoder>
 
 #include "../UpdateFuneralHomes/Include/dataStructure.h"
 //#include "../Include/Actuary/PQDate.h"
@@ -98,6 +99,8 @@ public:
     void setCommentDate(const QDate &date);
     void setDatesLocked(bool dl);
     void attemptToMakeRoomFor(const PQString &name);
+    void setRawFullName(const QString &fullName);
+    void setObitSnippet(const QString &snippet);
 
     void setProvider(const PROVIDER &pvdr);
     void setProviderKey(const unsigned int pk);
@@ -111,6 +114,7 @@ public:
     void clear();
     void clearDOB();
     void clearDOD();
+    void clearDates();
     void clearLastNames();
     void clearFirstNames();
     void clearMiddleNames();
@@ -186,6 +190,8 @@ public:
     QString getSpouseName() const;
     POSTALCODE_INFO getPostalCodeInfo() const;
     bool getDatesLocked() const;
+    QString getRawFullName() const;
+    QString getObitSnippet() const;
 
     void clearNames();
     void copyNames(dataRecord &source);
@@ -194,6 +200,7 @@ public:
     void addToList(QList<QString> &list, QStringList names);
     void addMaidenAndParentNames();
 
+    void drDoubles(QList<dataRecord> &listDoubles, QString obitSnippet);
     void xport(QString filename, int extraOptParam = -999);
     bool checkNames();
     void simplifyInitials(PQString &word);
@@ -291,6 +298,8 @@ private:
     QString usedFirstNameFromUnstructured;
     QString firstGivenNameUsedInSentence;
     QString spouseName;
+    QString rawFullName;
+    QString obitSnippet;
     POSTALCODE_INFO postalCodeInfo;
 };
 

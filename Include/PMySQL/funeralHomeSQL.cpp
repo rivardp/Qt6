@@ -213,7 +213,7 @@ unsigned int lookupFHspecialCode(GLOBALVARS *gv, PROVIDER provID, unsigned int p
     unsigned int result = 0;
 
     query.prepare("SELECT fhSpecialCode from death_audits.funeralhomedata WHERE providerID = :providerID AND providerKey = :providerKey AND "
-                                                                        "(fhRunStatus = 1 OR fhRunStatus = 2 OR fhRunStatus = 100)");
+                                                                        "(fhRunStatus = 1 OR fhRunStatus = 2 OR fhRunStatus = 100 OR fhRunStatus = 101)");
     query.bindValue(":providerID", QVariant(provID));
     query.bindValue(":providerKey", QVariant(provKey));
     success = query.exec();
@@ -267,7 +267,7 @@ int readRunTypes(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey)
     unsigned int result = 0;
 
     success = query.prepare("SELECT fhRunTypes from death_audits.funeralhomedata WHERE providerID = :providerID AND providerKey = :providerKey AND "
-                                                                        "(fhRunStatus = 1 OR fhRunStatus = 2 OR fhRunStatus = 100)");
+                                                                        "(fhRunStatus = 1 OR fhRunStatus = 2 OR fhRunStatus = 100 OR fhRunStatus = 101)");
     query.bindValue(":providerID", QVariant(provID));
     query.bindValue(":providerKey", QVariant(provKey));
     success = query.exec();
@@ -298,7 +298,7 @@ QDate getLastUpdateDate(GLOBALVARS *gv, PROVIDER provID, unsigned int provKey)
     QDate result;
 
     success = query.prepare("SELECT fhLastRun from death_audits.funeralhomedata WHERE providerID = :providerID AND providerKey = :providerKey AND "
-                                                                        "(fhRunStatus = 1 OR fhRunStatus = 2 OR fhRunStatus = 100)");
+                                                                        "(fhRunStatus = 1 OR fhRunStatus = 2 OR fhRunStatus = 100 OR fhRunStatus = 101)");
     query.bindValue(":providerID", QVariant(provID));
     query.bindValue(":providerKey", QVariant(provKey));
     success = query.exec();

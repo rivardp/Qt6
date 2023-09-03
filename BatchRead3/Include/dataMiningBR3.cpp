@@ -136,12 +136,12 @@ void MINER::mineReadObits()
     //   Processing of data is intentionally completed separately to allow multiple or re-reading of files
     //   while minimizing the number of actual download from the obit providers
 
-    int numProcessed, numDownloaded;
+    int numProcessed, numDownloaded, numIncluded;
     int index;
     QString fileExt, tempString;
-
     QString singleURLfileName, URLlistFileName, nextRecord;
     QFile *inputFile, *masterURLlist;
+    databaseSearches dbSearch;
 
     QSqlQuery query;
 
@@ -151,7 +151,8 @@ void MINER::mineReadObits()
     QList<DOWNLOADREQUEST> masterDownloadRequestList;
     DOWNLOADREQUEST downloadRequest;
     numProcessed = 0;
-    numDownloaded = 1;
+    numDownloaded = 0;
+    numIncluded = 0;
 
     // Loop through each .obitURLlist file to add records to the master file
     QListIterator<QString> iterFile(fileList);
@@ -196,6 +197,8 @@ void MINER::mineReadObits()
             record.pubDate = tempStream.getUntil(QString("|"));
             record.ageAtDeath = tempStream.getUntil(QString("|"));
             record.pcKey = tempStream.getUntil(QString("|"));
+            record.fullName = tempStream.getUntil(QString("|"));
+            record.snippet = tempStream.getUntil(QString("|"));
 
             records.append(record);
             nextRecord = inputStream.readLine();
@@ -320,6 +323,8 @@ void MINER::mineReadObits()
             downloadRequest.outputs.maidenNames = record.maidenNames.getString();
             downloadRequest.outputs.pubDate = record.pubDate.getString();
             downloadRequest.outputs.pcKey = record.pcKey.getString();
+            downloadRequest.outputs.fullName = record.fullName.getString();
+            downloadRequest.outputs.snippet = record.snippet.getString();
             downloadRequest.outputs.addToQueue = true;
             downloadRequest.outputs.globals = globals;
             if (forceOverwrite)
@@ -342,7 +347,16 @@ void MINER::mineReadObits()
             downloadRequest.instructions.providerID = record.providerID.getString().toUInt();
             downloadRequest.instructions.providerKey = record.providerKey.getString().toUInt();
 
-            masterDownloadRequestList.append(downloadRequest);
+            // Drop off record for providerIDs with no obit where record already exists in database
+            if (downloadRequest.instructions.providerID >= 3000)
+            {
+                QString url = downloadRequest.instructions.url.getString();
+                QDate pubDate = QDate::fromString(downloadRequest.outputs.pubDate, "yyyyMMdd");
+                if (!dbSearch.deceasedRecordExists(downloadRequest.outputs.providerID, downloadRequest.outputs.providerKey, downloadRequest.outputs.ID, url, pubDate))
+                    masterDownloadRequestList.append(downloadRequest);
+            }
+            else
+                masterDownloadRequestList.append(downloadRequest);
 
         } // end of loop through individual file
 
@@ -369,15 +383,51 @@ void MINER::mineReadObits()
 
     for (int i = 0; i < numProcessed; i++)
     {
-        www->downloadAndProcess(masterDownloadRequestList[i]);
-        while(www->processingDownload()){};
-        if(www->lastDownloadSuccessful())
+        // Skip download for 3000 level providerIDs where no obit exists
+        if(masterDownloadRequestList[i].instructions.providerID >= 3000)
         {
-            if (!masterDownloadRequestList[i].outputs.fileAlreadyExists)
-                numDownloaded++;
+            masterDownloadRequestList[i].outputs.createObitEntry(masterDownloadRequestList[i].instructions.url.getString());
+            numIncluded++;
         }
-        qDebug() << (i + 1) << " of " << numProcessed << " processed";
-        qDebug() << " ";
+        else
+        {
+            if((masterDownloadRequestList[i].instructions.providerID == 1) && (masterDownloadRequestList[i].instructions.providerKey > 100000))
+            {
+                // Three calls required
+                DOWNLOADREQUEST followUpRequest = masterDownloadRequestList[i];
+                QString ext = "?apssov2tk=UDZMSW83NGlsYUdRZUhndEE4OURWUTM5VXMxQk1mNjUvSCszUyt2bzRmandsSHdIR3o4aGRjZkdrdjJLZ2N6UERqaDljb2pjYXl5d1MxUzlVSC9jSEpGQUY1YmFjeU85M1VyVk1URlQ0VFk9";
+                followUpRequest.instructions.url += PQString(ext);
+
+                www->downloadAndProcess(masterDownloadRequestList[i]);
+                while(www->processingDownload()){};
+                if(www->lastDownloadSuccessful())
+                {
+                    www->downloadAndProcess(followUpRequest);
+                    while(www->processingDownload()){};
+                    // Third call handled below
+                }
+
+                www->delay(2);
+            }
+
+            www->downloadAndProcess(masterDownloadRequestList[i]);
+            while(www->processingDownload()){};
+            if(www->lastDownloadSuccessful())
+            {
+                if (!masterDownloadRequestList[i].outputs.fileAlreadyExists)
+                {
+                    numDownloaded++;
+                    numIncluded++;
+                }
+                else
+                {
+                    if (globals->runStatus < 3)
+                        numIncluded++;
+                }
+            }
+            qDebug() << (i + 1) << " of " << numProcessed << " processed";
+            qDebug() << " ";
+        }
     }
 
     // Return back to original order
@@ -423,6 +473,8 @@ void MINER::mineReadObits()
         {
             outputStream = new QTextStream(file);
             *outputStream << QString("BatchRead completed running and exited normally at ") << QDateTime::currentDateTime().toString("h:mm") << Qt::endl;
+            *outputStream << QString("Total downloads: ") << numDownloaded << Qt::endl;
+            *outputStream << QString("Total included: ") << numIncluded << Qt::endl;
         }
 
         delete outputStream;

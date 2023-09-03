@@ -78,6 +78,7 @@ public:
     int  runGenderValidation();
     int  runRecordValidation();
     void fixNameIssues();
+    void fixProviderSpecificIssues();
     void determinePotentialFirstName();
     void runStdProcessing(unstructuredContent &uc, int insertPeriods);
     void addressMissingGender();

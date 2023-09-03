@@ -148,6 +148,7 @@ void readObit::read()
     {
         readImageNameInfo();
         globals->globalDr->setMinMaxDOB();
+        fixProviderSpecificIssues();
         globals->globalDr->runDateValidations();
         fixNameIssues();
         globals->globalDr->wi.resetNonDateValidations();
@@ -283,6 +284,16 @@ void readObit::readInObitText()
                 uc.removeBookEnds(QUOTES);
             }
             break;
+
+        case 2:
+            if (consecutiveMovesTo(40, "class=\"details-copy", ">"))
+                uc = getUntil("<div class=\"details-published\">");
+            break;
+
+        case 3:
+            uc = globals->globalDr->getObitSnippet();
+            break;
+
         }
 
         break;
@@ -446,8 +457,19 @@ void readObit::readInObitText()
         break;
 
     case BlackPress:
-        if (consecutiveMovesTo(100, "class=\"entry-content", ">"))
-            uc = getUntilEarliestOf("<!-- AI CONTENT END 2 -->", "Share<");
+        switch(style)
+        {
+        case 0:
+            if (consecutiveMovesTo(100, "class=\"entry-content", ">"))
+                uc = getUntilEarliestOf("<!-- AI CONTENT END 2 -->", "Share<");
+            break;
+
+        case 1:
+            if (consecutiveMovesTo(125, "id=\"details-body\"", ">"))
+                uc = getUntil("</div>");
+            break;
+        }
+
         break;
 
     case Aberdeen:
@@ -2558,9 +2580,6 @@ void readObit::readInObitText()
     }
         break;
 
-    case WebCemeteries:
-        break;
-
     case Etincelle:
     {
         if (consecutiveMovesTo(300, "class=\"nom\"", "class=\"date\"", "</div>"))
@@ -3641,6 +3660,14 @@ void readObit::readInObitText()
     }
         break;
 
+    case WebCemeteries:
+        uc = globals->globalDr->getObitSnippet();
+        break;
+
+    case Legacy3000:
+        uc = globals->globalDr->getObitSnippet();
+        break;
+
     default:
         PQString errMsg;
         errMsg << "Reading in of obit text not coded for: " << globals->globalDr->getProvider();
@@ -3758,7 +3785,11 @@ void readObit::readInObitTitle()
     case Legacy:
     case Tukio:
         if (moveTo("<title>"))
+        {
             titleStream = getUntilEarliestOf(" Obituary", "</title>");
+            titleStream.removeEnding("|");
+            titleStream.removeEnding(" ");
+        }
         break;
 
     case LifeMoments:
@@ -3943,7 +3974,6 @@ void readObit::readInObitTitle()
     case RedChair:
     case Cahoots:
     case RKD:
-    case WebCemeteries:
     case Garrett:
     case Roy:
     case CremAlt:
@@ -4848,7 +4878,7 @@ void readObit::readInObitTitle()
         break;
 
     case Benjamins:
-        if (consecutiveMovesTo(1000, "<!-----upper part start ----------->", "class=\"heading_for_mob\""))
+        if (moveTo("id=\"ContentPlaceHolder1_Label1\""))
             titleStream = readNextBetween(BRACKETS);
         break;
 
@@ -5236,13 +5266,19 @@ void readObit::validateJustInitialNames()
     GENDER gender = globals->globalDr->getGender();
 
     databaseSearches dbSearch;
+    NAMESTATS nameStats;
     NAMETYPE nameType;
-    unstructuredContent firstTwoSentences, tempSentence, tempUC;
+    unstructuredContent firstTwoSentences, tempSentence, tempUC, UCsource;
     OQString checkWord, tempWord, nextWord;
     bool hasBookEnds, isAboriginal, hasComma, started, hadComma;
     bool potentialGenderMarker = false;
     QList<QString> nameList;
     int wordCount;
+
+    OQString originalWord, word, lastWord, doubleWord, wordBefore1, wordBefore2;
+    unsigned int numWords;
+    bool unrecognizedWordEncountered, invalidated;
+    bool restrictNamesToDR;
 
     if (globals->globalDr->getProvider() == SaltWire)
     {
@@ -5332,22 +5368,25 @@ void readObit::validateJustInitialNames()
         justInitialNamesUC.clear();
     if ((justInitialNamesUC.getLength() == 0) && (ucFillerRemovedAndTruncated.getLength() > 1))
     {
-        OQString originalWord, lastWord, doubleWord;
-        unsigned int numWords;
-        bool unrecognizedWordEncountered, invalidated;
-        bool restrictNamesToDR = false;
+        restrictNamesToDR = false;
+        if (globals->globalDr->getProvider() == Legacy3000)
+            UCsource = ucCleaned;
+        else
+            UCsource = ucFillerRemovedAndTruncated;
 
-        ucFillerRemovedAndTruncated.beg();
+        UCsource.beg();
         int i = 1;
-        while (!ucFillerRemovedAndTruncated.isEOS() && (i <= 2))
+        while (!UCsource.isEOS() && (i <= 2))
         {
-            tempSentence = ucFillerRemovedAndTruncated.getNextRealSentence(restrictNamesToDR, 3);
-
-            /*tempSentence.clear();
-            while (!ucFillerRemovedAndTruncated.isEOS() && ((tempSentence.getLength() == 0) || tempSentence.isJustDates() || tempSentence.startsWithClick()))
+            tempSentence = UCsource.getNextRealSentence(restrictNamesToDR, 3);
+            if (globals->globalDr->getProvider() == Legacy3000)
             {
-                tempSentence = ucFillerRemovedAndTruncated.getSentence();
-            }*/
+                tempSentence.truncateAfter(OQString::getParentReferences(lang), (i == 1));
+                tempSentence.truncateAfter(OQString::getSiblingReferences(lang), (i == 1));
+                tempSentence.truncateAfter(OQString::getChildReferences(lang), (i == 1));
+                tempSentence.truncateAfter(OQString::getRelativeReferences(lang), (i == 1));
+                tempSentence.truncateAfter(OQString::getRelationshipWords(lang), (i == 1));
+            }
 
             firstTwoSentences.addSentence(tempSentence);
             i++;
@@ -5394,6 +5433,8 @@ void readObit::validateJustInitialNames()
                 while (!tempSentence.isEOS())
                 {
                     originalWord = tempSentence.getWord(true);
+                    if (originalWord == OQString("-."))
+                        originalWord.removeEnding(".");
                     if (originalWord.getLength() > 2)
                         originalWord.removeEnding(".");
                     if (originalWord != OQString(","))
@@ -5445,8 +5486,6 @@ void readObit::validateJustInitialNames()
         justInitialNamesUC.clear();
     if ((justInitialNamesUC.getLength() == 0) && (firstTwoSentences.getLength() > 1))
     {
-        OQString originalWord, word, doubleWord, wordBefore1, wordBefore2;
-        bool invalidated;
         started = false;
         firstTwoSentences.beg();
 
@@ -5514,6 +5553,70 @@ void readObit::validateJustInitialNames()
     {
         justInitialNamesUC.clear();
         justInitialNamesUC = globals->globalObit->getStructuredNamesProcessed();
+    }
+
+    // If still nothing, special coding for Legacy3000
+    if (((justInitialNamesUC.getLength() == 0) || (justInitialNamesUC.countWords() <= 2)) && (globals->globalDr->getProvider() == Legacy3000))
+    {
+        if ((globals->globalDr->getFirstName().getLength() == 0) && ((justInitialNamesUC.countFirstNames() == 0) || (justInitialNamesUC.countWords() <= 1)))
+        {
+            // Only a last name is known, so pull first names from obitSnippet
+            justInitialNamesUC.clear();
+            started = false;
+            firstTwoSentences.beg();
+            while (!firstTwoSentences.isEOS() && !started)
+            {
+                lastWord.clear();
+                unrecognizedWordEncountered = false;
+                invalidated = false;
+                numWords = 0;
+
+                tempSentence = firstTwoSentences.getSentence(lang);
+
+                while (!unrecognizedWordEncountered && !invalidated && !tempSentence.isEOS() && (numWords < 20))
+                {
+                    originalWord = tempSentence.getWord(true);
+
+                    checkWord = originalWord;
+                    checkWord.removeBookEnds();
+                    checkWord.cleanUpEnds();
+                    checkWord.removeEnding(PUNCTUATION);
+                    numWords++;
+
+                    if (checkWord.isCapitalized())
+                    {
+                        unrecognizedWordEncountered = !checkWord.isRecognized() && !globals->websiteLocationWords.contains(checkWord.lower().getString());
+
+                        if (unrecognizedWordEncountered)
+                        {
+                            dbSearch.nameStatLookup(checkWord.getString(), globals, nameStats, gender);
+                            if (nameStats.isLikelyGivenName)
+                            {
+                                globals->globalDr->setFirstName(checkWord);
+
+                                started = true;
+                                justInitialNamesUC.clear();
+                                justInitialNamesUC += originalWord;
+                                while (!tempSentence.isEOS())
+                                {
+                                    originalWord = tempSentence.getWord(true);
+                                    if (originalWord == OQString("-."))
+                                        originalWord.removeEnding(".");
+                                    if (originalWord.getLength() > 2)
+                                        originalWord.removeEnding(".");
+                                    if (originalWord != OQString(","))
+                                        justInitialNamesUC += OQString(" ");
+                                    justInitialNamesUC += originalWord;
+                                }
+                                justInitialNamesUC.pickOffNames();  // From first unrecognized word
+                            }
+                            else
+                                unrecognizedWordEncountered = false;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // If still nothing, pull names from titleStream
@@ -6837,6 +6940,15 @@ void readObit::readPublishDate()
                 pubDate = tempUC.readDateField(doYMD);
             }
             break;
+
+        case 2:
+            if (consecutiveMovesTo(25, "publishedDate", ":"))
+            {
+                tempUC = readNextBetween(QUOTES);
+                pubDate = tempUC.readDateField(doYMD);
+            }
+
+            break;
         }
 
         break;
@@ -7455,7 +7567,7 @@ void readObit::fillInDatesNinthPass()
         bool restrictNamesToDR = false;
 
         success = query.prepare("SELECT fhFirstObit FROM death_audits.funeralhomedata WHERE providerID = :fhProviderID AND providerKey = :fhProviderKey AND "
-                                "(fhRunStatus = 1 OR fhRunstatus = 2 OR fhRunStatus = 100)");
+                                "(fhRunStatus = 1 OR fhRunstatus = 2 OR fhRunStatus = 100 OR fhRunStatus = 101)");
         query.bindValue(":fhProviderID", QVariant(providerID));
         query.bindValue(":fhProviderKey", QVariant(providerKey));
         success = query.exec();
@@ -7814,6 +7926,24 @@ void readObit::readAndPrepareStructuredContent()
                     globals->globalDr->wi.memorialFlag = 1;
             }
             break;
+
+        case 2:
+            if (moveTo("<div class=\"obit-name\">"))
+            {
+                tempUC = getUntil("</div>");
+                tempUC.removeHTMLtags();
+                tempUC.cleanUpEnds();
+                tempUC.prepareStructuredNames();
+
+                if (moveTo("<div class=\"obit-dates\">"))
+                {
+                    tempUC = getUntil("</div>");
+                    fillInDatesStructured(tempUC);
+                }
+
+            }
+            break;
+
         }
 
         break;
@@ -8094,32 +8224,52 @@ void readObit::readAndPrepareStructuredContent()
         break;
 
     case BlackPress:
-        if (moveTo("class=\"entry-title\""))
+        switch(style)
         {
-            tempUC = readNextBetween(BRACKETS);
-            tempUC.prepareStructuredNames();
-
-            if (consecutiveMovesTo(50, "class=\"entry-content", "<p><b>"))
+        case 0:
+            if (moveTo("class=\"entry-title\""))
             {
-                tempUC = getUntil("</b>");
-                fillInDatesStructured(tempUC);
-            }
-        }
-        else
-        {
-            beg();
-            if (consecutiveMovesTo(100, "class=\"post-title\"", ">"))
-            {
-                tempUC = getUntil("<");
+                tempUC = readNextBetween(BRACKETS);
                 tempUC.prepareStructuredNames();
 
-                if (consecutiveMovesTo(200, "class=\"post-published", "datetime=", ">On "))
+                if (consecutiveMovesTo(50, "class=\"entry-content", "<p><b>"))
                 {
-                    tempUC = getUntil("</time>");
-                    tempUC.processDateField(dfDOD);
+                    tempUC = getUntil("</b>");
+                    fillInDatesStructured(tempUC);
                 }
             }
+            else
+            {
+                beg();
+                if (consecutiveMovesTo(100, "class=\"post-title\"", ">"))
+                {
+                    tempUC = getUntil("<");
+                    tempUC.prepareStructuredNames();
+
+                    if (consecutiveMovesTo(200, "class=\"post-published", "datetime=", ">On "))
+                    {
+                        tempUC = getUntil("</time>");
+                        tempUC.processDateField(dfDOD);
+                    }
+                }
+            }
+            break;
+
+        case 1:
+            if (consecutiveMovesTo(100, "class=\"title text", "\""))
+            {
+                tempUC = readNextBetween(BRACKETS);
+                tempUC.prepareStructuredNames();
+
+                if (moveTo("<p", 25))
+                {
+                    tempUC = readNextBetween(BRACKETS);
+                    fillInDatesStructured(tempUC);
+                }
+            }
+            break;
         }
+
         break;
 
     case Aberdeen:
@@ -9763,7 +9913,13 @@ void readObit::readAndPrepareStructuredContent()
             if (conditionalMoveTo("<h4", "</div>", 2))
             {
                 tempUC = readNextBetween(BRACKETS);
-                fillInDatesStructured(tempUC);
+                if (tempUC.left(7) == OQString("Passed "))
+                {
+                    tempUC.dropLeft(7);
+                    tempUC.processDateField(dfDOD, doMDY);
+                }
+                else
+                    fillInDatesStructured(tempUC);
             }
             break;
 
@@ -12582,28 +12738,6 @@ void readObit::readAndPrepareStructuredContent()
     }
         break;
 
-    case WebCemeteries:
-    {
-        if (consecutiveMovesTo(100, "id=\"basic-details\"", "<h"))
-        {
-            tempUC = readNextBetween(BRACKETS);
-            tempUC.prepareStructuredNames();
-
-            if (moveTo("id=\"birth-date\""))
-            {
-                tempUC = readNextBetween(BRACKETS);
-                tempUC.processDateField(dfDOB);
-            }
-
-            if (moveTo("id=\"death-date\""))
-            {
-                tempUC = readNextBetween(BRACKETS);
-                tempUC.processDateField(dfDOD);
-            }
-        }
-    }
-        break;
-
     case Etincelle:
     {
         if (consecutiveMovesTo(100, "class=\"nom\"", "<h"))
@@ -13544,7 +13678,7 @@ void readObit::readAndPrepareStructuredContent()
         break;
 
     case Benjamins:
-        if (consecutiveMovesTo(1000, "<!-----upper part start ----------->", "class=\"heading_for_mob\""))
+        if (moveTo("id=\"ContentPlaceHolder1_lblName\""))
         {
             tempUC = readNextBetween(BRACKETS);
             tempUC.prepareStructuredNames();
@@ -15235,6 +15369,13 @@ void readObit::readAndPrepareStructuredContent()
         }
         break;
 
+    case WebCemeteries:
+    {
+        tempUC = globals->globalDr->getRawFullName();
+        tempUC.prepareStructuredNames();
+    }
+    break;
+
 
     default:
         PQString errMsg;
@@ -15252,7 +15393,10 @@ void readObit::readTitleInfo()
     {
     case Legacy:
         if (moveTo("<title>"))
+        {
             tempUC = getUntil(" Obituary");
+            tempUC.removeEnding("|");
+        }
         break;
 
     case Passages:
@@ -15337,11 +15481,31 @@ void readObit::readStyle()
     {
     case Legacy:
     {
-        if (moveTo("\"articleSection\": \"Obituaries\"", 10000))
+        if (getSource().getLength() == 0)
+            style = 3;
+        else
+        {
+            if (consecutiveMovesTo(25, "publishedDate", ": "))
+            {
+                style = 2;
+            }
+            else
+            {
+                beg();
+                if (moveTo("\"articleSection\": \"Obituaries\"", 10000))
+                    style = 1;
+                else
+                    style = 0;
+            }
+        }
+    }
+        break;
+
+    case BlackPress:
+        if (moveTo("class=\"title"))
             style = 1;
         else
             style = 0;
-    }
         break;
 
     case Batesville:
@@ -15405,13 +15569,19 @@ void readObit::readStyle()
                 else
                 {
                     beg();
-                    if (moveTo("deceased-info"))
+                    if (moveTo("class=\"deceased-info\""))
                         style = 1;
                     else
                     {
                         beg();
-                        if (moveTo("class=\"obituary-text\""))
+                        if (moveTo("class=\"flipbook-container\""))
                             style = 2;
+                        else
+                        {
+                            beg();
+                            if (moveTo("class=\"obituary-text\""))
+                                style = 2;
+                        }
                     }
                 }
             }
@@ -17757,12 +17927,50 @@ int readObit::runNameValidations()
     return warningScore;
 }
 
+void readObit::fixProviderSpecificIssues()
+{
+    QList<QString> tempList;
+
+    // Provider specific issues
+    switch (globals->globalDr->getProvider())
+    {
+
+    case 2003:
+        if (globals->globalDr->getFirstNameAKA2() == PQString("Alberta"))
+            globals->globalDr->setFirstName("", 3);
+        if (globals->globalDr->getFirstNameAKA1() == PQString("Alberta"))
+            globals->globalDr->setFirstName(globals->globalDr->getFirstNameAKA2(), 2);
+        globals->globalDr->getMiddleNameList(tempList);
+        if (tempList.contains("Ab"))
+        {
+            globals->globalDr->clearMiddleNames();
+            for (int i = 0; i < tempList.size(); i++)
+            {
+                if (tempList.at(i) != "Ab")
+                    globals->globalDr->setMiddleNames(PQString(tempList.at(i)));
+            }
+        }
+        break;
+
+    case 3001:
+        if (!globals->globalDr->getDOD().isValid() && (globals->globalDr->getYOD() == 0) && globals->globalDr->getDOB().isValid() && (globals->globalDr->getYOB() >= 2000))
+        {
+            QDate DOD = globals->globalDr->getDOB();
+            globals->globalDr->clearDates();
+            globals->globalDr->setDOD(DOD);
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
 int readObit::runRecordValidation()
 {
     bool valid = true;
     bool finished = false;
     int check = 0;
-    QList<QString> tempList;
 
     while (valid && !finished)
     {
@@ -17822,8 +18030,7 @@ int readObit::runRecordValidation()
             break;
 
         case 10:
-            // Provider specific issues
-            switch (globals->globalDr->getProvider())
+            switch(globals->globalDr->getProvider())
             {
             case 16:
                 if ((globals->globalDr->getProviderKey() == 4297) && !globals->globalDr->getDOD().isValid())
@@ -17835,23 +18042,6 @@ int readObit::runRecordValidation()
                 {
                     globals->globalDr->wi.dateFlag = 11;
                     valid = false;
-                }
-                break;
-
-            case 2003:
-                if (globals->globalDr->getFirstNameAKA2() == PQString("Alberta"))
-                    globals->globalDr->setFirstName("", 3);
-                if (globals->globalDr->getFirstNameAKA1() == PQString("Alberta"))
-                    globals->globalDr->setFirstName(globals->globalDr->getFirstNameAKA2(), 2);
-                globals->globalDr->getMiddleNameList(tempList);
-                if (tempList.contains("Ab"))
-                {
-                    globals->globalDr->clearMiddleNames();
-                    for (int i = 0; i < tempList.size(); i++)
-                    {
-                        if (tempList.at(i) != "Ab")
-                            globals->globalDr->setMiddleNames(PQString(tempList.at(i)));
-                    }
                 }
                 break;
 
@@ -17909,7 +18099,7 @@ int readObit::runGenderValidation()
         }
     }
 
-    if (((unisex >= 0.95) && (gender == Female)) || ((unisex <= 0.05) && (gender == Male)))
+    if (((unisex >= 0.975) && (gender == Female)) || ((unisex <= 0.025) && (gender == Male)))
     {
         globals->globalDr->wi.genderFlag = static_cast<int>(gender) + 10;
         return 0;
@@ -18831,7 +19021,6 @@ void readObit::readImageNameInfo()
     switch(globals->globalDr->getProvider())
     {
     case DignityMemorial:
-    case WebCemeteries:
         if (!globals->globalDr->getDOD().isValid())
         {
             beg();

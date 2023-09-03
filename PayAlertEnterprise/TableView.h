@@ -29,8 +29,8 @@ public:
             }
             else
             {
-                if(event->type() == QEvent::Leave)
-                    emit removeHoverRowSignal();
+                if(event->type() == QEvent::Leave);
+                    //emit removeHoverRowSignal();
             }
         }
 

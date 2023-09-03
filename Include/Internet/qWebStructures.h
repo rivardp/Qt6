@@ -25,6 +25,8 @@ struct downloadOutputs
     QString maidenNames;
     QString pubDate;
     QString pcKey;
+    QString fullName;
+    QString snippet;
     QFile* queue;
     bool addToQueue;
     bool fileAlreadyExists;
@@ -50,12 +52,48 @@ struct downloadOutputs
         maidenNames.clear();
         pubDate.clear();
         pcKey.clear();
+        fullName.clear();
+        snippet.clear();
         addToQueue = false;
         fileAlreadyExists = false;
         forceOverrides = true;
         globals = nullptr;
 
         obitListEntry.clear();
+    }
+
+    void createObitEntry(QString url)
+    {
+        QString entry(QString::number(providerID));
+        entry.append("||");
+        entry.append(QString::number(providerKey));
+        entry.append("||");
+        entry.append(ID);
+        entry.append("||");
+        entry.append(url);
+        entry.append("||");
+        entry.append(dob);
+        entry.append("||");
+        entry.append(yob);
+        entry.append("||");
+        entry.append(dod);
+        entry.append("||");
+        entry.append(yod);
+        entry.append("||");
+        entry.append(maidenNames);
+        entry.append("||");
+        entry.append(pubDate);
+        entry.append("||");
+        entry.append(QString::number(ageAtDeath));
+        entry.append("||");
+        entry.append(pcKey);
+        entry.append("||");
+        entry.append(fullName);
+        entry.append("||");
+        entry.append(snippet);
+        entry.append("||");
+
+        obitListEntry = entry;
     }
 };
 
@@ -168,6 +206,8 @@ struct StringRECORD
     OQString pubDate;
     OQString ageAtDeath;
     OQString pcKey;
+    OQString fullName;
+    OQString snippet;
 
     void clear(){
         providerID.clear();
@@ -183,6 +223,8 @@ struct StringRECORD
         pubDate.clear();
         ageAtDeath.clear();
         pcKey.clear();
+        fullName.clear();
+        snippet.clear();
     }
 
 };

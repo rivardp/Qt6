@@ -38,6 +38,7 @@
 #define mAGEDEATH       1048576
 #define mSPOUSENAME     2097152
 #define mPC             4194304
+#define mPubDate        8388608
 
 #define inconsistencyCost 2
 
@@ -102,6 +103,8 @@ public:
     bool closeDOBrange;
     int potentialNumDataMatches;
     int numNameMatches;
+    int nameMatchCount;
+    int finalAttemptPoints;
     double pcDistance;
     enum MATCHKEY matchKey;
 
@@ -131,6 +134,7 @@ public:
     bool inconsistentLNAME;
     bool consistentPC;
     bool inconsistentPC;
+    bool inconsistentPubDate;
 
     bool newRecord;
 
@@ -160,7 +164,7 @@ public:
     void compareIDs(QString recID, QString DBid, QString DBaltID, QString DBaltID2);
     void compareSpouseName(QString recSpouseName, QString DBspouseName);
     void comparePostalCodes(POSTALCODE_INFO &pc1, POSTALCODE_INFO &pc2);
-
+    void checkPubDates(DATEINFO &recDateInfo, DATEINFO &DBdateInfo, QDate &recPubDate, QDate &DBpubDate);
     void setRankScore(int score);
     void analyzeRank();
 

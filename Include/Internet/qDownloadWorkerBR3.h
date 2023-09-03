@@ -33,6 +33,7 @@ class DownloadWorkerBR3 : public QObject
     ~DownloadWorkerBR3();
 
     void quit();
+    void delay(int seconds);
 
     void setGlobalVars(GLOBALVARS &gv);
     bool downloadAndProcess(DOWNLOADREQUEST &downloadRequest);
